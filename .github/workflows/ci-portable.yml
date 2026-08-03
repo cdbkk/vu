@@ -1,0 +1,171 @@
+name: ci-portable
+
+# Cross-platform smoke test for the non-macOS-specific parts of the
+# workspace. macOS builds are handled in `release-macos.yml`; this
+# workflow guards the Windows/Linux portability of:
+#   - con-core  (control socket, named pipes, config, session)
+#   - con-cli   (control client, Unix socket + named pipe transport)
+#   - con-agent (tokio, rig)
+#   - con-terminal (theme helpers)
+#   - con-ghostty  (stub backend on non-macOS, libghostty wrapper on macOS)
+#   - con          (the UI binary — stub terminal view on non-macOS)
+#
+# Jobs run `cargo check` (not `cargo build`) to keep CI fast; they also
+# run the test suite for crates that can run hermetic tests on the host.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ci-portable.yml"
+      - ".github/workflows/release-*.yml"
+      - ".cargo/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "assets/**"
+      - "docs/**"
+      - "crates/**"
+      - "scripts/**"
+  pull_request:
+    paths:
+      - ".github/workflows/ci-portable.yml"
+      - ".github/workflows/release-*.yml"
+      - ".cargo/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "assets/**"
+      - "docs/**"
+      - "crates/**"
+      - "scripts/**"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  windows:
+    name: check (windows-latest)
+    runs-on: windows-latest
+    # GitHub hosted runners set $GITHUB_WORKSPACE to D:\a\<repo>\<repo>,
+    # which for this repo is D:\a\con\con. `con` is a reserved DOS device
+    # name and git.exe rejects any path whose components match one (CON,
+    # PRN, AUX, NUL, ...), failing `git init` with EINVAL on `.git`.
+    # Putting the checkout under a `path:` subdir doesn't help because
+    # the ancestor directory is still `con`. We sidestep the whole tree
+    # by cloning into C:\src\repo outside $GITHUB_WORKSPACE and pointing
+    # every subsequent step there.
+    #
+    # CON_SKIP_GHOSTTY_VT tells con-ghostty's build.rs to skip the
+    # zig-driven libghostty-vt build. `cargo check` doesn't link, so
+    # unresolved symbols don't matter; Zig 0.13+ isn't preinstalled on
+    # windows-latest images so trying to build would panic.
+    env:
+      CON_SKIP_GHOSTTY_VT: "1"
+      CON_CHECKOUT_DIR: C:\src\repo
+    defaults:
+      run:
+        working-directory: C:\src\repo
+    steps:
+      - name: Clone repo outside the reserved-name path
+        working-directory: C:\
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:CON_CHECKOUT_DIR | Out-Null
+          git -c core.longpaths=true clone `
+            "https://x-access-token:$env:GH_TOKEN@github.com/${{ github.repository }}.git" `
+            $env:CON_CHECKOUT_DIR
+          Set-Location $env:CON_CHECKOUT_DIR
+          git fetch origin "${{ github.event.pull_request.head.sha || github.sha }}"
+          git checkout "${{ github.event.pull_request.head.sha || github.sha }}"
+          git log -1 --oneline
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: C:\src\repo
+      - name: PowerShell installer parse check
+        shell: pwsh
+        run: |
+          $errors = $null
+          $tokens = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "scripts/install.ps1",
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Host
+            throw "PowerShell parse errors in scripts/install.ps1"
+          }
+      - name: cargo check — portable crates
+        run: cargo check -p con-core -p con-cli -p con-agent -p con-terminal -p con-ghostty
+      - name: cargo check — UI binary (stub terminal backend)
+        # The default `bin-con` target compiles to `con.exe`, which Win32
+        # file APIs reject because CON is a reserved device name. The
+        # `bin-con-app` feature routes the same `main.rs` to `con-app.exe`
+        # instead — mirrors what `cargo wbuild` / `cargo wrun` do locally.
+        run: cargo check -p con --no-default-features --features con/bin-con-app
+      - name: cargo test — portable crates
+        run: cargo test -p con-core -p con-cli -p con-agent -p con-terminal
+
+  linux:
+    name: check (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docs manifest validation
+        run: python3 scripts/docs/validate-manifest.py
+      - name: Release script syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/install.sh
+          bash -n scripts/linux/release.sh
+          bash -n scripts/release/verify-artifacts.sh
+          bash -n scripts/release/verify-release-gate.sh
+          for script in scripts/macos/*.sh scripts/sparkle/*.sh; do
+            bash -n "$script"
+          done
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Zig 0.15.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIG_VERSION="0.15.2"
+          ZIG_ARCH="x86_64"
+          ZIG_DIR="zig-${ZIG_ARCH}-linux-${ZIG_VERSION}"
+          ZIG_TARBALL="${ZIG_DIR}.tar.xz"
+          for base_url in \
+            "https://zigmirror.hryx.net/zig" \
+            "https://zig.linus.dev/zig" \
+            "https://zig.mirror.mschae23.de/zig" \
+            "https://ziglang.freetls.fastly.net" \
+            "https://pkg.hexops.org/zig" \
+            "https://ziglang.org/download/${ZIG_VERSION}"; do
+            if curl --retry 3 --retry-all-errors --retry-delay 5 --connect-timeout 30 --max-time 120 \
+              -sSfL "${base_url}/${ZIG_TARBALL}" \
+              -o "/tmp/${ZIG_TARBALL}"; then
+              break
+            fi
+          done
+          test -s "/tmp/${ZIG_TARBALL}"
+          mkdir -p "$HOME/.local"
+          tar -xJf "/tmp/${ZIG_TARBALL}" -C "$HOME/.local"
+          echo "$HOME/.local/${ZIG_DIR}" >> "$GITHUB_PATH"
+          "$HOME/.local/${ZIG_DIR}/zig" version
+      - name: apt deps for gpui_linux (wayland/x11 + font stack)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxcb-composite0-dev libxcb-dri2-0-dev libxcb-glx0-dev \
+            libxcb-present-dev libxcb-xfixes0-dev libxkbcommon-x11-dev \
+            libwayland-dev libvulkan-dev \
+            libfreetype-dev libfontconfig1-dev
+      - name: cargo check — portable crates
+        run: cargo check -p con-core -p con-cli -p con-agent -p con-terminal -p con-ghostty
+      - name: cargo check — UI binary (stub terminal backend)
+        run: cargo check -p con
+      - name: cargo test — portable crates
+        run: cargo test -p con-core -p con-cli -p con-agent -p con-terminal
