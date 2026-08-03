@@ -16,6 +16,7 @@ use gpui::*;
 
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_component::clipboard::Clipboard;
+use gpui_component::collapsible::Collapsible;
 use gpui_component::color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState};
 use gpui_component::input::InputState;
 use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
@@ -26,7 +27,7 @@ use gpui_component::{ActiveTheme, Disableable, Icon, IndexPath, Sizable as _, in
 use crate::model_registry::ModelRegistry;
 use crate::motion::{MotionValue, vertical_reveal_offset};
 use crate::ui_scale::ui_density_scale;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use url::Url;
 
@@ -238,6 +239,11 @@ pub struct SettingsPanel {
     theme_editor_status: Option<String>,
     /// Theme to restore if the editor is closed without saving.
     theme_editor_original: Option<String>,
+    /// Group headings the user has collapsed, by group id. Everything starts
+    /// expanded, so a setting is never hidden until the user hides it.
+    /// ponytail: in-memory only — the panel outlives every open/close, so this
+    /// survives a session. Persist to config if it needs to survive a restart.
+    collapsed_groups: HashSet<&'static str>,
 
     // Keybindings — which binding is being recorded (field name, e.g. "new_tab")
     recording_key: Option<String>,
@@ -1747,6 +1753,7 @@ impl SettingsPanel {
             theme_editor_name_input,
             theme_editor_status: None,
             theme_editor_original: None,
+            collapsed_groups: HashSet::new(),
             recording_key: None,
             #[cfg(target_os = "macos")]
             recording_resume_keybindings: None,
@@ -2218,6 +2225,66 @@ impl SettingsPanel {
             Some(())
         })
         .detach();
+    }
+
+    /// A settings group with a clickable heading that collapses its card.
+    ///
+    /// Replaces the bare `group_label` + card pairs. The heading stays visible
+    /// when collapsed, so collapsing hides bulk without hiding that the group
+    /// exists.
+    fn group(
+        &self,
+        id: &'static str,
+        label: &str,
+        content: impl IntoElement,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
+        let open = !self.collapsed_groups.contains(id);
+        let heading = div()
+            .id(SharedString::from(format!("group-{id}")))
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap(px(4.0))
+            .px(px(2.0))
+            .pb(px(2.0))
+            .cursor_pointer()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, _, _, cx| {
+                    if !this.collapsed_groups.remove(id) {
+                        this.collapsed_groups.insert(id);
+                    }
+                    cx.notify();
+                }),
+            )
+            .child(
+                svg()
+                    .path(if open {
+                        "phosphor/caret-down.svg"
+                    } else {
+                        "phosphor/caret-right.svg"
+                    })
+                    .size(px(9.0))
+                    .text_color(theme.muted_foreground.opacity(0.5)),
+            )
+            .child(
+                div()
+                    .text_size(px(10.0))
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(theme.muted_foreground.opacity(0.5))
+                    .child(label.to_string()),
+            );
+
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(8.0))
+            .child(Collapsible::new().open(open).child(heading).content(content))
     }
 
     /// Seed the palette editor from whichever theme is currently active.
@@ -3129,7 +3196,10 @@ impl SettingsPanel {
             cx,
         );
 
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
 
         // Build the Updates card (only shown for channels that poll).
         let channel = con_core::release_channel::current();
@@ -3170,9 +3240,7 @@ impl SettingsPanel {
                     .flex()
                     .flex_col()
                     .gap(px(8.0))
-                    .child(group_label("Updates", &theme))
-                    .child(
-                        card(theme, card_opacity)
+                    .child(self.group("updates", "Updates", card(theme, card_opacity)
                             .child(
                                 div()
                                     .flex()
@@ -3375,8 +3443,7 @@ impl SettingsPanel {
                                                 )),
                                         )
                                     }),
-                            ),
-                    ),
+                            ), cx)),
             );
         }
 
@@ -3387,8 +3454,7 @@ impl SettingsPanel {
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Continuity", &theme))
-                .child(card(theme, card_opacity).child(toggle_row(
+                .child(self.group("continuity", "Continuity", card(theme, card_opacity).child(toggle_row(
                     "Restore Terminal Text",
                     "Keep terminal text on restart continuity.",
                     Switch::new("restore-terminal-text-toggle")
@@ -3398,7 +3464,7 @@ impl SettingsPanel {
                             this.set_restore_terminal_text(*checked, cx);
                         })),
                     theme,
-                ))),
+                )), cx)),
         )
         // Skills paths
         .child(
@@ -3406,9 +3472,7 @@ impl SettingsPanel {
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Skills", &theme))
-                .child(
-                    card(theme, card_opacity)
+                .child(self.group("skills", "Skills", card(theme, card_opacity)
                         .child(
                             div()
                                 .px(px(16.0))
@@ -3493,8 +3557,7 @@ impl SettingsPanel {
                                         .children(global_chips)
                                         .children(global_presets),
                                 ),
-                        ),
-                ),
+                        ), cx)),
         )
         // Network / proxy
         .child(
@@ -3502,13 +3565,10 @@ impl SettingsPanel {
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Network", &theme))
-                .child(
-                    card(theme, card_opacity)
+                .child(self.group("network", "Network", card(theme, card_opacity)
                         .child(row_field("HTTP Proxy", &self.http_proxy_input))
                         .child(row_separator(theme))
-                        .child(row_field("HTTPS Proxy", &self.https_proxy_input)),
-                ),
+                        .child(row_field("HTTPS Proxy", &self.https_proxy_input)), cx)),
         )
     }
 
@@ -3519,7 +3579,10 @@ impl SettingsPanel {
         paths: &[String],
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
         let chip_bg = theme.muted.opacity(0.06);
         let chip_hover_bg = theme.muted.opacity(0.10);
         let fg = theme.foreground;
@@ -3588,7 +3651,10 @@ impl SettingsPanel {
         presets: &[(&str, &str)],
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
         let muted_fg = theme.muted_foreground.opacity(0.4);
         let hover_bg = theme.muted.opacity(0.08);
         let hover_fg = theme.foreground;
@@ -3796,7 +3862,10 @@ impl SettingsPanel {
         };
 
         // Now all mutable borrows are done — get theme for pure layout
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
 
         let mut import_section = div()
             .px(px(18.0))
@@ -3879,9 +3948,7 @@ impl SettingsPanel {
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Fonts", &theme))
-                .child(
-                    card(theme, card_opacity)
+                .child(self.group("fonts", "Fonts & Icons", card(theme, card_opacity)
                         .child(searchable_select_row(
                             "Terminal Font",
                             "Terminal and mono UI like code blocks.",
@@ -3908,8 +3975,7 @@ impl SettingsPanel {
                             &icon_scale_slider,
                             icon_scale,
                             theme,
-                        )),
-                ),
+                        )), cx)),
         );
 
         content = content.child(
@@ -3917,15 +3983,12 @@ impl SettingsPanel {
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Cursor", &theme))
-                .child(
-                    card(theme, card_opacity).child(div().px(px(16.0)).child(select_row(
+                .child(self.group("cursor", "Cursor", card(theme, card_opacity).child(div().px(px(16.0)).child(select_row(
                         "Cursor Style",
                         "Choose how the terminal insertion point is drawn.",
                         &self.cursor_style_select,
                         theme,
-                    ))),
-                ),
+                    ))), cx)),
         );
 
         content = content.child(
@@ -3933,9 +3996,7 @@ impl SettingsPanel {
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Transparency", &theme))
-                .child(
-                    card(theme, card_opacity)
+                .child(self.group("transparency", "Transparency", card(theme, card_opacity)
                         .child(slider_row(
                             "Terminal Glass",
                             "How much of the desktop shows through the terminal.",
@@ -3980,8 +4041,7 @@ impl SettingsPanel {
                             &ui_opacity_slider,
                             ui_opacity,
                             theme,
-                        )),
-                ),
+                        )), cx)),
         );
 
         content = content.child(
@@ -3989,9 +4049,7 @@ impl SettingsPanel {
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Tabs & Top Bar", &theme))
-                .child(
-                    card(theme, card_opacity)
+                .child(self.group("tabs-top-bar", "Tabs & Top Bar", card(theme, card_opacity)
                         .child(
                             div()
                                 .px(px(12.0))
@@ -4070,8 +4128,7 @@ impl SettingsPanel {
                             &tab_accent_inactive_hover_alpha_slider,
                             tab_accent_inactive_hover_alpha,
                             theme,
-                        )),
-                ),
+                        )), cx)),
         );
 
         content = content.child(
@@ -4079,9 +4136,7 @@ impl SettingsPanel {
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Background Image", &theme))
-                .child(
-                    card(theme, card_opacity)
+                .child(self.group("background-image", "Background Image", card(theme, card_opacity)
                         .child(
                             div()
                                 .px(px(16.0))
@@ -4182,8 +4237,7 @@ impl SettingsPanel {
                                 .child(
                                     "Ghostty renders the image per terminal.",
                                 ),
-                        ),
-                ),
+                        ), cx)),
         );
 
         // ── Built-in themes ──
@@ -4256,8 +4310,7 @@ impl SettingsPanel {
                         .flex()
                         .items_center()
                         .justify_between()
-                        .child(group_label("Palette", &theme))
-                        .child(customize_btn),
+                        .child(self.group("palette", "Palette", customize_btn, cx)),
                 )
                 .children(theme_editor_card),
         );
@@ -4273,7 +4326,10 @@ impl SettingsPanel {
         // before cx.theme() borrows cx immutably.
         let preview = self.render_theme_editor_preview(&working, cx);
         let slots = self.render_theme_editor_slots(&working, cx);
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
         let name_input = self.theme_editor_name_input.clone();
 
         let save_btn = Button::new("theme-editor-save")
@@ -4326,7 +4382,10 @@ impl SettingsPanel {
         term_theme: &con_terminal::TerminalTheme,
         cx: &mut Context<Self>,
     ) -> Div {
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
         let c = |color: con_terminal::Color| gpui::rgb(color.to_u32());
         let bg = c(term_theme.background);
         let fg = c(term_theme.foreground);
@@ -4404,7 +4463,10 @@ impl SettingsPanel {
         term_theme: &con_terminal::TerminalTheme,
         cx: &mut Context<Self>,
     ) -> Div {
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
         // Offer the palette's own colours as one-click swatches — most edits
         // are "make this the same green as that", not a fresh hue.
         let featured: Vec<Hsla> = THEME_SLOTS
@@ -4488,7 +4550,10 @@ impl SettingsPanel {
         is_sel: bool,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
         let name = term_theme.name.clone();
         let theme_name = name.clone();
         let bg = term_theme.background;
@@ -4631,10 +4696,14 @@ impl SettingsPanel {
         // credential that model needs is one task; splitting them meant bouncing
         // between tabs to finish it.
         let providers = self.render_providers_body(window, cx);
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
         let card_opacity = self.card_opacity();
         let max_turns_input = self.max_turns_input.clone();
         let temperature_input = self.temperature_input.clone();
+        let ai_purpose_select = self.ai_purpose_select.clone();
         let active_provider_select = self.active_provider_select.clone();
         let active_model_select = self.active_model_select.clone();
         let suggestion_provider_select = self.suggestion_provider_select.clone();
@@ -4662,6 +4731,12 @@ impl SettingsPanel {
                     ),
             )
             .child(row_separator(theme))
+            .child(select_row(
+                "Purpose",
+                "Operating stance for the built-in agent.",
+                &ai_purpose_select,
+                theme,
+            ))
             .child(searchable_select_row(
                     "Active Provider",
                     "Default provider for the agent panel, command palette actions, and AI fallback suggestions.",
@@ -4768,7 +4843,10 @@ impl SettingsPanel {
     }
 
     fn render_providers_body(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
         let card_opacity = self.card_opacity();
         let viewport_w = window.viewport_size().width.as_f32();
         let compact = viewport_w < 980.0;
@@ -5405,7 +5483,10 @@ impl SettingsPanel {
                           this: &mut Self,
                           cx: &mut Context<Self>|
          -> Div {
-            let theme = cx.theme();
+            // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
             let mut c = card(theme, card_opacity);
             for (i, (label, field)) in keys.iter().enumerate() {
                 if i > 0 {
@@ -5487,7 +5568,10 @@ impl SettingsPanel {
         let quick_terminal_value = self.config.keybindings.quick_terminal.clone();
         #[cfg(target_os = "macos")]
         let quick_terminal_recording = recording.as_deref() == Some("quick_terminal");
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
 
         let fixed_tab_card = card(theme, card_opacity).child(
             div()
@@ -5821,14 +5905,12 @@ impl SettingsPanel {
             .flex()
             .flex_col()
             .gap(px(8.0))
-            .child(group_label("Global", &theme))
-            .child(global_summon_card);
+            .child(self.group("global", "Global", global_summon_card, cx));
         #[cfg(target_os = "macos")]
         let shortcut_groups = shortcut_groups.child(quick_terminal_card);
         let shortcut_groups = shortcut_groups
             .child(div().h(px(8.0)))
-            .child(group_label("General", &theme))
-            .child(general_card);
+            .child(self.group("general", "General", general_card, cx));
 
         section_content(
             "Keyboard Shortcuts",
@@ -5841,33 +5923,28 @@ impl SettingsPanel {
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Fixed Shortcuts", &theme))
-                .child(fixed_tab_card),
+                .child(self.group("fixed-shortcuts", "Fixed Shortcuts", fixed_tab_card, cx)),
         )
         .child(
             div()
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Panes", &theme))
-                .child(pane_card),
+                .child(self.group("panes", "Panes", pane_card, cx)),
         )
         .child(
             div()
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Surfaces", &theme))
-                .child(surface_card),
+                .child(self.group("surfaces", "Surfaces", surface_card, cx)),
         )
         .child(
             div()
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Terminal", &theme))
-                .child(
-                    card(theme, card_opacity)
+                .child(self.group("terminal", "Terminal", card(theme, card_opacity)
                         // Terminal clipboard uses ⌘C/V on macOS and the
                         // Windows-Terminal-standard Ctrl+Shift+C/V on
                         // Windows (plain Ctrl+C would raise SIGINT in
@@ -5893,8 +5970,7 @@ impl SettingsPanel {
                             theme,
                         ))
                         .child(row_separator(theme))
-                        .child(key_row("Select All", "secondary-a", theme)),
-                ),
+                        .child(key_row("Select All", "secondary-a", theme)), cx)),
         )
     }
 }
@@ -5928,7 +6004,10 @@ impl Render for SettingsPanel {
         };
 
         let has_unsaved_changes = self.standalone && self.has_unsaved_changes(cx);
-        let theme = cx.theme();
+        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
+        // borrow would block.
+        let theme_owned = cx.theme().clone();
+        let theme = &theme_owned;
         let viewport = window.viewport_size();
         let viewport_w = viewport.width.as_f32();
         let viewport_h = viewport.height.as_f32();
