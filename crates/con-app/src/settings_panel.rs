@@ -6,8 +6,9 @@ use con_agent::{
 use con_core::{
     Config,
     config::{
-        AppearanceConfig, DEFAULT_TERMINAL_FONT_FAMILY, MAX_UI_FONT_SIZE, MIN_UI_FONT_SIZE,
-        TabsOrientation, is_gpui_pseudo_font_family, sanitize_terminal_font_family,
+        AppearanceConfig, DEFAULT_TERMINAL_FONT_FAMILY, MAX_ICON_SCALE, MAX_UI_FONT_SIZE,
+        MIN_ICON_SCALE, MIN_UI_FONT_SIZE, TabsOrientation, is_gpui_pseudo_font_family,
+        sanitize_terminal_font_family,
     },
 };
 use futures::{FutureExt, StreamExt};
@@ -206,6 +207,7 @@ pub struct SettingsPanel {
     font_size_input: Entity<InputState>,
     ui_font_size_input: Entity<InputState>,
     terminal_opacity_slider: Entity<SliderState>,
+    icon_scale_slider: Entity<SliderState>,
     terminal_blur: bool,
     ui_opacity_slider: Entity<SliderState>,
     tab_accent_inactive_alpha_slider: Entity<SliderState>,
@@ -292,6 +294,18 @@ struct EndpointPreset {
 impl SettingsPanel {
     fn clamp_ui_font_size(value: f32) -> f32 {
         value.clamp(MIN_UI_FONT_SIZE, MAX_UI_FONT_SIZE)
+    }
+
+    fn clamp_icon_scale(value: f32) -> f32 {
+        if value.is_finite() {
+            value.clamp(MIN_ICON_SCALE, MAX_ICON_SCALE)
+        } else {
+            1.0
+        }
+    }
+
+    fn icon_scale_value(&self) -> f32 {
+        Self::clamp_icon_scale(self.config.appearance.icon_scale)
     }
 
     fn clamp_terminal_opacity(value: f32) -> f32 {
@@ -1332,6 +1346,13 @@ impl SettingsPanel {
             );
             s
         });
+        let icon_scale_slider = cx.new(|_| {
+            SliderState::new()
+                .min(MIN_ICON_SCALE)
+                .max(MAX_ICON_SCALE)
+                .step(0.05)
+                .default_value(Self::clamp_icon_scale(config.appearance.icon_scale))
+        });
         let terminal_opacity_slider = cx.new(|_| {
             SliderState::new()
                 .min(0.25)
@@ -1424,6 +1445,20 @@ impl SettingsPanel {
             s
         });
 
+        cx.subscribe(&icon_scale_slider, |this, _, event: &SliderEvent, cx| {
+            match event {
+                SliderEvent::Change(value) => {
+                    let scale = Self::clamp_icon_scale(value.end());
+                    this.config.appearance.icon_scale = scale;
+                    // Icon sizing is read from a process global at paint time, so
+                    // push it before notifying or the preview lags one frame.
+                    crate::ui_scale::set_icon_scale(scale);
+                    cx.emit(AppearancePreview);
+                    cx.notify();
+                }
+            }
+        })
+        .detach();
         cx.subscribe(
             &terminal_opacity_slider,
             |this, _, event: &SliderEvent, cx| match event {
@@ -1644,6 +1679,7 @@ impl SettingsPanel {
             font_size_input,
             ui_font_size_input,
             terminal_opacity_slider,
+            icon_scale_slider,
             terminal_blur: Self::effective_terminal_blur(config.appearance.terminal_blur),
             ui_opacity_slider,
             tab_accent_inactive_alpha_slider,
@@ -1794,6 +1830,14 @@ impl SettingsPanel {
                 cx,
             )
         });
+        self.icon_scale_slider.update(cx, |slider, cx| {
+            slider.set_value(
+                Self::clamp_icon_scale(self.config.appearance.icon_scale),
+                window,
+                cx,
+            );
+        });
+        crate::ui_scale::set_icon_scale(self.config.appearance.icon_scale);
         self.terminal_opacity_slider.update(cx, |slider, cx| {
             slider.set_value(
                 Self::clamp_terminal_opacity(self.config.appearance.terminal_opacity),
@@ -2488,6 +2532,8 @@ impl SettingsPanel {
             ));
         };
         self.config.appearance.ui_font_size = Self::clamp_ui_font_size(parsed_ui_font_size);
+        self.config.appearance.icon_scale =
+            Self::clamp_icon_scale(self.icon_scale_slider.read(cx).value().end());
         self.config.appearance.terminal_opacity =
             Self::clamp_terminal_opacity(self.terminal_opacity_slider.read(cx).value().end());
         self.config.appearance.terminal_blur = Self::effective_terminal_blur(self.terminal_blur);
@@ -3468,6 +3514,8 @@ impl SettingsPanel {
         let font_size_input = self.font_size_input.clone();
         let ui_font_size_input = self.ui_font_size_input.clone();
         let terminal_opacity_slider = self.terminal_opacity_slider.clone();
+        let icon_scale_slider = self.icon_scale_slider.clone();
+        let icon_scale = self.icon_scale_value();
         let ui_opacity_slider = self.ui_opacity_slider.clone();
         let tab_accent_inactive_alpha_slider = self.tab_accent_inactive_alpha_slider.clone();
         let tab_accent_inactive_hover_alpha_slider =
@@ -3690,7 +3738,15 @@ impl SettingsPanel {
                         .child(row_separator(theme))
                         .child(row_field("UI Size", &ui_font_size_input))
                         .child(row_separator(theme))
-                        .child(row_field("Terminal Size", &font_size_input)),
+                        .child(row_field("Terminal Size", &font_size_input))
+                        .child(row_separator(theme))
+                        .child(slider_row(
+                            "Icon Size",
+                            "Sidebar, tab strip, and pane header icons. Does not move text.",
+                            &icon_scale_slider,
+                            icon_scale,
+                            theme,
+                        )),
                 ),
         );
 

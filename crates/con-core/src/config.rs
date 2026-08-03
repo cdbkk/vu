@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 
 pub const MIN_UI_FONT_SIZE: f32 = 12.0;
 pub const MAX_UI_FONT_SIZE: f32 = 24.0;
+pub const MIN_ICON_SCALE: f32 = 0.75;
+pub const MAX_ICON_SCALE: f32 = 2.5;
 pub const DEFAULT_TERMINAL_FONT_FAMILY: &str = "Ioskeley Mono";
 
 fn default_font_family() -> String {
@@ -25,6 +27,9 @@ fn default_ui_font_family() -> String {
 }
 fn default_ui_font_size() -> f32 {
     16.0f32.clamp(MIN_UI_FONT_SIZE, MAX_UI_FONT_SIZE)
+}
+fn default_icon_scale() -> f32 {
+    1.0
 }
 fn default_terminal_opacity() -> f32 {
     0.80
@@ -123,6 +128,11 @@ pub struct AppearanceConfig {
     /// Workspace tab presentation. Vertical is the default; horizontal remains
     /// available for users who prefer a top tab strip.
     pub tabs_orientation: TabsOrientation,
+    /// Multiplier for chrome icon glyphs — activity bar, tab strip, pane
+    /// header. Independent of `ui_font_size` so icons can be enlarged without
+    /// growing labels or padding. Buttons grow only far enough to contain the
+    /// icon.
+    pub icon_scale: f32,
 }
 
 impl Default for AppearanceConfig {
@@ -143,6 +153,7 @@ impl Default for AppearanceConfig {
             restore_terminal_text: default_restore_terminal_text(),
             hide_pane_title_bar: false,
             tabs_orientation: TabsOrientation::Vertical,
+            icon_scale: default_icon_scale(),
         }
     }
 }
@@ -178,6 +189,11 @@ impl AppearanceConfig {
             Self::MAX_TAB_ACCENT_INACTIVE_HOVER_ALPHA,
         )
         .max(self.tab_accent_inactive_alpha);
+        self.icon_scale = if self.icon_scale.is_finite() {
+            self.icon_scale.clamp(MIN_ICON_SCALE, MAX_ICON_SCALE)
+        } else {
+            default_icon_scale()
+        };
     }
 }
 

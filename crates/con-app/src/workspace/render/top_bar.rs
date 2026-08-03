@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::ui_scale::{icon_box_px, icon_px};
 use gpui_component::menu::ContextMenuExt;
 
 fn sanitize_tab_accent_alpha(alpha: f32) -> f32 {
@@ -866,7 +867,7 @@ impl ConWorkspace {
                                     .child(
                                         svg()
                                             .path("phosphor/terminal.svg")
-                                            .size(px(12.0))
+                                            .size(icon_px(12.0))
                                             .flex_shrink_0()
                                             .text_color(theme.primary.opacity(0.7)),
                                     )
@@ -1071,7 +1072,7 @@ impl ConWorkspace {
                                         .child(
                                             svg()
                                                 .path("phosphor/terminal.svg")
-                                                .size(px(12.0))
+                                                .size(icon_px(12.0))
                                                 .flex_shrink_0()
                                                 .text_color(theme.primary.opacity(0.7)),
                                         )
@@ -1162,7 +1163,7 @@ impl ConWorkspace {
             .flex()
             .items_center()
             .justify_center()
-            .size(px(24.0))
+            .size(icon_box_px(24.0, 12.0))
             .rounded(px(6.0))
             .cursor_pointer()
             // `.occlude()` is required on Windows so the parent
@@ -1192,7 +1193,7 @@ impl ConWorkspace {
             new_tab_button.child(
                 svg()
                     .path("phosphor/plus.svg")
-                    .size(px(12.0))
+                    .size(icon_px(12.0))
                     .text_color(new_tab_icon_color),
             ),
         );
@@ -1208,7 +1209,7 @@ impl ConWorkspace {
                 .flex()
                 .items_center()
                 .justify_center()
-                .size(px(22.0))
+                .size(icon_box_px(22.0, 12.0))
                 .rounded(px(5.0))
                 .cursor_pointer()
                 .occlude()
@@ -1235,7 +1236,7 @@ impl ConWorkspace {
                 .child(
                     svg()
                         .path("phosphor/sidebar.svg")
-                        .size(px(12.0))
+                        .size(icon_px(12.0))
                         .text_color(chrome_toggle_tone(
                             theme,
                             self.left_panel_open,
@@ -1256,7 +1257,7 @@ impl ConWorkspace {
                 .flex()
                 .items_center()
                 .justify_center()
-                .size(px(22.0))
+                .size(icon_box_px(22.0, 12.0))
                 .rounded(px(5.0))
                 .cursor_pointer()
                 .occlude()
@@ -1283,7 +1284,7 @@ impl ConWorkspace {
                 .child(
                     svg()
                         .path("phosphor/square-half-bottom-fill.svg")
-                        .size(px(12.0))
+                        .size(icon_px(12.0))
                         .text_color(chrome_toggle_tone(
                             theme,
                             self.input_bar_visible,
@@ -1304,7 +1305,7 @@ impl ConWorkspace {
                 .flex()
                 .items_center()
                 .justify_center()
-                .size(px(22.0))
+                .size(icon_box_px(22.0, 12.0))
                 .rounded(px(5.0))
                 .cursor_pointer()
                 .occlude()
@@ -1331,7 +1332,7 @@ impl ConWorkspace {
                 .child(
                     svg()
                         .path("phosphor/square-half-fill.svg")
-                        .size(px(12.0))
+                        .size(icon_px(12.0))
                         .text_color(chrome_toggle_tone(
                             theme,
                             self.agent_panel_open,
@@ -1353,7 +1354,7 @@ impl ConWorkspace {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .size(px(22.0))
+                    .size(icon_box_px(22.0, 12.0))
                     .rounded(px(5.0))
                     .cursor_pointer()
                     .occlude()
@@ -1378,7 +1379,7 @@ impl ConWorkspace {
                     .child(
                         svg()
                             .path("phosphor/gear.svg")
-                            .size(px(12.0))
+                            .size(icon_px(12.0))
                             .text_color(chrome_icon_tone(theme, compact_titlebar_progress)),
                     ),
             );

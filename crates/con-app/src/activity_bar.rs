@@ -19,7 +19,15 @@ use gpui_component::{
     button::{Button, ButtonVariants as _},
 };
 
-pub const ACTIVITY_BAR_HEADER_HEIGHT: f32 = 32.0;
+use crate::ui_scale::{icon_box_px, icon_px};
+
+const ACTIVITY_BAR_BASE_HEIGHT: f32 = 32.0;
+const SLOT_ICON_SIZE: f32 = 12.5;
+
+/// Bar height, grown just enough to hold scaled slot icons.
+pub fn activity_bar_header_height() -> gpui::Pixels {
+    icon_box_px(ACTIVITY_BAR_BASE_HEIGHT, SLOT_ICON_SIZE)
+}
 
 /// The content slot currently shown in the left panel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,7 +105,7 @@ impl Render for ActivityBar {
 
         div()
             .id("activity-bar")
-            .h(px(ACTIVITY_BAR_HEADER_HEIGHT))
+            .h(activity_bar_header_height())
             .w_full()
             .flex()
             .flex_row()
@@ -142,7 +150,7 @@ impl Render for ActivityBar {
                         0.70
                     }))
                     .rounded(px(5.0))
-                    .with_size(px(20.0))
+                    .with_size(icon_box_px(20.0, 12.0))
                     .cursor_pointer()
                     .on_click(cx.listener(|this, _: &gpui::ClickEvent, _window, cx| {
                         this.close_panel(cx);
@@ -188,7 +196,7 @@ where
         .flex()
         .items_center()
         .justify_center()
-        .h(px(24.0))
+        .h(icon_box_px(24.0, SLOT_ICON_SIZE))
         .px(px(6.0))
         .gap(px(4.5))
         .rounded(px(5.0))
@@ -198,7 +206,12 @@ where
         .cursor_pointer()
         .occlude()
         .on_click(handler)
-        .child(svg().path(icon).size(px(12.5)).text_color(icon_color))
+        .child(
+            svg()
+                .path(icon)
+                .size(icon_px(SLOT_ICON_SIZE))
+                .text_color(icon_color),
+        )
         .child(
             div()
                 .text_size(px(11.0))

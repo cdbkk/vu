@@ -2540,6 +2540,8 @@ fn main() {
         gpui_component::init(cx);
         input_bar::InputBar::init(cx);
 
+        ui_scale::set_icon_scale(config.appearance.icon_scale);
+
         // Load and activate con's design theme (synced to terminal theme)
         theme::init_theme(
             cx,

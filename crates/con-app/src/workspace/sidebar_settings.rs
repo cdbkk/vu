@@ -972,6 +972,9 @@ impl ConWorkspace {
         let next_background_image_repeat = appearance_config.background_image_repeat;
         let next_tabs_orientation = appearance_config.tabs_orientation;
 
+        crate::ui_scale::set_icon_scale(appearance_config.icon_scale);
+        self.config.appearance.icon_scale = appearance_config.icon_scale;
+
         let font_changed = self.terminal_font_family != next_terminal_font_family
             || (self.font_size - next_font_size).abs() > f32::EPSILON;
         let terminal_appearance_changed = font_changed

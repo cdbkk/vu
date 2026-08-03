@@ -1,12 +1,45 @@
-use con_core::config::{MAX_UI_FONT_SIZE, MIN_UI_FONT_SIZE};
+use con_core::config::{MAX_ICON_SCALE, MAX_UI_FONT_SIZE, MIN_ICON_SCALE, MIN_UI_FONT_SIZE};
 use gpui::{Pixels, px};
 use gpui_component::Theme;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 const DEFAULT_UI_FONT_SIZE: f32 = 16.0;
 const DEFAULT_MONO_FONT_SIZE: f32 = 13.0;
 const MIN_DENSITY_SCALE: f32 = 0.92;
 const MAX_DENSITY_SCALE: f32 = 1.25;
 const DENSITY_SCALE_WEIGHT: f32 = 0.45;
+
+// ponytail: one read-mostly f32 shared by every render pass. An atomic beats
+// threading the config through every icon call site. Promote to a GPUI global if
+// icon sizing ever has to differ per window.
+static ICON_SCALE: AtomicU32 = AtomicU32::new(1.0f32.to_bits());
+
+/// Set the chrome icon multiplier. Call whenever `appearance.icon_scale` changes.
+pub(crate) fn set_icon_scale(scale: f32) {
+    let scale = if scale.is_finite() {
+        scale.clamp(MIN_ICON_SCALE, MAX_ICON_SCALE)
+    } else {
+        1.0
+    };
+    ICON_SCALE.store(scale.to_bits(), Ordering::Relaxed);
+}
+
+pub(crate) fn icon_scale() -> f32 {
+    f32::from_bits(ICON_SCALE.load(Ordering::Relaxed))
+}
+
+/// Size for an icon glyph. Independent of `ui_font_size` so icons can be grown
+/// without moving labels or padding.
+pub(crate) fn icon_px(base_px: f32) -> Pixels {
+    px(base_px * icon_scale())
+}
+
+/// Size for a control that contains an icon. Keeps the design's original padding
+/// and grows only once the scaled glyph would overflow the base box.
+pub(crate) fn icon_box_px(base_box_px: f32, base_icon_px: f32) -> Pixels {
+    let padding = (base_box_px - base_icon_px).max(0.0);
+    px(base_box_px.max(base_icon_px * icon_scale() + padding))
+}
 
 pub(crate) fn ui_font_scale(theme: &Theme) -> f32 {
     font_scale(
@@ -74,7 +107,28 @@ fn density_scale(font_scale: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{density_scale, font_scale};
+    use super::{density_scale, font_scale, icon_box_px, icon_px, set_icon_scale};
+    use gpui::px;
+
+    #[test]
+    fn icon_scale_grows_glyph_and_keeps_padding() {
+        set_icon_scale(1.0);
+        assert_eq!(icon_px(12.0), px(12.0));
+        // 22px box around a 12px glyph = 10px of padding, preserved when scaled.
+        assert_eq!(icon_box_px(22.0, 12.0), px(22.0));
+
+        set_icon_scale(2.0);
+        assert_eq!(icon_px(12.0), px(24.0));
+        assert_eq!(icon_box_px(22.0, 12.0), px(34.0));
+
+        // Shrinking never collapses a control below its designed size.
+        set_icon_scale(0.75);
+        assert_eq!(icon_box_px(22.0, 12.0), px(22.0));
+
+        set_icon_scale(f32::NAN);
+        assert_eq!(icon_px(12.0), px(12.0));
+        set_icon_scale(1.0);
+    }
 
     #[test]
     fn font_scale_preserves_default_and_clamps_extremes() {
