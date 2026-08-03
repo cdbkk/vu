@@ -521,6 +521,19 @@ impl TerminalTheme {
         }
     }
 
+    /// Serialize back to the Ghostty config format `from_ghostty_format` reads.
+    /// This is what the theme editor writes to the user themes directory.
+    pub fn to_ghostty_format(&self) -> String {
+        let mut s = String::new();
+        s.push_str(&format!("# {}\n", self.name));
+        s.push_str(&format!("background = {}\n", hex(self.background)));
+        s.push_str(&format!("foreground = {}\n", hex(self.foreground)));
+        for (idx, color) in self.ansi.iter().enumerate() {
+            s.push_str(&format!("palette = {idx}={}\n", hex(*color)));
+        }
+        s
+    }
+
     pub fn load_user_themes() -> Vec<Self> {
         let dir = Self::user_themes_dir();
 
@@ -563,6 +576,10 @@ impl Default for TerminalTheme {
     }
 }
 
+fn hex(c: Color) -> String {
+    format!("#{:02X}{:02X}{:02X}", c.r, c.g, c.b)
+}
+
 fn parse_hex_color(value: &str) -> Option<Color> {
     let hex = value.strip_prefix('#').unwrap_or(value);
     if hex.len() != 6 {
@@ -573,4 +590,27 @@ fn parse_hex_color(value: &str) -> Option<Color> {
     let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
     let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
     Some(Color::rgb(r, g, b))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TerminalTheme;
+
+    #[test]
+    fn edited_themes_survive_a_write_read_cycle() {
+        // The editor writes with to_ghostty_format and the loader reads it back
+        // with from_ghostty_format; a mismatch silently reverts the user's edits.
+        let mut original = TerminalTheme::catppuccin_mocha();
+        original.ansi[2] = super::Color::rgb(0x00, 0xFF, 0x7F);
+        original.foreground = super::Color::rgb(0x12, 0x34, 0x56);
+
+        let text = original.to_ghostty_format();
+        let parsed = TerminalTheme::from_ghostty_format("catppuccin-mocha", &text)
+            .expect("serialized theme must parse");
+
+        assert_eq!(parsed.name, original.name);
+        assert_eq!(parsed.background, original.background);
+        assert_eq!(parsed.foreground, original.foreground);
+        assert_eq!(parsed.ansi, original.ansi);
+    }
 }

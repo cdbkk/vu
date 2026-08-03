@@ -227,6 +227,13 @@ pub struct SettingsPanel {
     custom_theme_name_input: Entity<InputState>,
     custom_theme_preview: Option<con_terminal::TerminalTheme>,
     custom_theme_status: Option<String>,
+    /// Working copy for the palette editor. `None` means the editor is closed.
+    theme_editor: Option<con_terminal::TerminalTheme>,
+    /// Which palette slot is open for editing, as a `ThemeSlot` index.
+    theme_editor_slot: Option<usize>,
+    theme_editor_hex_input: Entity<InputState>,
+    theme_editor_name_input: Entity<InputState>,
+    theme_editor_status: Option<String>,
 
     // Keybindings — which binding is being recorded (field name, e.g. "new_tab")
     recording_key: Option<String>,
@@ -1430,6 +1437,16 @@ impl SettingsPanel {
             s.set_placeholder("Save as, e.g. flexoki-amber", window, cx);
             s
         });
+        let theme_editor_hex_input = cx.new(|cx| {
+            let mut s = InputState::new(window, cx);
+            s.set_placeholder("#RRGGBB", window, cx);
+            s
+        });
+        let theme_editor_name_input = cx.new(|cx| {
+            let mut s = InputState::new(window, cx);
+            s.set_placeholder("my-theme", window, cx);
+            s
+        });
         let http_proxy_input = cx.new(|cx| {
             let mut s = InputState::new(window, cx);
             let val = config.network.http_proxy.clone().unwrap_or_default();
@@ -1699,6 +1716,11 @@ impl SettingsPanel {
             custom_theme_name_input,
             custom_theme_preview: None,
             custom_theme_status: None,
+            theme_editor: None,
+            theme_editor_slot: None,
+            theme_editor_hex_input,
+            theme_editor_name_input,
+            theme_editor_status: None,
             recording_key: None,
             #[cfg(target_os = "macos")]
             recording_resume_keybindings: None,
@@ -2170,6 +2192,110 @@ impl SettingsPanel {
             Some(())
         })
         .detach();
+    }
+
+    /// Seed the palette editor from whichever theme is currently active.
+    fn open_theme_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let base = con_terminal::TerminalTheme::by_name(&self.config.terminal.theme)
+            .unwrap_or_default();
+        self.theme_editor_name_input.update(cx, |s, cx| {
+            s.set_value(&format!("{}-custom", base.name), window, cx);
+        });
+        self.theme_editor = Some(base);
+        self.theme_editor_slot = None;
+        self.theme_editor_status = None;
+        cx.notify();
+    }
+
+    fn close_theme_editor(&mut self, cx: &mut Context<Self>) {
+        self.theme_editor = None;
+        self.theme_editor_slot = None;
+        self.theme_editor_status = None;
+        cx.notify();
+    }
+
+    /// Select a palette slot and load its current value into the hex field.
+    fn select_theme_slot(&mut self, slot: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(theme) = self.theme_editor.as_ref() else {
+            return;
+        };
+        let Some(color) = THEME_SLOTS.get(slot).map(|s| s.read(theme)) else {
+            return;
+        };
+        self.theme_editor_hex_input.update(cx, |s, cx| {
+            s.set_value(&color_to_hex(color), window, cx);
+        });
+        self.theme_editor_slot = Some(slot);
+        self.theme_editor_status = None;
+        cx.notify();
+    }
+
+    /// Commit the hex field into the selected slot of the working theme.
+    fn commit_theme_slot(&mut self, cx: &mut Context<Self>) {
+        let (Some(slot), Some(theme)) = (self.theme_editor_slot, self.theme_editor.as_mut()) else {
+            return;
+        };
+        let text = self.theme_editor_hex_input.read(cx).value().to_string();
+        let Some(color) = parse_hex_color(text.trim()) else {
+            self.theme_editor_status =
+                Some(format!("\"{}\" is not a #RRGGBB color.", text.trim()));
+            cx.notify();
+            return;
+        };
+        let Some(spec) = THEME_SLOTS.get(slot) else {
+            return;
+        };
+        spec.write(theme, color);
+        self.theme_editor_status = None;
+        cx.notify();
+    }
+
+    /// Write the edited palette to the user themes directory and activate it.
+    fn save_theme_editor(&mut self, cx: &mut Context<Self>) {
+        let Some(theme) = self.theme_editor.as_ref() else {
+            return;
+        };
+        let name = self
+            .theme_editor_name_input
+            .read(cx)
+            .value()
+            .trim()
+            .to_lowercase()
+            .replace(' ', "-");
+        if name.is_empty() {
+            self.theme_editor_status = Some("Name the theme before saving.".into());
+            cx.notify();
+            return;
+        }
+        // Built-in names resolve from Rust before the user themes directory is
+        // consulted, so saving over one would write a file that never loads.
+        if con_terminal::TerminalTheme::available().contains(&name.as_str()) {
+            self.theme_editor_status = Some(format!(
+                "\"{name}\" is a built-in theme. Pick another name."
+            ));
+            cx.notify();
+            return;
+        }
+
+        let mut saved = theme.clone();
+        saved.name = name.clone();
+
+        let dir = con_terminal::TerminalTheme::user_themes_dir();
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            self.theme_editor_status = Some(format!("Error: {e}"));
+            cx.notify();
+            return;
+        }
+        if let Err(e) = std::fs::write(dir.join(&name), saved.to_ghostty_format()) {
+            self.theme_editor_status = Some(format!("Error: {e}"));
+            cx.notify();
+            return;
+        }
+
+        self.config.terminal.theme = name.clone();
+        cx.emit(ThemePreview(name.clone()));
+        self.theme_editor_status = Some(format!("Saved and applied: {name}"));
+        cx.notify();
     }
 
     /// Save the custom theme to the user themes directory and apply it.
@@ -3562,6 +3688,7 @@ impl SettingsPanel {
         } else {
             None
         };
+        let theme_editor_card = self.render_theme_editor(card_opacity, cx);
 
         // Build import section
         let custom_theme_name_input = self.custom_theme_name_input.clone();
@@ -3580,6 +3707,21 @@ impl SettingsPanel {
             .ghost()
             .on_click(cx.listener(|this, _, window, cx| {
                 this.browse_background_image(window, cx);
+            }));
+        let editor_open = self.theme_editor.is_some();
+        let customize_btn = Button::new("theme-customize")
+            .label(if editor_open {
+                "Editing"
+            } else {
+                "Customize"
+            })
+            .icon(Icon::default().path("phosphor/palette.svg"))
+            .small()
+            .ghost()
+            .on_click(cx.listener(|this, _, window, cx| {
+                if this.theme_editor.is_none() {
+                    this.open_theme_editor(window, cx);
+                }
             }));
         let open_catalog_btn = Button::new("theme-catalog-link")
             .label("Browse Themes")
@@ -4073,12 +4215,262 @@ impl SettingsPanel {
             );
         }
         content = content.child(card(theme, card_opacity).child(theme_card_inner));
+        content = content.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(8.0))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .child(group_label("Palette", &theme))
+                        .child(customize_btn),
+                )
+                .children(theme_editor_card),
+        );
         content = content.child(card(theme, card_opacity).child(import_section));
 
         content
     }
 
-    /// Render a grid of theme preview cards.
+    /// The palette editor card: live preview, slot list, hex field, save row.
+    fn render_theme_editor(&self, card_opacity: f32, cx: &mut Context<Self>) -> Option<Div> {
+        let working = self.theme_editor.clone()?;
+        // These take &mut cx for their click listeners, so they have to be built
+        // before cx.theme() borrows cx immutably.
+        let preview = self.render_theme_editor_preview(&working, cx);
+        let slots = self.render_theme_editor_slots(&working, cx);
+        let theme = cx.theme();
+        let hex_input = self.theme_editor_hex_input.clone();
+        let name_input = self.theme_editor_name_input.clone();
+
+        let selected_label = self
+            .theme_editor_slot
+            .and_then(|i| THEME_SLOTS.get(i))
+            .map(|s| s.label)
+            .unwrap_or("Pick a colour");
+
+        let apply_hex_btn = Button::new("theme-editor-apply-hex")
+            .label("Set")
+            .small()
+            .ghost()
+            .on_click(cx.listener(|this, _, _, cx| this.commit_theme_slot(cx)));
+        let save_btn = Button::new("theme-editor-save")
+            .label("Save & Apply")
+            .icon(Icon::default().path("phosphor/check.svg"))
+            .small()
+            .primary()
+            .on_click(cx.listener(|this, _, _, cx| this.save_theme_editor(cx)));
+        let close_btn = Button::new("theme-editor-close")
+            .label("Done")
+            .small()
+            .ghost()
+            .on_click(cx.listener(|this, _, _, cx| this.close_theme_editor(cx)));
+
+        Some(
+            card(theme, card_opacity)
+                .flex()
+                .flex_col()
+                .gap(px(12.0))
+                .p(px(16.0))
+                .child(preview)
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap(px(8.0))
+                        .child(
+                            div()
+                                .w(px(120.0))
+                                .text_size(px(11.5))
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(theme.foreground)
+                                .child(selected_label),
+                        )
+                        .child(div().flex_1().min_w_0().child(hex_input))
+                        .child(apply_hex_btn),
+                )
+                .child(slots)
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap(px(8.0))
+                        .child(div().flex_1().min_w_0().child(name_input))
+                        .child(save_btn)
+                        .child(close_btn),
+                )
+                .children(self.theme_editor_status.as_ref().map(|status| {
+                    div()
+                        .text_size(px(11.0))
+                        .text_color(if status.starts_with("Saved") {
+                            theme.success
+                        } else {
+                            theme.danger
+                        })
+                        .child(status.clone())
+                })),
+        )
+    }
+
+    /// Live preview of the working palette, shaped like a real agent session so
+    /// each slot is shown doing the job its hint describes.
+    fn render_theme_editor_preview(
+        &self,
+        term_theme: &con_terminal::TerminalTheme,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let theme = cx.theme();
+        let c = |color: con_terminal::Color| gpui::rgb(color.to_u32());
+        let bg = c(term_theme.background);
+        let fg = c(term_theme.foreground);
+        let red = c(term_theme.ansi[1]);
+        let green = c(term_theme.ansi[2]);
+        let yellow = c(term_theme.ansi[3]);
+        let blue = c(term_theme.ansi[4]);
+        let cyan = c(term_theme.ansi[6]);
+        let dim = c(term_theme.ansi[8]);
+
+        // (indent, [(text, color)]) — one screen line each.
+        let lines: Vec<(f32, Vec<(&str, gpui::Rgba)>)> = vec![
+            (0.0, vec![("~/code/con", dim), ("  main", dim)]),
+            (0.0, vec![("> ", green), ("fix the palette mapping", fg)]),
+            (0.0, vec![("", fg)]),
+            (
+                0.0,
+                vec![("● ", cyan), ("I'll update the ANSI slots first.", fg)],
+            ),
+            (0.0, vec![("", fg)]),
+            (
+                2.0,
+                vec![
+                    ("Bash", cyan),
+                    ("(", dim),
+                    ("cargo test -p con-terminal", yellow),
+                    (")", dim),
+                ],
+            ),
+            (2.0, vec![("⎿  running 1 test", dim)]),
+            (5.0, vec![("test result: ok. 1 passed", green)]),
+            (0.0, vec![("", fg)]),
+            (
+                2.0,
+                vec![("Update", cyan), ("(", dim), ("src/theme.rs", blue), (")", dim)],
+            ),
+            (2.0, vec![("⎿  + pub fn to_ghostty_format(&self)", green)]),
+            (5.0, vec![("- pub fn legacy_format(&self)", red)]),
+            (0.0, vec![("", fg)]),
+            (2.0, vec![("warning: unused variable `slot`", yellow)]),
+            (2.0, vec![("error: mismatched types", red)]),
+        ];
+
+        let mut screen = div()
+            .flex()
+            .flex_col()
+            .w_full()
+            .bg(bg)
+            .rounded(px(8.0))
+            .px(px(14.0))
+            .py(px(12.0))
+            .gap(px(2.0))
+            .font_family(theme.mono_font_family.clone())
+            .text_size(px(11.0))
+            .line_height(px(16.0));
+
+        for (indent, spans) in lines {
+            let mut row = div().flex().flex_row().pl(px(indent * 6.0));
+            for (text, color) in spans {
+                // Empty spans are blank spacer lines; a zero-width child would
+                // collapse the row height, so keep a non-breaking space.
+                let text = if text.is_empty() { "\u{00a0}" } else { text };
+                row = row.child(div().text_color(color).child(text.to_string()));
+            }
+            screen = screen.child(row);
+        }
+
+        screen
+    }
+
+    /// The 18 palette slots as clickable swatches.
+    fn render_theme_editor_slots(
+        &self,
+        term_theme: &con_terminal::TerminalTheme,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let theme = cx.theme();
+        let selected = self.theme_editor_slot;
+        let mut grid = div().flex().flex_col().gap(px(1.0));
+
+        for (idx, spec) in THEME_SLOTS.iter().enumerate() {
+            let color = spec.read(term_theme);
+            let is_sel = selected == Some(idx);
+            grid = grid.child(
+                div()
+                    .id(SharedString::from(format!("theme-slot-{idx}")))
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(px(10.0))
+                    .px(px(10.0))
+                    .py(px(6.0))
+                    .rounded(px(6.0))
+                    .cursor_pointer()
+                    .bg(if is_sel {
+                        theme.primary.opacity(0.10)
+                    } else {
+                        theme.transparent
+                    })
+                    .hover(|s| s.bg(theme.primary.opacity(0.06)))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, window, cx| {
+                            this.select_theme_slot(idx, window, cx);
+                        }),
+                    )
+                    .child(
+                        div()
+                            .size(px(18.0))
+                            .rounded(px(4.0))
+                            .flex_shrink_0()
+                            .bg(gpui::rgb(color.to_u32())),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .text_size(px(11.5))
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(theme.foreground)
+                                    .child(spec.label),
+                            )
+                            .child(
+                                div()
+                                    .text_size(px(10.5))
+                                    .text_color(theme.muted_foreground)
+                                    .child(spec.hint),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(10.5))
+                            .font_family(theme.mono_font_family.clone())
+                            .text_color(theme.muted_foreground)
+                            .child(color_to_hex(color)),
+                    ),
+            );
+        }
+
+        grid
+    }
+
     fn render_theme_grid(
         &self,
         themes: &[&con_terminal::TerminalTheme],
@@ -6152,6 +6544,93 @@ fn card(theme: &gpui_component::Theme, opacity: f32) -> Div {
 
 fn row_separator(_theme: &gpui_component::Theme) -> Div {
     div().h(px(6.0))
+}
+
+/// One editable colour in a terminal theme.
+///
+/// `hint` says what the slot actually paints on screen, since "ANSI 6" tells you
+/// nothing about the fact that it colours agent tool names. Chrome colours are
+/// derived from this same palette by `theme::generate_gpui_theme_json`, so
+/// editing ANSI 4 restyles the tab strip and sidebar accent too.
+struct ThemeSlot {
+    label: &'static str,
+    hint: &'static str,
+    /// `None` targets `foreground`/`background`, `Some(i)` targets `ansi[i]`.
+    ansi: Option<usize>,
+    is_background: bool,
+}
+
+impl ThemeSlot {
+    fn read(&self, theme: &con_terminal::TerminalTheme) -> con_terminal::Color {
+        match self.ansi {
+            Some(i) => theme.ansi[i],
+            None if self.is_background => theme.background,
+            None => theme.foreground,
+        }
+    }
+
+    fn write(&self, theme: &mut con_terminal::TerminalTheme, color: con_terminal::Color) {
+        match self.ansi {
+            Some(i) => theme.ansi[i] = color,
+            None if self.is_background => theme.background = color,
+            None => theme.foreground = color,
+        }
+    }
+}
+
+const fn slot(label: &'static str, hint: &'static str, ansi: Option<usize>) -> ThemeSlot {
+    ThemeSlot {
+        label,
+        hint,
+        ansi,
+        is_background: false,
+    }
+}
+
+const THEME_SLOTS: &[ThemeSlot] = &[
+    ThemeSlot {
+        label: "Background",
+        hint: "Terminal and app background",
+        ansi: None,
+        is_background: true,
+    },
+    slot(
+        "Foreground",
+        "Agent prose and your typed text",
+        None,
+    ),
+    slot("Black", "Dim fills and separators", Some(0)),
+    slot("Red", "Errors and removed diff lines", Some(1)),
+    slot("Green", "Success, added diff lines, shell prompt", Some(2)),
+    slot("Yellow", "Warnings and command arguments", Some(3)),
+    slot("Blue", "UI accent, tab strip, links, directories", Some(4)),
+    slot("Magenta", "Keywords and special values", Some(5)),
+    slot("Cyan", "Agent tool names and info", Some(6)),
+    slot("White", "Bright default text", Some(7)),
+    slot("Bright Black", "Dimmed output and thinking text", Some(8)),
+    slot("Bright Red", "Emphasized errors", Some(9)),
+    slot("Bright Green", "Emphasized success", Some(10)),
+    slot("Bright Yellow", "Emphasized warnings", Some(11)),
+    slot("Bright Blue", "Emphasized accent", Some(12)),
+    slot("Bright Magenta", "Emphasized keywords", Some(13)),
+    slot("Bright Cyan", "Emphasized info", Some(14)),
+    slot("Bright White", "Highest-contrast text", Some(15)),
+];
+
+fn color_to_hex(c: con_terminal::Color) -> String {
+    format!("#{:02X}{:02X}{:02X}", c.r, c.g, c.b)
+}
+
+fn parse_hex_color(value: &str) -> Option<con_terminal::Color> {
+    let hex = value.strip_prefix('#').unwrap_or(value);
+    if hex.len() != 6 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    Some(con_terminal::Color::rgb(
+        u8::from_str_radix(&hex[0..2], 16).ok()?,
+        u8::from_str_radix(&hex[2..4], 16).ok()?,
+        u8::from_str_radix(&hex[4..6], 16).ok()?,
+    ))
 }
 
 fn row_field(label: &str, input: &Entity<InputState>) -> Div {
