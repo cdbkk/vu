@@ -2249,10 +2249,12 @@ impl SettingsPanel {
             .flex()
             .flex_row()
             .items_center()
-            .gap(px(4.0))
-            .px(px(2.0))
-            .pb(px(2.0))
+            .gap(px(6.0))
+            .px(px(6.0))
+            .py(px(5.0))
+            .rounded(px(5.0))
             .cursor_pointer()
+            .hover(|s| s.bg(theme.muted.opacity(0.10)))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
@@ -2269,14 +2271,14 @@ impl SettingsPanel {
                     } else {
                         "phosphor/caret-right.svg"
                     })
-                    .size(px(9.0))
-                    .text_color(theme.muted_foreground.opacity(0.5)),
+                    .size(px(12.0))
+                    .text_color(theme.muted_foreground.opacity(0.85)),
             )
             .child(
                 div()
-                    .text_size(px(10.0))
-                    .font_weight(FontWeight::MEDIUM)
-                    .text_color(theme.muted_foreground.opacity(0.5))
+                    .text_size(px(13.0))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.foreground.opacity(0.85))
                     .child(label.to_string()),
             );
 
@@ -3937,10 +3939,91 @@ impl SettingsPanel {
             );
         }
 
+        let mut theme_card_inner = div()
+            .px(px(16.0))
+            .py(px(12.0))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .mb(px(12.0))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child("Terminal Theme"),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(10.0))
+                            .text_color(theme.muted_foreground.opacity(0.5))
+                            .child(format!("{total_count} themes")),
+                    ),
+            )
+            .child(
+                div()
+                    .text_size(px(10.5))
+                    .text_color(theme.muted_foreground.opacity(0.4))
+                    .mb(px(10.0))
+                    .child("You can also import community-maintained Ghostty styles."),
+            )
+            .child(builtin_grid);
+
+        // User-installed themes
+        if let Some(user_grid) = user_grid {
+            theme_card_inner = theme_card_inner.child(
+                div()
+                    .mt(px(16.0))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.0))
+                            .mb(px(10.0))
+                            .child(
+                                svg()
+                                    .path("phosphor/folder.svg")
+                                    .size(px(12.0))
+                                    .text_color(theme.muted_foreground.opacity(0.5)),
+                            )
+                            .child(
+                                div()
+                                    .text_size(px(10.5))
+                                    .text_color(theme.muted_foreground.opacity(0.6))
+                                    .child("Installed"),
+                            ),
+                    )
+                    .child(user_grid),
+            );
+        }
+
         let mut content = section_content(
             "Appearance",
             "Tweak the Con's textures, tastes and feels.",
             theme,
+        );
+
+        // Theme first: it is what people open Appearance to change, and every
+        // group below it only adjusts details of whatever is picked here.
+        content = content.child(card(theme, card_opacity).child(theme_card_inner));
+        content = content.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(8.0))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        // Not a collapsible group: the editor is opened by
+                        // Customize and closed by its own Done button, so a
+                        // second hide control would just be confusing.
+                        .child(group_label("Palette", theme))
+                        .child(customize_btn),
+                )
+                .children(theme_editor_card),
         );
 
         content = content.child(
@@ -4241,79 +4324,6 @@ impl SettingsPanel {
         );
 
         // ── Built-in themes ──
-        let mut theme_card_inner = div()
-            .px(px(16.0))
-            .py(px(12.0))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .mb(px(12.0))
-                    .child(
-                        div()
-                            .text_sm()
-                            .font_weight(FontWeight::MEDIUM)
-                            .child("Terminal Theme"),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(10.0))
-                            .text_color(theme.muted_foreground.opacity(0.5))
-                            .child(format!("{total_count} themes")),
-                    ),
-            )
-            .child(
-                div()
-                    .text_size(px(10.5))
-                    .text_color(theme.muted_foreground.opacity(0.4))
-                    .mb(px(10.0))
-                    .child("You can also import community-maintained Ghostty styles."),
-            )
-            .child(builtin_grid);
-
-        // User-installed themes
-        if let Some(user_grid) = user_grid {
-            theme_card_inner = theme_card_inner.child(
-                div()
-                    .mt(px(16.0))
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(6.0))
-                            .mb(px(10.0))
-                            .child(
-                                svg()
-                                    .path("phosphor/folder.svg")
-                                    .size(px(12.0))
-                                    .text_color(theme.muted_foreground.opacity(0.5)),
-                            )
-                            .child(
-                                div()
-                                    .text_size(px(10.5))
-                                    .text_color(theme.muted_foreground.opacity(0.6))
-                                    .child("Installed"),
-                            ),
-                    )
-                    .child(user_grid),
-            );
-        }
-        content = content.child(card(theme, card_opacity).child(theme_card_inner));
-        content = content.child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(8.0))
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(self.group("palette", "Palette", customize_btn, cx)),
-                )
-                .children(theme_editor_card),
-        );
         content = content.child(card(theme, card_opacity).child(import_section));
 
         content
@@ -6664,6 +6674,7 @@ impl gpui_component::select::SelectItem for FontChoice {
         Some(
             div()
                 .font_family(self.0.clone())
+                .truncate()
                 .child(self.0.clone())
                 .into_any_element(),
         )
@@ -6682,13 +6693,10 @@ impl gpui_component::select::SelectItem for FontChoice {
             // letterforms, the specimen shows digits and glyph width, which is
             // what actually differs between the mono faces.
             .font_family(self.0.clone())
-            .child(div().min_w_0().child(self.0.clone()))
-            .child(
-                div()
-                    .flex_shrink_0()
-                    .text_color(muted)
-                    .child("AaBbGg 0123 —> !="),
-            )
+            // Long names must truncate, not run under the specimen: some faces
+            // render far wider than the UI font the list was sized for.
+            .child(div().flex_1().min_w_0().truncate().child(self.0.clone()))
+            .child(div().flex_shrink_0().text_color(muted).child("Aa 0123 !="))
     }
 }
 
