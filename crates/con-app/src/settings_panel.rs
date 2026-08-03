@@ -2329,13 +2329,23 @@ impl SettingsPanel {
         cx.notify();
     }
 
-    /// Load a slot into the editor's top picker, from a preview click.
+    /// Load a slot into the editor's top picker, from a preview click, and open
+    /// the picker so one click on the coloured text is enough.
     fn select_theme_slot(&mut self, slot: usize, _window: &mut Window, cx: &mut Context<Self>) {
-        self.theme_editor_slot = if self.theme_editor_slot == Some(slot) {
-            None
-        } else {
-            Some(slot)
-        };
+        let deselecting = self.theme_editor_slot == Some(slot);
+
+        // Close whatever was open first, or two popovers fight over the anchor.
+        if let Some(previous) = self.theme_editor_slot
+            && let Some(picker) = self.theme_editor_pickers.get(previous)
+        {
+            picker.update(cx, |state, cx| state.set_open(false, cx));
+        }
+
+        self.theme_editor_slot = if deselecting { None } else { Some(slot) };
+
+        if !deselecting && let Some(picker) = self.theme_editor_pickers.get(slot) {
+            picker.update(cx, |state, cx| state.set_open(true, cx));
+        }
         cx.notify();
     }
 

@@ -31,9 +31,11 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["fo
 gpui_macros = { git = "https://github.com/zed-industries/zed" }
 
 # UI Components — upstream gpui-component, never local 3pp paths
-gpui-component = { git = "https://github.com/longbridge/gpui-component.git", branch = "main", package = "gpui-component" }
-gpui-component-macros = { git = "https://github.com/longbridge/gpui-component.git", branch = "main", package = "gpui-component-macros" }
-gpui-component-assets = { git = "https://github.com/longbridge/gpui-component.git", branch = "main", package = "gpui-component-assets" }
+# Pinned to a fork carrying ColorPickerState::set_open (upstream PR pending);
+# revert these three to longbridge/main once it merges.
+gpui-component = { git = "https://github.com/cdbkk/gpui-component.git", branch = "con-pin", package = "gpui-component" }
+gpui-component-macros = { git = "https://github.com/cdbkk/gpui-component.git", branch = "con-pin", package = "gpui-component-macros" }
+gpui-component-assets = { git = "https://github.com/cdbkk/gpui-component.git", branch = "con-pin", package = "gpui-component-assets" }
 
 # AI Agent
 rig = { package = "rig-core", version = "0.40.0", default-features = false, features = ["rustls"] }
