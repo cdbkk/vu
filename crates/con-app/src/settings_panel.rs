@@ -16,6 +16,7 @@ use gpui::*;
 
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_component::clipboard::Clipboard;
+use gpui_component::color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState};
 use gpui_component::input::InputState;
 use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
 use gpui_component::slider::{Slider, SliderEvent, SliderState};
@@ -33,6 +34,12 @@ actions!(settings, [ToggleSettings, SaveSettings, DismissSettings]);
 
 /// Emitted when the user selects a different terminal theme for live preview.
 pub struct ThemePreview(pub String);
+
+/// An unsaved palette from the theme editor, applied to the live window so
+/// edits show up on real tabs and terminal text. `ThemePreview` can't do this:
+/// it carries a name, and the workspace resolves names off disk.
+#[derive(Clone)]
+pub struct ThemeLivePreview(pub con_terminal::TerminalTheme);
 
 /// Emitted for lightweight appearance changes that should be visible
 /// immediately but should not persist/rebuild the full agent config.
@@ -134,7 +141,6 @@ enum SettingsSection {
     General,
     Appearance,
     Ai,
-    Providers,
     Keys,
 }
 
@@ -144,7 +150,6 @@ impl SettingsSection {
             Self::General => "General",
             Self::Appearance => "Appearance",
             Self::Ai => "AI",
-            Self::Providers => "Providers",
             Self::Keys => "Keys",
         }
     }
@@ -154,7 +159,6 @@ impl SettingsSection {
             Self::General => "phosphor/sliders.svg",
             Self::Appearance => "phosphor/sun.svg",
             Self::Ai => "phosphor/robot.svg",
-            Self::Providers => "phosphor/plugs-connected.svg",
             Self::Keys => "phosphor/keyboard.svg",
         }
     }
@@ -164,7 +168,6 @@ const ALL_SECTIONS: &[SettingsSection] = &[
     SettingsSection::General,
     SettingsSection::Appearance,
     SettingsSection::Ai,
-    SettingsSection::Providers,
     SettingsSection::Keys,
 ];
 
@@ -229,11 +232,12 @@ pub struct SettingsPanel {
     custom_theme_status: Option<String>,
     /// Working copy for the palette editor. `None` means the editor is closed.
     theme_editor: Option<con_terminal::TerminalTheme>,
-    /// Which palette slot is open for editing, as a `ThemeSlot` index.
-    theme_editor_slot: Option<usize>,
-    theme_editor_hex_input: Entity<InputState>,
+    /// One picker per `THEME_SLOTS` entry, built once and retargeted on open.
+    theme_editor_pickers: Vec<Entity<ColorPickerState>>,
     theme_editor_name_input: Entity<InputState>,
     theme_editor_status: Option<String>,
+    /// Theme to restore if the editor is closed without saving.
+    theme_editor_original: Option<String>,
 
     // Keybindings — which binding is being recorded (field name, e.g. "new_tab")
     recording_key: Option<String>,
@@ -1437,11 +1441,19 @@ impl SettingsPanel {
             s.set_placeholder("Save as, e.g. flexoki-amber", window, cx);
             s
         });
-        let theme_editor_hex_input = cx.new(|cx| {
-            let mut s = InputState::new(window, cx);
-            s.set_placeholder("#RRGGBB", window, cx);
-            s
-        });
+        let theme_editor_pickers: Vec<Entity<ColorPickerState>> = THEME_SLOTS
+            .iter()
+            .map(|_| cx.new(|cx| ColorPickerState::new(window, cx)))
+            .collect();
+        for (idx, picker) in theme_editor_pickers.iter().enumerate() {
+            cx.subscribe(picker, move |this, _, event: &ColorPickerEvent, cx| {
+                let ColorPickerEvent::Change(Some(hsla)) = event else {
+                    return;
+                };
+                this.set_theme_slot(idx, *hsla, cx);
+            })
+            .detach();
+        }
         let theme_editor_name_input = cx.new(|cx| {
             let mut s = InputState::new(window, cx);
             s.set_placeholder("my-theme", window, cx);
@@ -1717,10 +1729,10 @@ impl SettingsPanel {
             custom_theme_preview: None,
             custom_theme_status: None,
             theme_editor: None,
-            theme_editor_slot: None,
-            theme_editor_hex_input,
+            theme_editor_pickers,
             theme_editor_name_input,
             theme_editor_status: None,
+            theme_editor_original: None,
             recording_key: None,
             #[cfg(target_os = "macos")]
             recording_resume_keybindings: None,
@@ -2201,52 +2213,46 @@ impl SettingsPanel {
         self.theme_editor_name_input.update(cx, |s, cx| {
             s.set_value(&format!("{}-custom", base.name), window, cx);
         });
+        for (idx, spec) in THEME_SLOTS.iter().enumerate() {
+            let hsla = color_to_hsla(spec.read(&base));
+            if let Some(picker) = self.theme_editor_pickers.get(idx) {
+                picker.update(cx, |state, cx| state.set_value(hsla, window, cx));
+            }
+        }
+        self.theme_editor_original = Some(self.config.terminal.theme.clone());
         self.theme_editor = Some(base);
-        self.theme_editor_slot = None;
         self.theme_editor_status = None;
         cx.notify();
     }
 
+    /// Close the editor. Unsaved edits are dropped and the previous theme is
+    /// restored, since every edit was already pushed to the live window.
     fn close_theme_editor(&mut self, cx: &mut Context<Self>) {
+        let saved = self
+            .theme_editor_status
+            .as_ref()
+            .is_some_and(|s| s.starts_with("Saved"));
+        if let (false, Some(original)) = (saved, self.theme_editor_original.take()) {
+            cx.emit(ThemePreview(original));
+        }
         self.theme_editor = None;
-        self.theme_editor_slot = None;
+        self.theme_editor_original = None;
         self.theme_editor_status = None;
         cx.notify();
     }
 
-    /// Select a palette slot and load its current value into the hex field.
-    fn select_theme_slot(&mut self, slot: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(theme) = self.theme_editor.as_ref() else {
-            return;
-        };
-        let Some(color) = THEME_SLOTS.get(slot).map(|s| s.read(theme)) else {
-            return;
-        };
-        self.theme_editor_hex_input.update(cx, |s, cx| {
-            s.set_value(&color_to_hex(color), window, cx);
-        });
-        self.theme_editor_slot = Some(slot);
-        self.theme_editor_status = None;
-        cx.notify();
-    }
-
-    /// Commit the hex field into the selected slot of the working theme.
-    fn commit_theme_slot(&mut self, cx: &mut Context<Self>) {
-        let (Some(slot), Some(theme)) = (self.theme_editor_slot, self.theme_editor.as_mut()) else {
-            return;
-        };
-        let text = self.theme_editor_hex_input.read(cx).value().to_string();
-        let Some(color) = parse_hex_color(text.trim()) else {
-            self.theme_editor_status =
-                Some(format!("\"{}\" is not a #RRGGBB color.", text.trim()));
-            cx.notify();
+    /// Write a picked color into the working theme and push it to the window.
+    fn set_theme_slot(&mut self, slot: usize, hsla: Hsla, cx: &mut Context<Self>) {
+        let Some(theme) = self.theme_editor.as_mut() else {
             return;
         };
         let Some(spec) = THEME_SLOTS.get(slot) else {
             return;
         };
-        spec.write(theme, color);
+        spec.write(theme, hsla_to_color(hsla));
+        let live = theme.clone();
         self.theme_editor_status = None;
+        cx.emit(ThemeLivePreview(live));
         cx.notify();
     }
 
@@ -3969,9 +3975,20 @@ impl SettingsPanel {
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
-                .child(group_label("Pane", &theme))
+                .child(group_label("Tabs & Top Bar", &theme))
                 .child(
                     card(theme, card_opacity)
+                        .child(
+                            div()
+                                .px(px(12.0))
+                                .pt(px(10.0))
+                                .text_size(px(10.5))
+                                .text_color(theme.muted_foreground.opacity(0.7))
+                                .child(
+                                    "Tab and top bar colors come from the palette below — \
+                                     the accent follows Blue.",
+                                ),
+                        )
                         .child(toggle_row(
                             "Vertical Tabs",
                             "Use the left sidebar for workspace tabs.",
@@ -4243,20 +4260,8 @@ impl SettingsPanel {
         let preview = self.render_theme_editor_preview(&working, cx);
         let slots = self.render_theme_editor_slots(&working, cx);
         let theme = cx.theme();
-        let hex_input = self.theme_editor_hex_input.clone();
         let name_input = self.theme_editor_name_input.clone();
 
-        let selected_label = self
-            .theme_editor_slot
-            .and_then(|i| THEME_SLOTS.get(i))
-            .map(|s| s.label)
-            .unwrap_or("Pick a colour");
-
-        let apply_hex_btn = Button::new("theme-editor-apply-hex")
-            .label("Set")
-            .small()
-            .ghost()
-            .on_click(cx.listener(|this, _, _, cx| this.commit_theme_slot(cx)));
         let save_btn = Button::new("theme-editor-save")
             .label("Save & Apply")
             .icon(Icon::default().path("phosphor/check.svg"))
@@ -4276,23 +4281,6 @@ impl SettingsPanel {
                 .gap(px(12.0))
                 .p(px(16.0))
                 .child(preview)
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap(px(8.0))
-                        .child(
-                            div()
-                                .w(px(120.0))
-                                .text_size(px(11.5))
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.foreground)
-                                .child(selected_label),
-                        )
-                        .child(div().flex_1().min_w_0().child(hex_input))
-                        .child(apply_hex_btn),
-                )
                 .child(slots)
                 .child(
                     div()
@@ -4395,48 +4383,42 @@ impl SettingsPanel {
         screen
     }
 
-    /// The 18 palette slots as clickable swatches.
+    /// The 18 palette slots, each opening a colour picker. The picker carries
+    /// its own hex field and HSL sliders, so there is no separate hex row.
     fn render_theme_editor_slots(
         &self,
         term_theme: &con_terminal::TerminalTheme,
         cx: &mut Context<Self>,
     ) -> Div {
         let theme = cx.theme();
-        let selected = self.theme_editor_slot;
+        // Offer the palette's own colours as one-click swatches — most edits
+        // are "make this the same green as that", not a fresh hue.
+        let featured: Vec<Hsla> = THEME_SLOTS
+            .iter()
+            .map(|spec| color_to_hsla(spec.read(term_theme)))
+            .collect();
+
         let mut grid = div().flex().flex_col().gap(px(1.0));
 
         for (idx, spec) in THEME_SLOTS.iter().enumerate() {
+            let Some(picker_state) = self.theme_editor_pickers.get(idx) else {
+                continue;
+            };
             let color = spec.read(term_theme);
-            let is_sel = selected == Some(idx);
             grid = grid.child(
                 div()
-                    .id(SharedString::from(format!("theme-slot-{idx}")))
                     .flex()
                     .flex_row()
                     .items_center()
                     .gap(px(10.0))
                     .px(px(10.0))
-                    .py(px(6.0))
+                    .py(px(5.0))
                     .rounded(px(6.0))
-                    .cursor_pointer()
-                    .bg(if is_sel {
-                        theme.primary.opacity(0.10)
-                    } else {
-                        theme.transparent
-                    })
-                    .hover(|s| s.bg(theme.primary.opacity(0.06)))
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(move |this, _, window, cx| {
-                            this.select_theme_slot(idx, window, cx);
-                        }),
-                    )
+                    .hover(|s| s.bg(theme.primary.opacity(0.05)))
                     .child(
-                        div()
-                            .size(px(18.0))
-                            .rounded(px(4.0))
-                            .flex_shrink_0()
-                            .bg(gpui::rgb(color.to_u32())),
+                        ColorPicker::new(picker_state)
+                            .featured_colors(featured.clone())
+                            .anchor(Corner::TopLeft),
                     )
                     .child(
                         div()
@@ -4630,7 +4612,11 @@ impl SettingsPanel {
             )
     }
 
-    fn render_ai(&mut self, cx: &mut Context<Self>) -> Div {
+    fn render_ai(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
+        // Providers used to be its own tab, but picking a model and holding the
+        // credential that model needs is one task; splitting them meant bouncing
+        // between tabs to finish it.
+        let providers = self.render_providers_body(window, cx);
         let theme = cx.theme();
         let card_opacity = self.card_opacity();
         let max_turns_input = self.max_turns_input.clone();
@@ -4756,13 +4742,18 @@ impl SettingsPanel {
             .flex_1()
             .gap(px(12.0))
             .child(routing_card)
-            .child(behavior_card);
+            .child(behavior_card)
+            .child(providers);
 
-        section_content("AI", "Model selection and AI harness configuration.", theme)
-            .child(ai_layout)
+        section_content(
+            "AI",
+            "Models, providers, credentials, and harness behavior.",
+            theme,
+        )
+        .child(ai_layout)
     }
 
-    fn render_providers(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
+    fn render_providers_body(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
         let theme = cx.theme();
         let card_opacity = self.card_opacity();
         let viewport_w = window.viewport_size().width.as_f32();
@@ -5331,20 +5322,25 @@ impl SettingsPanel {
                 card(theme, card_opacity).child(div().px(px(4.0)).py(px(4.0)).child(provider_list)),
             );
 
-        section_content(
-            "Providers",
-            "Manage credentials, endpoints, and provider-specific defaults independently from the app-wide AI behavior.",
-            theme,
-        )
-        .child(
-            div()
-                .flex()
-                .flex_1()
-                .min_w_0()
-                .gap(px(16.0))
-                .child(provider_column)
-                .child(right_col),
-        )
+        card(theme, card_opacity)
+            .flex()
+            .flex_col()
+            .gap(px(12.0))
+            .p(px(16.0))
+            .child(
+                div()
+                    .text_sm()
+                    .font_weight(FontWeight::MEDIUM)
+                    .child("Providers"),
+            )
+            .child(
+                div()
+                    .flex()
+                    .min_w_0()
+                    .gap(px(16.0))
+                    .child(provider_column)
+                    .child(right_col),
+            )
     }
 
     fn render_keys(&mut self, cx: &mut Context<Self>) -> Div {
@@ -5891,6 +5887,7 @@ impl SettingsPanel {
 
 impl EventEmitter<SaveSettings> for SettingsPanel {}
 impl EventEmitter<ThemePreview> for SettingsPanel {}
+impl EventEmitter<ThemeLivePreview> for SettingsPanel {}
 impl EventEmitter<AppearancePreview> for SettingsPanel {}
 
 impl Focusable for SettingsPanel {
@@ -5912,8 +5909,7 @@ impl Render for SettingsPanel {
         let content = match active {
             SettingsSection::General => self.render_general(cx),
             SettingsSection::Appearance => self.render_appearance(cx),
-            SettingsSection::Ai => self.render_ai(cx),
-            SettingsSection::Providers => self.render_providers(window, cx),
+            SettingsSection::Ai => self.render_ai(window, cx),
             SettingsSection::Keys => self.render_keys(cx),
         };
 
@@ -5940,10 +5936,14 @@ impl Render for SettingsPanel {
         };
         // Uniform width for all sections — prevents position jumping when switching tabs
         let card_width = px(((viewport_w * 0.76).clamp(680.0, 980.0)).min(viewport_w - 32.0));
+        // While picking colours the panel drops to the bottom and shrinks, so the
+        // tab strip and terminal it is restyling stay visible above it.
+        let theme_editing = self.theme_editor.is_some() && active == SettingsSection::Appearance;
         let card_height = {
             let target = match active {
+                _ if theme_editing => (viewport_h * 0.58).clamp(360.0, 620.0),
                 SettingsSection::Appearance => (viewport_h * 0.82).clamp(440.0, 780.0),
-                SettingsSection::Providers => (viewport_h * 0.80).clamp(440.0, 760.0),
+                SettingsSection::Ai => (viewport_h * 0.82).clamp(440.0, 780.0),
                 _ => (viewport_h * 0.76).clamp(420.0, 720.0),
             };
             px(target.min(viewport_h - 32.0))
@@ -6427,7 +6427,11 @@ impl Render for SettingsPanel {
             .occlude()
             .absolute()
             .size_full()
-            .bg(theme.background.opacity(0.6 * overlay_progress))
+            .bg(theme.background.opacity(
+                // Nearly clear while editing colours — the point is to see the
+                // app behind the panel repaint as you pick.
+                if theme_editing { 0.10 } else { 0.6 } * overlay_progress,
+            ))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, window, cx| {
@@ -6435,12 +6439,13 @@ impl Render for SettingsPanel {
                 }),
             );
 
-        let card = div()
-            .id("settings-card-shell")
-            .absolute()
-            .inset_0()
-            .flex()
-            .items_center()
+        let card_shell = div().id("settings-card-shell").absolute().inset_0().flex();
+        let card_shell = if theme_editing {
+            card_shell.items_end().pb(px(16.0))
+        } else {
+            card_shell.items_center()
+        };
+        let card = card_shell
             .justify_center()
             .opacity(overlay_progress)
             .child(
@@ -6621,16 +6626,20 @@ fn color_to_hex(c: con_terminal::Color) -> String {
     format!("#{:02X}{:02X}{:02X}", c.r, c.g, c.b)
 }
 
-fn parse_hex_color(value: &str) -> Option<con_terminal::Color> {
-    let hex = value.strip_prefix('#').unwrap_or(value);
-    if hex.len() != 6 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
-        return None;
+fn color_to_hsla(c: con_terminal::Color) -> Hsla {
+    gpui::Rgba {
+        r: c.r as f32 / 255.0,
+        g: c.g as f32 / 255.0,
+        b: c.b as f32 / 255.0,
+        a: 1.0,
     }
-    Some(con_terminal::Color::rgb(
-        u8::from_str_radix(&hex[0..2], 16).ok()?,
-        u8::from_str_radix(&hex[2..4], 16).ok()?,
-        u8::from_str_radix(&hex[4..6], 16).ok()?,
-    ))
+    .into()
+}
+
+fn hsla_to_color(h: Hsla) -> con_terminal::Color {
+    let rgba: gpui::Rgba = h.into();
+    let to_u8 = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+    con_terminal::Color::rgb(to_u8(rgba.r), to_u8(rgba.g), to_u8(rgba.b))
 }
 
 fn row_field(label: &str, input: &Entity<InputState>) -> Div {

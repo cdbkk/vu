@@ -309,6 +309,19 @@ impl ConWorkspace {
             })
             .detach();
 
+            let workspace_for_live_theme = workspace.clone();
+            let main_window_for_live_theme = main_window;
+            cx.subscribe(&panel, move |_settings, event: &ThemeLivePreview, cx| {
+                let theme = event.0.clone();
+                let _ = main_window_for_live_theme.update(cx, |_, window, cx| {
+                    let _ = workspace_for_live_theme.update(cx, |workspace, cx| {
+                        workspace.apply_terminal_theme(theme, window, cx);
+                        cx.notify();
+                    });
+                });
+            })
+            .detach();
+
             let workspace_for_appearance = workspace.clone();
             let main_window_for_appearance = main_window;
             cx.subscribe(&panel, move |settings, _: &AppearancePreview, cx| {

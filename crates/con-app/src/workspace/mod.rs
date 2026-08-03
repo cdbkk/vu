@@ -54,7 +54,9 @@ use crate::motion::MotionValue;
 use crate::pane_tree::{
     PaneTree, SplitDirection, SplitPlacement, SurfaceCreateOptions, SurfaceRenameEditor,
 };
-use crate::settings_panel::{self, AppearancePreview, SaveSettings, SettingsPanel, ThemePreview};
+use crate::settings_panel::{
+    self, AppearancePreview, SaveSettings, SettingsPanel, ThemeLivePreview, ThemePreview,
+};
 use crate::sidebar::{
     DraggedTab, DraggedTabOrigin, NewSession, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH, SessionEntry,
     SessionSidebar, SidebarCloseOthers, SidebarCloseTab, SidebarDuplicate, SidebarOpenToolSlot,
