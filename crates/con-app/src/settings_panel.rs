@@ -2267,7 +2267,7 @@ impl SettingsPanel {
     }
 
     /// Parse a ghostty config from clipboard and show a live preview.
-    fn paste_theme_from_clipboard(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+    fn paste_theme_from_clipboard(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let text = match cx
             .read_from_clipboard()
             .and_then(|c| c.text().map(|s| s.to_string()))
@@ -2292,11 +2292,13 @@ impl SettingsPanel {
         match con_terminal::TerminalTheme::from_ghostty_format(&name, &text) {
             Some(theme) => {
                 self.custom_theme_status = Some(format!(
-                    "Loaded \"{}\" from the clipboard. {} ANSI colors are ready to preview.",
-                    display_theme_name(&name),
-                    theme.ansi.len()
+                    "Loaded \"{}\" into the editor. Adjust any slot, then Save & Apply.",
+                    display_theme_name(&name)
                 ));
-                self.custom_theme_preview = Some(theme);
+                self.custom_theme_preview = Some(theme.clone());
+                // Drop the import straight into the editor rather than leaving
+                // it as a preview the user has to separately apply and reopen.
+                self.load_theme_into_editor(theme, window, cx);
             }
             None => {
                 self.custom_theme_status = Some(
@@ -2405,17 +2407,37 @@ impl SettingsPanel {
     fn open_theme_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let base = con_terminal::TerminalTheme::by_name(&self.config.terminal.theme)
             .unwrap_or_default();
+        self.load_theme_into_editor(base, window, cx);
+    }
+
+    /// Seed the editor and every picker from `theme`. Used both by Customize and
+    /// by a clipboard import, so an imported theme lands somewhere editable.
+    fn load_theme_into_editor(
+        &mut self,
+        theme: con_terminal::TerminalTheme,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let suggested = if theme.name.ends_with("-custom") {
+            theme.name.clone()
+        } else {
+            format!("{}-custom", theme.name)
+        };
         self.theme_editor_name_input.update(cx, |s, cx| {
-            s.set_value(&format!("{}-custom", base.name), window, cx);
+            s.set_value(&suggested, window, cx);
         });
         for (idx, spec) in THEME_SLOTS.iter().enumerate() {
-            let hsla = color_to_hsla(spec.read(&base));
+            let hsla = color_to_hsla(spec.read(&theme));
             if let Some(picker) = self.theme_editor_pickers.get(idx) {
                 picker.update(cx, |state, cx| state.set_value(hsla, window, cx));
             }
         }
-        self.theme_editor_original = Some(self.config.terminal.theme.clone());
-        self.theme_editor = Some(base);
+        if self.theme_editor_original.is_none() {
+            self.theme_editor_original = Some(self.config.terminal.theme.clone());
+        }
+        // Show the import on the real window immediately, same as an edit.
+        cx.emit(ThemeLivePreview(theme.clone()));
+        self.theme_editor = Some(theme);
         self.theme_editor_slot = None;
         self.theme_editor_status = None;
         cx.notify();
@@ -2470,6 +2492,28 @@ impl SettingsPanel {
         let live = theme.clone();
         self.theme_editor_status = None;
         cx.emit(ThemeLivePreview(live));
+        cx.notify();
+    }
+
+    /// Copy the working palette as a Ghostty theme file, so it can be pasted
+    /// into another machine's editor or committed somewhere.
+    fn copy_theme_to_clipboard(&mut self, cx: &mut Context<Self>) {
+        let Some(theme) = self.theme_editor.as_ref() else {
+            return;
+        };
+        let name = self
+            .theme_editor_name_input
+            .read(cx)
+            .value()
+            .trim()
+            .to_lowercase()
+            .replace(' ', "-");
+        let mut out = theme.clone();
+        if !name.is_empty() {
+            out.name = name;
+        }
+        cx.write_to_clipboard(ClipboardItem::new_string(out.to_ghostty_format()));
+        self.theme_editor_status = Some(format!("Copied \"{}\" to the clipboard.", out.name));
         cx.notify();
     }
 
@@ -4631,6 +4675,12 @@ impl SettingsPanel {
             .small()
             .primary()
             .on_click(cx.listener(|this, _, _, cx| this.save_theme_editor(cx)));
+        let copy_btn = Button::new("theme-editor-copy")
+            .label("Copy")
+            .icon(Icon::default().path("phosphor/copy.svg"))
+            .small()
+            .ghost()
+            .on_click(cx.listener(|this, _, _, cx| this.copy_theme_to_clipboard(cx)));
         let close_btn = Button::new("theme-editor-close")
             .label("Done")
             .small()
@@ -4653,6 +4703,7 @@ impl SettingsPanel {
                         .items_center()
                         .gap(px(8.0))
                         .child(div().flex_1().min_w_0().child(name_input))
+                        .child(copy_btn)
                         .child(save_btn)
                         .child(close_btn),
                 )
