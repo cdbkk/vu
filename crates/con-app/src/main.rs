@@ -2541,6 +2541,10 @@ fn main() {
         input_bar::InputBar::init(cx);
 
         ui_scale::set_icon_scale(config.appearance.icon_scale);
+        theme::set_chrome_strengths(
+            config.appearance.chrome_surface_strength,
+            config.appearance.chrome_border_strength,
+        );
 
         // Load and activate con's design theme (synced to terminal theme)
         theme::init_theme(

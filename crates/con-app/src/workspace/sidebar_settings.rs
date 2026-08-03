@@ -973,6 +973,10 @@ impl ConWorkspace {
         let next_tabs_orientation = appearance_config.tabs_orientation;
 
         crate::ui_scale::set_icon_scale(appearance_config.icon_scale);
+        crate::theme::set_chrome_strengths(
+            appearance_config.chrome_surface_strength,
+            appearance_config.chrome_border_strength,
+        );
         self.config.appearance.icon_scale = appearance_config.icon_scale;
 
         let font_changed = self.terminal_font_family != next_terminal_font_family

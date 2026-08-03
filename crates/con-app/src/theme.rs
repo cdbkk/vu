@@ -1,6 +1,7 @@
 use con_core::config::{MAX_UI_FONT_SIZE, MIN_UI_FONT_SIZE, sanitize_terminal_font_family};
 use con_terminal::{Color, TerminalTheme};
 use gpui::App;
+use std::sync::atomic::{AtomicU32, Ordering};
 use gpui_component::highlighter::LanguageRegistry;
 use gpui_component::scroll::ScrollbarShow;
 use gpui_component::{Theme, ThemeMode, ThemeRegistry};
@@ -338,6 +339,28 @@ fn apply_gpui_theme_by_name(terminal_theme_name: &str, cx: &mut App) {
 /// - warning = yellow (ansi[3])
 /// - info = cyan (ansi[6])
 /// - Surface colors derived from bg/fg with blending
+// ponytail: process-global read-mostly scalars, same shape as ui_scale's icon
+// scale. generate_gpui_theme_json is called from several places that do not
+// carry the config; threading it through all of them buys nothing.
+static CHROME_SURFACE_STRENGTH: AtomicU32 = AtomicU32::new(1.0f32.to_bits());
+static CHROME_BORDER_STRENGTH: AtomicU32 = AtomicU32::new(1.0f32.to_bits());
+
+/// Set how far chrome is separated from the terminal background. Call whenever
+/// the appearance config changes, before re-applying the theme.
+pub fn set_chrome_strengths(surface: f32, border: f32) {
+    let clamp = |v: f32| if v.is_finite() { v.clamp(0.0, 4.0) } else { 1.0 };
+    CHROME_SURFACE_STRENGTH.store(clamp(surface).to_bits(), Ordering::Relaxed);
+    CHROME_BORDER_STRENGTH.store(clamp(border).to_bits(), Ordering::Relaxed);
+}
+
+fn chrome_surface_strength() -> f64 {
+    f32::from_bits(CHROME_SURFACE_STRENGTH.load(Ordering::Relaxed)) as f64
+}
+
+fn chrome_border_strength() -> f64 {
+    f32::from_bits(CHROME_BORDER_STRENGTH.load(Ordering::Relaxed)) as f64
+}
+
 fn generate_gpui_theme_json(tt: &TerminalTheme) -> String {
     let bg = tt.background;
     let fg = tt.foreground;
@@ -351,10 +374,14 @@ fn generate_gpui_theme_json(tt: &TerminalTheme) -> String {
     let is_dark = is_dark_color(bg);
     let mode = if is_dark { "dark" } else { "light" };
 
-    // Generate surface colors by blending bg toward fg
-    let surface1 = blend(bg, fg, 0.06);
-    let surface2 = blend(bg, fg, 0.12);
-    let surface3 = blend(bg, fg, 0.18);
+    // Generate surface colors by blending bg toward fg. The strengths let the
+    // user pull chrome toward the terminal (0) or push it further away.
+    let sw = chrome_surface_strength();
+    let bw = chrome_border_strength();
+    let surface1 = blend(bg, fg, (0.06 * sw).clamp(0.0, 1.0));
+    let surface2 = blend(bg, fg, (0.12 * sw).clamp(0.0, 1.0));
+    let surface3 = blend(bg, fg, (0.18 * sw).clamp(0.0, 1.0));
+    let border_color = blend(bg, fg, (0.12 * bw).clamp(0.0, 1.0));
     let muted_fg = blend(fg, bg, 0.45);
 
     // Primary contrast — use bg as text on primary buttons for max contrast
@@ -510,7 +537,7 @@ fn generate_gpui_theme_json(tt: &TerminalTheme) -> String {
 }}"#,
         bg_hex = hex(bg),
         fg_hex = hex(fg),
-        border = hex(surface2),
+        border = hex(border_color),
         primary_fg_hex = hex(primary_fg),
         primary_hover_hex = hex(primary_hover),
         primary_active_hex = hex(primary_active),

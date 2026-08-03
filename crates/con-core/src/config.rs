@@ -304,6 +304,12 @@ pub struct AppearanceConfig {
     /// growing labels or padding. Buttons grow only far enough to contain the
     /// icon.
     pub icon_scale: f32,
+    /// Scales how far chrome surfaces (title bar, sidebar, cards) are blended
+    /// from the terminal background toward its foreground. 0 makes chrome match
+    /// the terminal exactly; higher values separate it more.
+    pub chrome_surface_strength: f32,
+    /// Same, for borders and dividers specifically.
+    pub chrome_border_strength: f32,
 }
 
 impl Default for AppearanceConfig {
@@ -325,6 +331,8 @@ impl Default for AppearanceConfig {
             hide_pane_title_bar: false,
             tabs_orientation: TabsOrientation::Vertical,
             icon_scale: default_icon_scale(),
+            chrome_surface_strength: 1.0,
+            chrome_border_strength: 1.0,
         }
     }
 }
@@ -365,6 +373,9 @@ impl AppearanceConfig {
         } else {
             default_icon_scale()
         };
+        let strength = |v: f32| if v.is_finite() { v.clamp(0.0, 4.0) } else { 1.0 };
+        self.chrome_surface_strength = strength(self.chrome_surface_strength);
+        self.chrome_border_strength = strength(self.chrome_border_strength);
     }
 }
 

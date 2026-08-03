@@ -218,6 +218,8 @@ pub struct SettingsPanel {
     minimum_contrast_slider: Entity<SliderState>,
     unfocused_split_slider: Entity<SliderState>,
     window_padding_slider: Entity<SliderState>,
+    chrome_surface_slider: Entity<SliderState>,
+    chrome_border_slider: Entity<SliderState>,
     terminal_blur: bool,
     ui_opacity_slider: Entity<SliderState>,
     tab_accent_inactive_alpha_slider: Entity<SliderState>,
@@ -1421,6 +1423,20 @@ impl SettingsPanel {
                 .step(1.0)
                 .default_value(tw.window_padding_x)
         });
+        let chrome_surface_slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.0)
+                .max(3.0)
+                .step(0.1)
+                .default_value(config.appearance.chrome_surface_strength)
+        });
+        let chrome_border_slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.0)
+                .max(3.0)
+                .step(0.1)
+                .default_value(config.appearance.chrome_border_strength)
+        });
         let icon_scale_slider = cx.new(|_| {
             SliderState::new()
                 .min(MIN_ICON_SCALE)
@@ -1550,6 +1566,23 @@ impl SettingsPanel {
                 .detach();
             };
         }
+        macro_rules! chrome_slider {
+            ($slider:expr, $field:ident) => {
+                cx.subscribe(&$slider, |this, _, event: &SliderEvent, cx| {
+                    let SliderEvent::Change(value) = event;
+                    this.config.appearance.$field = value.end();
+                    crate::theme::set_chrome_strengths(
+                        this.config.appearance.chrome_surface_strength,
+                        this.config.appearance.chrome_border_strength,
+                    );
+                    cx.emit(AppearancePreview);
+                    cx.notify();
+                })
+                .detach();
+            };
+        }
+        chrome_slider!(chrome_surface_slider, chrome_surface_strength);
+        chrome_slider!(chrome_border_slider, chrome_border_strength);
         tweak_slider!(line_height_slider, line_height_percent);
         tweak_slider!(letter_spacing_slider, letter_spacing_percent);
         tweak_slider!(minimum_contrast_slider, minimum_contrast);
@@ -1805,6 +1838,8 @@ impl SettingsPanel {
             minimum_contrast_slider,
             unfocused_split_slider,
             window_padding_slider,
+            chrome_surface_slider,
+            chrome_border_slider,
             terminal_blur: Self::effective_terminal_blur(config.appearance.terminal_blur),
             ui_opacity_slider,
             tab_accent_inactive_alpha_slider,
@@ -4166,6 +4201,10 @@ impl SettingsPanel {
         let minimum_contrast_slider = self.minimum_contrast_slider.clone();
         let unfocused_split_slider = self.unfocused_split_slider.clone();
         let window_padding_slider = self.window_padding_slider.clone();
+        let chrome_surface_slider = self.chrome_surface_slider.clone();
+        let chrome_border_slider = self.chrome_border_slider.clone();
+        let chrome_surface_strength = self.config.appearance.chrome_surface_strength;
+        let chrome_border_strength = self.config.appearance.chrome_border_strength;
         content = content.child(
             div()
                 .flex()
@@ -4367,8 +4406,8 @@ impl SettingsPanel {
                                 .text_size(px(10.5))
                                 .text_color(theme.muted_foreground.opacity(0.7))
                                 .child(
-                                    "Tab and top bar colors come from the palette below — \
-                                     the accent follows Blue.",
+                                    "Surfaces are blended from the terminal background toward \
+                                     its foreground; the accent follows the palette's Blue.",
                                 ),
                         )
                         .child(toggle_row(
@@ -4437,6 +4476,22 @@ impl SettingsPanel {
                             "Accent strength when hovering inactive tabs.",
                             &tab_accent_inactive_hover_alpha_slider,
                             tab_accent_inactive_hover_alpha,
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(slider_row(
+                            "Surface Contrast",
+                            "How far the title bar, tab strip, sidebar, and cards sit from the terminal background. 0 makes them match it exactly.",
+                            &chrome_surface_slider,
+                            chrome_surface_strength,
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(slider_row(
+                            "Border Contrast",
+                            "Visibility of borders and dividers between panes and panels.",
+                            &chrome_border_slider,
+                            chrome_border_strength,
                             theme,
                         )), cx)),
         );
@@ -4854,10 +4909,29 @@ impl SettingsPanel {
                     )
                     .child(
                         div()
-                            .text_size(px(10.5))
-                            .font_family(theme.mono_font_family.clone())
-                            .text_color(theme.muted_foreground)
-                            .child(color_to_hex(color)),
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(px(6.0))
+                            .children(THEME_SLOTS.iter().take(idx).position(|other| {
+                                other.read(term_theme) == color
+                            }).and_then(|dupe| THEME_SLOTS.get(dupe)).map(|dupe| {
+                                div()
+                                    .text_size(px(9.5))
+                                    .px(px(5.0))
+                                    .py(px(1.0))
+                                    .rounded(px(3.0))
+                                    .bg(theme.muted.opacity(0.35))
+                                    .text_color(theme.muted_foreground)
+                                    .child(format!("= {}", dupe.label))
+                            }))
+                            .child(
+                                div()
+                                    .text_size(px(10.5))
+                                    .font_family(theme.mono_font_family.clone())
+                                    .text_color(theme.muted_foreground)
+                                    .child(color_to_hex(color)),
+                            ),
                     ),
             );
         }
@@ -7087,14 +7161,14 @@ const THEME_SLOTS: &[ThemeSlot] = &[
     slot("Magenta", "Keywords and special values", Some(5)),
     slot("Cyan", "Agent tool names and info", Some(6)),
     slot("White", "Bright default text", Some(7)),
-    slot("Bright Black", "Dimmed output and thinking text", Some(8)),
-    slot("Bright Red", "Emphasized errors", Some(9)),
-    slot("Bright Green", "Emphasized success", Some(10)),
-    slot("Bright Yellow", "Emphasized warnings", Some(11)),
-    slot("Bright Blue", "Emphasized accent", Some(12)),
-    slot("Bright Magenta", "Emphasized keywords", Some(13)),
-    slot("Bright Cyan", "Emphasized info", Some(14)),
-    slot("Bright White", "Highest-contrast text", Some(15)),
+    slot("Bright Black", "Dimmed output, comments, thinking text", Some(8)),
+    slot("Bright Red", "Bright variant of Red", Some(9)),
+    slot("Bright Green", "Bright variant of Green", Some(10)),
+    slot("Bright Yellow", "Bright variant of Yellow", Some(11)),
+    slot("Bright Blue", "Bright variant of Blue", Some(12)),
+    slot("Bright Magenta", "Bright variant of Magenta", Some(13)),
+    slot("Bright Cyan", "Bright variant of Cyan", Some(14)),
+    slot("Bright White", "Bright variant of White", Some(15)),
 ];
 
 fn color_to_hex(c: con_terminal::Color) -> String {
