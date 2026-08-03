@@ -88,6 +88,8 @@ pub struct TerminalConfig {
     pub font_size: f32,
     pub theme: String,
     pub cursor_style: String,
+    /// Terminal behaviour ghostty supports but con never surfaced.
+    pub tweaks: TerminalTweaks,
 }
 
 impl Default for TerminalConfig {
@@ -97,8 +99,177 @@ impl Default for TerminalConfig {
             font_size: default_font_size(),
             theme: default_theme(),
             cursor_style: default_cursor_style(),
+            tweaks: TerminalTweaks::default(),
         }
     }
+}
+
+/// Terminal rendering options passed straight through to ghostty.
+///
+/// These render to a ghostty config fragment rather than typed fields on
+/// `GhosttyConfigPatch`, because `con-ghostty` deliberately has no dependency on
+/// this crate and adding ten Option fields to the patch/merge path would cost
+/// far more than the string it produces.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct TerminalTweaks {
+    /// Extra cell height as a percentage; 0 is ghostty's natural line height.
+    pub line_height_percent: f32,
+    /// Extra cell width as a percentage.
+    pub letter_spacing_percent: f32,
+    /// Font ligatures. Off disables calt/liga/dlig.
+    pub ligatures: bool,
+    /// Synthetic bolding for thin faces on low-DPI displays.
+    pub font_thicken: bool,
+    pub cursor_blink: bool,
+    /// Render bold text using the bright ANSI colour.
+    pub bold_is_bright: bool,
+    /// Minimum contrast ratio between text and its background. 1 disables it;
+    /// raising it rescues unreadable colours without hand-tuning the palette.
+    pub minimum_contrast: f32,
+    /// Dim splits that do not have focus. 1 disables the effect.
+    pub unfocused_split_opacity: f32,
+    pub window_padding_x: f32,
+    pub window_padding_y: f32,
+    pub mouse_hide_while_typing: bool,
+    /// `None` leaves ghostty's default (inverted cell colours).
+    pub selection_background: Option<String>,
+    pub selection_foreground: Option<String>,
+}
+
+impl Default for TerminalTweaks {
+    fn default() -> Self {
+        Self {
+            line_height_percent: 0.0,
+            letter_spacing_percent: 0.0,
+            ligatures: true,
+            font_thicken: false,
+            cursor_blink: true,
+            bold_is_bright: false,
+            minimum_contrast: 1.0,
+            unfocused_split_opacity: 1.0,
+            window_padding_x: 0.0,
+            window_padding_y: 0.0,
+            mouse_hide_while_typing: false,
+            selection_background: None,
+            selection_foreground: None,
+        }
+    }
+}
+
+impl TerminalTweaks {
+    pub const MAX_SPACING_PERCENT: f32 = 100.0;
+    pub const MIN_SPACING_PERCENT: f32 = -20.0;
+    pub const MAX_CONTRAST: f32 = 21.0;
+    pub const MAX_PADDING: f32 = 64.0;
+
+    pub fn normalize(&mut self) {
+        let pct = |v: f32| {
+            if v.is_finite() {
+                v.clamp(Self::MIN_SPACING_PERCENT, Self::MAX_SPACING_PERCENT)
+            } else {
+                0.0
+            }
+        };
+        self.line_height_percent = pct(self.line_height_percent);
+        self.letter_spacing_percent = pct(self.letter_spacing_percent);
+        self.minimum_contrast = if self.minimum_contrast.is_finite() {
+            self.minimum_contrast.clamp(1.0, Self::MAX_CONTRAST)
+        } else {
+            1.0
+        };
+        self.unfocused_split_opacity = if self.unfocused_split_opacity.is_finite() {
+            self.unfocused_split_opacity.clamp(0.15, 1.0)
+        } else {
+            1.0
+        };
+        let pad = |v: f32| {
+            if v.is_finite() {
+                v.clamp(0.0, Self::MAX_PADDING)
+            } else {
+                0.0
+            }
+        };
+        self.window_padding_x = pad(self.window_padding_x);
+        self.window_padding_y = pad(self.window_padding_y);
+        if !self
+            .selection_background
+            .as_deref()
+            .is_some_and(is_hex_color)
+        {
+            self.selection_background = None;
+        }
+        if !self
+            .selection_foreground
+            .as_deref()
+            .is_some_and(is_hex_color)
+        {
+            self.selection_foreground = None;
+        }
+    }
+
+    /// Render as ghostty config lines. Options left at their default are
+    /// omitted so ghostty keeps its own behaviour rather than being pinned to
+    /// a value we happened to pick.
+    pub fn to_ghostty_config(&self) -> String {
+        let mut s = String::new();
+        if self.line_height_percent != 0.0 {
+            s.push_str(&format!(
+                "adjust-cell-height = {:.0}%\n",
+                self.line_height_percent
+            ));
+        }
+        if self.letter_spacing_percent != 0.0 {
+            s.push_str(&format!(
+                "adjust-cell-width = {:.0}%\n",
+                self.letter_spacing_percent
+            ));
+        }
+        if !self.ligatures {
+            // Ghostty takes one feature per line; these three cover the
+            // ligature sets the bundled mono face ships with.
+            s.push_str("font-feature = -calt\nfont-feature = -liga\nfont-feature = -dlig\n");
+        }
+        if self.font_thicken {
+            s.push_str("font-thicken = true\n");
+        }
+        if !self.cursor_blink {
+            s.push_str("cursor-style-blink = false\n");
+        }
+        if self.bold_is_bright {
+            s.push_str("bold-is-bright = true\n");
+        }
+        if self.minimum_contrast > 1.0 {
+            s.push_str(&format!("minimum-contrast = {:.2}\n", self.minimum_contrast));
+        }
+        if self.unfocused_split_opacity < 1.0 {
+            s.push_str(&format!(
+                "unfocused-split-opacity = {:.2}\n",
+                self.unfocused_split_opacity
+            ));
+        }
+        if self.window_padding_x > 0.0 {
+            s.push_str(&format!("window-padding-x = {:.0}\n", self.window_padding_x));
+        }
+        if self.window_padding_y > 0.0 {
+            s.push_str(&format!("window-padding-y = {:.0}\n", self.window_padding_y));
+        }
+        if self.mouse_hide_while_typing {
+            s.push_str("mouse-hide-while-typing = true\n");
+        }
+        if let Some(bg) = &self.selection_background {
+            s.push_str(&format!("selection-background = {bg}\n"));
+        }
+        if let Some(fg) = &self.selection_foreground {
+            s.push_str(&format!("selection-foreground = {fg}\n"));
+        }
+        s
+    }
+}
+
+fn is_hex_color(v: &str) -> bool {
+    let h = v.strip_prefix('#').unwrap_or(v);
+    h.len() == 6 && h.chars().all(|c| c.is_ascii_hexdigit())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -853,6 +1024,7 @@ impl Config {
     pub fn normalize(&mut self) {
         self.appearance.normalize();
         self.keybindings.normalize();
+        self.terminal.tweaks.normalize();
     }
 
     pub fn load() -> Result<Self> {
@@ -1086,6 +1258,43 @@ mod tests {
     #[test]
     fn new_configs_enable_restore_terminal_text_by_default() {
         assert!(Config::default().appearance.restore_terminal_text);
+    }
+
+    #[test]
+    fn tweaks_emit_only_non_default_ghostty_keys() {
+        use super::TerminalTweaks;
+        // Emitting defaults would pin ghostty to values we picked rather than
+        // letting it keep its own, so an untouched config must produce nothing.
+        let mut tweaks = TerminalTweaks::default();
+        assert_eq!(tweaks.to_ghostty_config(), "");
+
+        tweaks.line_height_percent = 20.0;
+        tweaks.ligatures = false;
+        tweaks.minimum_contrast = 3.0;
+        let out = tweaks.to_ghostty_config();
+        assert!(out.contains("adjust-cell-height = 20%"), "{out}");
+        assert!(out.contains("font-feature = -liga"), "{out}");
+        assert!(out.contains("minimum-contrast = 3.00"), "{out}");
+        assert!(!out.contains("font-thicken"), "{out}");
+    }
+
+    #[test]
+    fn tweaks_normalize_rejects_bad_values() {
+        use super::TerminalTweaks;
+        let mut tweaks = TerminalTweaks {
+            line_height_percent: f32::NAN,
+            minimum_contrast: 999.0,
+            unfocused_split_opacity: -3.0,
+            selection_background: Some("not-a-color".into()),
+            selection_foreground: Some("#AABBCC".into()),
+            ..TerminalTweaks::default()
+        };
+        tweaks.normalize();
+        assert_eq!(tweaks.line_height_percent, 0.0);
+        assert_eq!(tweaks.minimum_contrast, TerminalTweaks::MAX_CONTRAST);
+        assert_eq!(tweaks.unfocused_split_opacity, 0.15);
+        assert_eq!(tweaks.selection_background, None);
+        assert_eq!(tweaks.selection_foreground.as_deref(), Some("#AABBCC"));
     }
 
     #[test]

@@ -674,6 +674,7 @@ impl ConWorkspace {
             active_tab,
             is_quick_terminal: false,
             terminal_font_family,
+            terminal_tweaks_config: config.terminal.tweaks.to_ghostty_config(),
             ui_font_family,
             ui_font_size,
             font_size,

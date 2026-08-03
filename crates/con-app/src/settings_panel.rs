@@ -7,6 +7,7 @@ use con_core::{
     Config,
     config::{
         AppearanceConfig, DEFAULT_TERMINAL_FONT_FAMILY, MAX_ICON_SCALE, MAX_UI_FONT_SIZE,
+        TerminalTweaks,
         MIN_ICON_SCALE, MIN_UI_FONT_SIZE, TabsOrientation, is_gpui_pseudo_font_family,
         sanitize_terminal_font_family,
     },
@@ -212,6 +213,11 @@ pub struct SettingsPanel {
     ui_font_size_input: Entity<InputState>,
     terminal_opacity_slider: Entity<SliderState>,
     icon_scale_slider: Entity<SliderState>,
+    line_height_slider: Entity<SliderState>,
+    letter_spacing_slider: Entity<SliderState>,
+    minimum_contrast_slider: Entity<SliderState>,
+    unfocused_split_slider: Entity<SliderState>,
+    window_padding_slider: Entity<SliderState>,
     terminal_blur: bool,
     ui_opacity_slider: Entity<SliderState>,
     tab_accent_inactive_alpha_slider: Entity<SliderState>,
@@ -1379,6 +1385,42 @@ impl SettingsPanel {
             );
             s
         });
+        let tw = &config.terminal.tweaks;
+        let line_height_slider = cx.new(|_| {
+            SliderState::new()
+                .min(TerminalTweaks::MIN_SPACING_PERCENT)
+                .max(60.0)
+                .step(1.0)
+                .default_value(tw.line_height_percent)
+        });
+        let letter_spacing_slider = cx.new(|_| {
+            SliderState::new()
+                .min(TerminalTweaks::MIN_SPACING_PERCENT)
+                .max(60.0)
+                .step(1.0)
+                .default_value(tw.letter_spacing_percent)
+        });
+        let minimum_contrast_slider = cx.new(|_| {
+            SliderState::new()
+                .min(1.0)
+                .max(TerminalTweaks::MAX_CONTRAST)
+                .step(0.5)
+                .default_value(tw.minimum_contrast)
+        });
+        let unfocused_split_slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.15)
+                .max(1.0)
+                .step(0.05)
+                .default_value(tw.unfocused_split_opacity)
+        });
+        let window_padding_slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.0)
+                .max(TerminalTweaks::MAX_PADDING)
+                .step(1.0)
+                .default_value(tw.window_padding_x)
+        });
         let icon_scale_slider = cx.new(|_| {
             SliderState::new()
                 .min(MIN_ICON_SCALE)
@@ -1496,6 +1538,33 @@ impl SettingsPanel {
             s
         });
 
+        macro_rules! tweak_slider {
+            ($slider:expr, $field:ident) => {
+                cx.subscribe(&$slider, |this, _, event: &SliderEvent, cx| {
+                    let SliderEvent::Change(value) = event;
+                    this.config.terminal.tweaks.$field = value.end();
+                    this.config.terminal.tweaks.normalize();
+                    cx.emit(AppearancePreview);
+                    cx.notify();
+                })
+                .detach();
+            };
+        }
+        tweak_slider!(line_height_slider, line_height_percent);
+        tweak_slider!(letter_spacing_slider, letter_spacing_percent);
+        tweak_slider!(minimum_contrast_slider, minimum_contrast);
+        tweak_slider!(unfocused_split_slider, unfocused_split_opacity);
+        cx.subscribe(&window_padding_slider, |this, _, event: &SliderEvent, cx| {
+            let SliderEvent::Change(value) = event;
+            // One control drives both axes; separate x/y padding is a config-file
+            // level knob, not something worth two sliders in the panel.
+            this.config.terminal.tweaks.window_padding_x = value.end();
+            this.config.terminal.tweaks.window_padding_y = value.end();
+            this.config.terminal.tweaks.normalize();
+            cx.emit(AppearancePreview);
+            cx.notify();
+        })
+        .detach();
         cx.subscribe(&icon_scale_slider, |this, _, event: &SliderEvent, cx| {
             match event {
                 SliderEvent::Change(value) => {
@@ -1731,6 +1800,11 @@ impl SettingsPanel {
             ui_font_size_input,
             terminal_opacity_slider,
             icon_scale_slider,
+            line_height_slider,
+            letter_spacing_slider,
+            minimum_contrast_slider,
+            unfocused_split_slider,
+            window_padding_slider,
             terminal_blur: Self::effective_terminal_blur(config.appearance.terminal_blur),
             ui_opacity_slider,
             tab_accent_inactive_alpha_slider,
@@ -4084,6 +4158,134 @@ impl SettingsPanel {
                             icon_scale,
                             theme,
                         )), cx)),
+        );
+
+        let tw = self.config.terminal.tweaks.clone();
+        let line_height_slider = self.line_height_slider.clone();
+        let letter_spacing_slider = self.letter_spacing_slider.clone();
+        let minimum_contrast_slider = self.minimum_contrast_slider.clone();
+        let unfocused_split_slider = self.unfocused_split_slider.clone();
+        let window_padding_slider = self.window_padding_slider.clone();
+        content = content.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(8.0))
+                .child(self.group(
+                    "terminal-render",
+                    "Terminal Rendering",
+                    card(theme, card_opacity)
+                        .child(slider_row(
+                            "Line Spacing",
+                            "Extra height per row, as a percentage of the natural line height.",
+                            &line_height_slider,
+                            tw.line_height_percent,
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(slider_row(
+                            "Letter Spacing",
+                            "Extra width per cell, as a percentage.",
+                            &letter_spacing_slider,
+                            tw.letter_spacing_percent,
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(slider_row(
+                            "Minimum Contrast",
+                            "Force a readability floor between text and its background. 1 leaves colours untouched.",
+                            &minimum_contrast_slider,
+                            tw.minimum_contrast,
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(slider_row(
+                            "Unfocused Split Dim",
+                            "Fade splits that do not have focus. 1 disables the effect.",
+                            &unfocused_split_slider,
+                            tw.unfocused_split_opacity,
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(slider_row(
+                            "Window Padding",
+                            "Space between the terminal grid and the window edge.",
+                            &window_padding_slider,
+                            tw.window_padding_x,
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(toggle_row(
+                            "Ligatures",
+                            "Render font ligatures such as -> and != as single glyphs.",
+                            Switch::new("tweak-ligatures")
+                                .checked(tw.ligatures)
+                                .small()
+                                .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                                    this.config.terminal.tweaks.ligatures = *checked;
+                                    cx.emit(AppearancePreview);
+                                    cx.notify();
+                                })),
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(toggle_row(
+                            "Thicken Font",
+                            "Synthetic bolding. Helps thin faces on low-DPI displays.",
+                            Switch::new("tweak-thicken")
+                                .checked(tw.font_thicken)
+                                .small()
+                                .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                                    this.config.terminal.tweaks.font_thicken = *checked;
+                                    cx.emit(AppearancePreview);
+                                    cx.notify();
+                                })),
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(toggle_row(
+                            "Blink Cursor",
+                            "Blink the terminal cursor.",
+                            Switch::new("tweak-blink")
+                                .checked(tw.cursor_blink)
+                                .small()
+                                .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                                    this.config.terminal.tweaks.cursor_blink = *checked;
+                                    cx.emit(AppearancePreview);
+                                    cx.notify();
+                                })),
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(toggle_row(
+                            "Bold Uses Bright",
+                            "Draw bold text in the bright variant of its ANSI colour.",
+                            Switch::new("tweak-bold-bright")
+                                .checked(tw.bold_is_bright)
+                                .small()
+                                .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                                    this.config.terminal.tweaks.bold_is_bright = *checked;
+                                    cx.emit(AppearancePreview);
+                                    cx.notify();
+                                })),
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(toggle_row(
+                            "Hide Mouse While Typing",
+                            "Hide the pointer until the mouse moves again.",
+                            Switch::new("tweak-mouse-hide")
+                                .checked(tw.mouse_hide_while_typing)
+                                .small()
+                                .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                                    this.config.terminal.tweaks.mouse_hide_while_typing = *checked;
+                                    cx.emit(AppearancePreview);
+                                    cx.notify();
+                                })),
+                            theme,
+                        )),
+                    cx,
+                )),
         );
 
         content = content.child(

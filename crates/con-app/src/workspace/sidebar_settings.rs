@@ -991,6 +991,7 @@ impl ConWorkspace {
             || (self.ui_font_size - next_ui_font_size).abs() > f32::EPSILON;
 
         self.terminal_font_family = next_terminal_font_family;
+        self.terminal_tweaks_config = term_config.tweaks.to_ghostty_config();
         self.ui_font_family = next_ui_font_family;
         self.ui_font_size = next_ui_font_size;
         self.font_size = next_font_size;
@@ -1110,6 +1111,7 @@ impl ConWorkspace {
                     Some(&self.background_image_position),
                     Some(&self.background_image_fit),
                     self.background_image_repeat,
+                    &self.terminal_tweaks_config,
                     cx,
                 );
             }
@@ -1126,6 +1128,7 @@ impl ConWorkspace {
             Some(&self.background_image_position),
             Some(&self.background_image_fit),
             self.background_image_repeat,
+            Some(&self.terminal_tweaks_config),
         ) {
             log::error!("Failed to update Ghostty appearance: {}", e);
         }

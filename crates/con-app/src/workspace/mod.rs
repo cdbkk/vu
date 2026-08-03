@@ -150,6 +150,9 @@ pub struct ConWorkspace {
     /// should reinitialize a fresh tab and hide the window instead.
     is_quick_terminal: bool,
     terminal_font_family: String,
+    /// Pre-rendered ghostty lines for [`TerminalTweaks`]; see its docs for why
+    /// this crosses the crate boundary as text.
+    terminal_tweaks_config: String,
     ui_font_family: String,
     ui_font_size: f32,
     font_size: f32,

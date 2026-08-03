@@ -86,6 +86,7 @@ impl TerminalPane {
         background_image_position: Option<&str>,
         background_image_fit: Option<&str>,
         background_image_repeat: bool,
+        extra_config: &str,
         cx: &mut App,
     ) {
         let is_dark = theme.name.to_lowercase().contains("dark");
@@ -102,6 +103,7 @@ impl TerminalPane {
                 background_image_position,
                 background_image_fit,
                 background_image_repeat,
+                Some(extra_config),
             ) {
                 log::error!("Failed to update Ghostty surface appearance: {}", err);
             }

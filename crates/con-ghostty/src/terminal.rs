@@ -81,6 +81,10 @@ pub struct GhosttyConfigPatch {
     pub background_image_position: Option<String>,
     pub background_image_fit: Option<String>,
     pub background_image_repeat: Option<bool>,
+    /// Pre-rendered ghostty config lines from the app's terminal tweaks.
+    /// Passed as text so this crate keeps its zero-dependency-on-con-core rule
+    /// and does not grow a typed field per ghostty option.
+    pub extra_config: Option<String>,
 }
 
 impl GhosttyConfigPatch {
@@ -120,6 +124,9 @@ impl GhosttyConfigPatch {
         }
         if let Some(background_image_repeat) = patch.background_image_repeat {
             self.background_image_repeat = Some(background_image_repeat);
+        }
+        if let Some(extra_config) = &patch.extra_config {
+            self.extra_config = Some(extra_config.clone());
         }
     }
 
@@ -190,6 +197,11 @@ impl GhosttyConfigPatch {
                     background_image_repeat
                 ));
             }
+        }
+        if let Some(extra) = &self.extra_config {
+            // Last: ghostty honours the final occurrence of a repeated key, so
+            // a tweak can override anything written above it.
+            s.push_str(extra);
         }
         s
     }
@@ -492,6 +504,7 @@ impl GhosttyApp {
             background_image_position: background_image_position.map(ToOwned::to_owned),
             background_image_fit: background_image_fit.map(ToOwned::to_owned),
             background_image_repeat,
+            extra_config: None,
         };
         let config = build_ghostty_config(&appearance)?;
 
@@ -582,6 +595,7 @@ impl GhosttyApp {
             background_image_position: None,
             background_image_fit: None,
             background_image_repeat: None,
+            extra_config: None,
         })
     }
 
@@ -598,6 +612,7 @@ impl GhosttyApp {
         background_image_position: Option<&str>,
         background_image_fit: Option<&str>,
         background_image_repeat: bool,
+        extra_config: Option<&str>,
     ) -> Result<(), String> {
         self.update_config(&GhosttyConfigPatch {
             colors: Some(colors.clone()),
@@ -612,6 +627,7 @@ impl GhosttyApp {
             background_image_position: background_image_position.map(ToOwned::to_owned),
             background_image_fit: background_image_fit.map(ToOwned::to_owned),
             background_image_repeat: background_image.map(|_| background_image_repeat),
+            extra_config: extra_config.map(ToOwned::to_owned),
         })
     }
 
@@ -865,6 +881,7 @@ impl GhosttyTerminal {
         background_image_position: Option<&str>,
         background_image_fit: Option<&str>,
         background_image_repeat: bool,
+        extra_config: Option<&str>,
     ) -> Result<(), String> {
         self.update_config(&GhosttyConfigPatch {
             colors: Some(colors.clone()),
@@ -879,6 +896,7 @@ impl GhosttyTerminal {
             background_image_position: background_image_position.map(ToOwned::to_owned),
             background_image_fit: background_image_fit.map(ToOwned::to_owned),
             background_image_repeat: background_image.map(|_| background_image_repeat),
+            extra_config: extra_config.map(ToOwned::to_owned),
         })?;
         self.refresh();
         Ok(())
