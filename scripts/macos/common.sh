@@ -119,19 +119,19 @@ setup_release_env() {
   export CON_APP_VERSION="${CON_APP_VERSION:-$(read_workspace_version)}"
   export CON_MARKETING_VERSION="${CON_MARKETING_VERSION:-$(derive_marketing_version "$CON_APP_VERSION")}"
   export CON_BUILD_NUMBER="$(derive_build_number)"
-  export CON_BUNDLE_ID_BASE="${CON_BUNDLE_ID_BASE:-co.nowledge.con}"
+  export CON_BUNDLE_ID_BASE="${CON_BUNDLE_ID_BASE:-co.cdbkk.vu}"
   export CON_MINIMUM_SYSTEM_VERSION="${CON_MINIMUM_SYSTEM_VERSION:-10.15.7}"
   export CON_ICON_SOURCE="${CON_ICON_SOURCE:-$REPO_ROOT/assets/Con-macOS-Dark-1024x1024@1x.png}"
   export CON_DIST_ROOT="${CON_DIST_ROOT:-$REPO_ROOT/dist/macos/$CON_CHANNEL/$CON_ARCH}"
 
   local default_bundle_id="$CON_BUNDLE_ID_BASE"
-  local default_app_name="con"
+  local default_app_name="vu"
   if [[ "$CON_CHANNEL" == "beta" ]]; then
     default_bundle_id="${CON_BUNDLE_ID_BASE}.beta"
-    default_app_name="con Beta"
+    default_app_name="vu Beta"
   elif [[ "$CON_CHANNEL" == "dev" ]]; then
     default_bundle_id="${CON_BUNDLE_ID_BASE}.dev"
-    default_app_name="con Dev"
+    default_app_name="vu Dev"
   fi
   export CON_BUNDLE_ID="${CON_BUNDLE_ID:-$default_bundle_id}"
   export CON_APP_NAME="${CON_APP_NAME:-$default_app_name}"
@@ -142,8 +142,11 @@ setup_release_env() {
   # Pattern: https://con-releases.nowledge.co/appcast/{channel}-macos-{arch}.xml
   if [[ "$CON_CHANNEL" == "dev" ]]; then
     unset CON_SPARKLE_FEED_URL
-  elif [[ -z "${CON_SPARKLE_FEED_URL:-}" && -n "${CON_SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
-    export CON_SPARKLE_FEED_URL="https://con-releases.nowledge.co/appcast/${CON_CHANNEL}-macos-${CON_ARCH}.xml"
+  elif [[ -z "${CON_SPARKLE_FEED_URL:-}" ]]; then
+    # No default feed: con-releases.nowledge.co is upstream's, and pointing our
+    # builds at it would hand our users upstream's binaries. Set
+    # CON_SPARKLE_FEED_URL explicitly once this fork hosts its own appcast.
+    unset CON_SPARKLE_FEED_URL
   fi
 
   export CON_APP_BUNDLE_PATH="$CON_DIST_ROOT/$CON_APP_NAME.app"
