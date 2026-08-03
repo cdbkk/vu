@@ -233,6 +233,8 @@ pub struct SettingsPanel {
     custom_theme_status: Option<String>,
     /// Working copy for the palette editor. `None` means the editor is closed.
     theme_editor: Option<con_terminal::TerminalTheme>,
+    /// Slot picked by clicking the preview, surfaced at the top of the editor.
+    theme_editor_slot: Option<usize>,
     /// One picker per `THEME_SLOTS` entry, built once and retargeted on open.
     theme_editor_pickers: Vec<Entity<ColorPickerState>>,
     theme_editor_name_input: Entity<InputState>,
@@ -1749,6 +1751,7 @@ impl SettingsPanel {
             custom_theme_preview: None,
             custom_theme_status: None,
             theme_editor: None,
+            theme_editor_slot: None,
             theme_editor_pickers,
             theme_editor_name_input,
             theme_editor_status: None,
@@ -2304,6 +2307,7 @@ impl SettingsPanel {
         }
         self.theme_editor_original = Some(self.config.terminal.theme.clone());
         self.theme_editor = Some(base);
+        self.theme_editor_slot = None;
         self.theme_editor_status = None;
         cx.notify();
     }
@@ -2319,8 +2323,19 @@ impl SettingsPanel {
             cx.emit(ThemePreview(original));
         }
         self.theme_editor = None;
+        self.theme_editor_slot = None;
         self.theme_editor_original = None;
         self.theme_editor_status = None;
+        cx.notify();
+    }
+
+    /// Load a slot into the editor's top picker, from a preview click.
+    fn select_theme_slot(&mut self, slot: usize, _window: &mut Window, cx: &mut Context<Self>) {
+        self.theme_editor_slot = if self.theme_editor_slot == Some(slot) {
+            None
+        } else {
+            Some(slot)
+        };
         cx.notify();
     }
 
@@ -4006,7 +4021,6 @@ impl SettingsPanel {
 
         // Theme first: it is what people open Appearance to change, and every
         // group below it only adjusts details of whatever is picked here.
-        content = content.child(card(theme, card_opacity).child(theme_card_inner));
         content = content.child(
             div()
                 .flex()
@@ -4025,6 +4039,7 @@ impl SettingsPanel {
                 )
                 .children(theme_editor_card),
         );
+        content = content.child(card(theme, card_opacity).child(theme_card_inner));
 
         content = content.child(
             div()
@@ -4335,6 +4350,7 @@ impl SettingsPanel {
         // These take &mut cx for their click listeners, so they have to be built
         // before cx.theme() borrows cx immutably.
         let preview = self.render_theme_editor_preview(&working, cx);
+        let selected_row = self.render_selected_slot_row(&working, cx);
         let slots = self.render_theme_editor_slots(&working, cx);
         // Owned clone: self.group() needs &mut cx, which a live cx.theme()
         // borrow would block.
@@ -4360,6 +4376,7 @@ impl SettingsPanel {
                 .flex_col()
                 .gap(px(12.0))
                 .p(px(16.0))
+                .children(selected_row)
                 .child(preview)
                 .child(slots)
                 .child(
@@ -4396,18 +4413,13 @@ impl SettingsPanel {
         // borrow would block.
         let theme_owned = cx.theme().clone();
         let theme = &theme_owned;
-        let c = |color: con_terminal::Color| gpui::rgb(color.to_u32());
-        let bg = c(term_theme.background);
-        let fg = c(term_theme.foreground);
-        let red = c(term_theme.ansi[1]);
-        let green = c(term_theme.ansi[2]);
-        let yellow = c(term_theme.ansi[3]);
-        let blue = c(term_theme.ansi[4]);
-        let cyan = c(term_theme.ansi[6]);
-        let dim = c(term_theme.ansi[8]);
+        let bg = gpui::rgb(term_theme.background.to_u32());
+        // Spans carry a THEME_SLOTS index, not a colour, so clicking any run of
+        // text knows which slot painted it and can jump straight to its picker.
+        let (fg, red, green, yellow, blue, cyan, dim) = (1, 3, 4, 5, 6, 8, 10);
 
-        // (indent, [(text, color)]) — one screen line each.
-        let lines: Vec<(f32, Vec<(&str, gpui::Rgba)>)> = vec![
+        // (indent, [(text, slot)]) — one screen line each.
+        let lines: Vec<(f32, Vec<(&str, usize)>)> = vec![
             (0.0, vec![("~/code/con", dim), ("  main", dim)]),
             (0.0, vec![("> ", green), ("fix the palette mapping", fg)]),
             (0.0, vec![("", fg)]),
@@ -4452,18 +4464,105 @@ impl SettingsPanel {
             .text_size(px(11.0))
             .line_height(px(16.0));
 
-        for (indent, spans) in lines {
+        let selected = self.theme_editor_slot;
+        for (line_idx, (indent, spans)) in lines.into_iter().enumerate() {
             let mut row = div().flex().flex_row().pl(px(indent * 6.0));
-            for (text, color) in spans {
+            for (span_idx, (text, slot)) in spans.into_iter().enumerate() {
                 // Empty spans are blank spacer lines; a zero-width child would
                 // collapse the row height, so keep a non-breaking space.
-                let text = if text.is_empty() { "\u{00a0}" } else { text };
-                row = row.child(div().text_color(color).child(text.to_string()));
+                let is_blank = text.is_empty();
+                let text = if is_blank { "\u{00a0}" } else { text };
+                let color = THEME_SLOTS
+                    .get(slot)
+                    .map(|spec| gpui::rgb(spec.read(term_theme).to_u32()))
+                    .unwrap_or(bg);
+                // Always stateful: .id() changes the type, so branching on it
+                // would leave the two arms unable to unify.
+                let mut span = div()
+                    .id(SharedString::from(format!("preview-{line_idx}-{span_idx}")))
+                    .text_color(color)
+                    .rounded(px(3.0))
+                    .child(text.to_string());
+                if selected == Some(slot) {
+                    // Keep the preview and the top picker in agreement.
+                    span = span.bg(theme.foreground.opacity(0.16));
+                }
+                if !is_blank {
+                    span = span.cursor_pointer().hover(|d| d.bg(theme.foreground.opacity(0.10)));
+                    span = span.on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, window, cx| {
+                            this.select_theme_slot(slot, window, cx);
+                        }),
+                    );
+                }
+                row = row.child(span);
             }
             screen = screen.child(row);
         }
 
         screen
+    }
+
+    /// The slot most recently clicked in the preview, hoisted to the top of the
+    /// editor with its own picker so you never hunt for it in the list below.
+    fn render_selected_slot_row(
+        &self,
+        term_theme: &con_terminal::TerminalTheme,
+        cx: &mut Context<Self>,
+    ) -> Option<Div> {
+        let slot = self.theme_editor_slot?;
+        let spec = THEME_SLOTS.get(slot)?;
+        let picker_state = self.theme_editor_pickers.get(slot)?;
+        let featured: Vec<Hsla> = THEME_SLOTS
+            .iter()
+            .map(|s| color_to_hsla(s.read(term_theme)))
+            .collect();
+        let picker = ColorPicker::new(picker_state)
+            .featured_colors(featured)
+            .anchor(Corner::TopLeft);
+        let theme = cx.theme();
+        let color = spec.read(term_theme);
+
+        Some(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(10.0))
+                .px(px(10.0))
+                .py(px(8.0))
+                .rounded(px(6.0))
+                .bg(theme.primary.opacity(0.10))
+                .child(picker)
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .flex_1()
+                        .min_w_0()
+                        .child(
+                            div()
+                                .text_size(px(12.5))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(theme.foreground)
+                                .child(spec.label),
+                        )
+                        .child(
+                            div()
+                                .text_size(px(10.5))
+                                .text_color(theme.muted_foreground)
+                                .child(spec.hint),
+                        ),
+                )
+                .child(
+                    div()
+                        .text_size(px(11.0))
+                        .font_family(theme.mono_font_family.clone())
+                        .text_color(theme.muted_foreground)
+                        .child(color_to_hex(color)),
+                ),
+        )
     }
 
     /// The 18 palette slots, each opening a colour picker. The picker carries
