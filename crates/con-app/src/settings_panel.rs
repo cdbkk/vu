@@ -4025,7 +4025,7 @@ impl SettingsPanel {
 
         let mut content = section_content(
             "Appearance",
-            "Tweak the Con's textures, tastes and feels.",
+            "Tweak the terminal's textures, tastes and feels.",
             theme,
         );
 
@@ -4493,8 +4493,10 @@ impl SettingsPanel {
                     .text_color(color)
                     .rounded(px(3.0))
                     .child(text.to_string());
-                if selected == Some(slot) {
-                    // Keep the preview and the top picker in agreement.
+                if selected == Some(slot) && !is_blank {
+                    // Keep the preview and the top picker in agreement. Blank
+                    // spacer spans carry a slot too, and highlighting them lights
+                    // up empty lines.
                     span = span.bg(theme.foreground.opacity(0.16));
                 }
                 if !is_blank {
@@ -4600,6 +4602,23 @@ impl SettingsPanel {
                 continue;
             };
             let color = spec.read(term_theme);
+            // A ColorPickerState renders one popover per ColorPicker bound to it.
+            // The selected slot already has a picker hoisted to the top of the
+            // editor, so binding a second one here opened two popovers at once.
+            let is_hoisted = self.theme_editor_slot == Some(idx);
+            let swatch = if is_hoisted {
+                div()
+                    .size(px(15.0))
+                    .rounded(px(3.0))
+                    .flex_shrink_0()
+                    .bg(gpui::rgb(color.to_u32()))
+                    .into_any_element()
+            } else {
+                ColorPicker::new(picker_state)
+                    .featured_colors(featured.clone())
+                    .anchor(Corner::TopLeft)
+                    .into_any_element()
+            };
             grid = grid.child(
                 div()
                     .flex()
@@ -4610,11 +4629,7 @@ impl SettingsPanel {
                     .py(px(5.0))
                     .rounded(px(6.0))
                     .hover(|s| s.bg(theme.primary.opacity(0.05)))
-                    .child(
-                        ColorPicker::new(picker_state)
-                            .featured_colors(featured.clone())
-                            .anchor(Corner::TopLeft),
-                    )
+                    .child(swatch)
                     .child(
                         div()
                             .flex()

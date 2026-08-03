@@ -9,14 +9,14 @@
 # Ceiling: pinned to whatever CON_ZIG_SDK resolves to. Delete this whole file
 # once the pinned Ghostty revision builds under zig 0.16, which handles the new SDK.
 #
-# Usage: CON_ZIG_BIN=scripts/zig-macos26-shim.sh cargo build
+# Usage: VU_ZIG_BIN=scripts/zig-macos26-shim.sh cargo build
 
 set -e
 
-ZIG="${CON_ZIG_REAL:-$(command -v zig)}"
-[ -n "$ZIG" ] || { echo "zig-macos26-shim: no zig on PATH; set CON_ZIG_REAL" >&2; exit 1; }
+ZIG="${VU_ZIG_REAL:-${CON_ZIG_REAL:-$(command -v zig)}}"
+[ -n "$ZIG" ] || { echo "zig-macos26-shim: no zig on PATH; set VU_ZIG_REAL" >&2; exit 1; }
 
-SDK="${CON_ZIG_SDK:-/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk}"
+SDK="${VU_ZIG_SDK:-${CON_ZIG_SDK:-/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk}}"
 if [ ! -d "$SDK" ]; then
     exec "$ZIG" "$@" # no older SDK to fall back to; let zig fail loudly
 fi

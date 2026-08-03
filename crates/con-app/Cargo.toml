@@ -1,34 +1,32 @@
 [package]
-name = "con"
+name = "vu"
 edition.workspace = true
 license.workspace = true
 version.workspace = true
-default-run = "con"
+default-run = "vu"
 
 # Two binaries pointing at the same `main.rs`, gated by mutually-exclusive
-# features. `CON` is a reserved DOS device name on Windows so `con.exe` is
-# rejected by the Win32 file APIs; on that target we ship `con-app.exe`
-# instead. macOS / Linux keep the plain `con` binary so existing scripts
-# and the `.app` bundle structure are unchanged.
+# features. Upstream needed this because `CON` is a reserved DOS device name
+# and `con.exe` is rejected by the Win32 file APIs. `vu.exe` is not reserved,
+# so the split is now vestigial and the Windows path could collapse onto the
+# default binary; kept for now so the release scripts keep working.
 #
-# Default feature set targets macOS / Linux. Windows users must build with
-# `--no-default-features --features bin-con-app`; the workspace
-# `.cargo/config.toml` exposes a `cargo wbuild` / `cargo wrun` alias for
-# this so the day-to-day command stays short.
+# Windows builds use `--no-default-features --features bin-vu-app` via the
+# `cargo wbuild` / `cargo wrun` aliases in the workspace `.cargo/config.toml`.
 [[bin]]
-name = "con"
+name = "vu"
 path = "src/main.rs"
-required-features = ["bin-con"]
+required-features = ["bin-vu"]
 
 [[bin]]
-name = "con-app"
+name = "vu-app"
 path = "src/main.rs"
-required-features = ["bin-con-app"]
+required-features = ["bin-vu-app"]
 
 [features]
-default = ["bin-con"]
-bin-con = []
-bin-con-app = []
+default = ["bin-vu"]
+bin-vu = []
+bin-vu-app = []
 
 [dependencies]
 con-core.workspace = true
@@ -100,6 +98,6 @@ winresource = "0.1"
 
 [package.metadata.bundle]
 icon = ["resources/app-icon@2x.png", "resources/app-icon.png"]
-identifier = "co.nowledge.con"
-name = "con"
+identifier = "co.cdbkk.vu"
+name = "vu"
 osx_minimum_system_version = "10.15.7"

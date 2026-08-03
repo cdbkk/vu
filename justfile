@@ -37,15 +37,15 @@ default:
 
 # Debug build — current platform
 build:
-    {{ if os() == "windows" { "cargo wbuild -p con" } else { "cargo build -p con" } }}
+    {{ if os() == "windows" { "cargo wbuild -p vu" } else { "cargo build -p vu" } }}
 
 # Release build — current platform
 build-release:
-    {{ if os() == "windows" { "cargo wbuild -p con --release" } else { "cargo build --release -p con" } }}
+    {{ if os() == "windows" { "cargo wbuild -p vu --release" } else { "cargo build --release -p vu" } }}
 
 # Run from source — current platform
 run:
-    {{ if os() == "windows" { "cargo wrun -p con" } else { "cargo run -p con" } }}
+    {{ if os() == "windows" { "cargo wrun -p vu" } else { "cargo run -p vu" } }}
 
 # Run the platform-appropriate test set
 test:
@@ -53,7 +53,7 @@ test:
 
 # Check without building — current platform
 check:
-    {{ if os() == "windows" { "cargo wcheck -p con" } else { "cargo check --workspace" } }}
+    {{ if os() == "windows" { "cargo wcheck -p vu" } else { "cargo check --workspace" } }}
 
 # Run clippy — current platform
 lint:
@@ -213,7 +213,7 @@ windows-build:
 
 # [Windows] Release build
 windows-build-release:
-    cargo wbuild -p con --release
+    cargo wbuild -p vu --release
     cargo build -p con-cli --release
 
 # [Windows] Run

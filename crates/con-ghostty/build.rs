@@ -39,6 +39,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=CON_GHOSTTY_VT_SIMD");
     println!("cargo:rerun-if-env-changed=CON_GHOSTTY_VT_STEP");
     println!("cargo:rerun-if-env-changed={GHOSTTY_VT_TARGET_ENV}");
+    println!("cargo:rerun-if-env-changed=VU_ZIG_BIN");
     println!("cargo:rerun-if-env-changed=CON_ZIG_BIN");
     println!("cargo:rerun-if-env-changed=CON_GHOSTTY_OPTIMIZE");
     println!("cargo:rerun-if-env-changed=TARGET");
@@ -65,7 +66,9 @@ fn build_macos() {
     let ghostty_dir = patchable_ghostty_source(ghostty_dir);
     let _initial_output_restore_enabled = apply_embedded_initial_output_patch(&ghostty_dir);
     let optimize = ghostty_optimize();
-    let zig_bin = env::var_os("CON_ZIG_BIN").unwrap_or_else(|| std::ffi::OsString::from("zig"));
+    let zig_bin = env::var_os("VU_ZIG_BIN")
+        .or_else(|| env::var_os("CON_ZIG_BIN"))
+        .unwrap_or_else(|| std::ffi::OsString::from("zig"));
     let zig_global_cache_dir = zig_global_cache_dir("macos");
 
     let build_args = vec![
@@ -210,7 +213,9 @@ fn build_vt_backend(target_os: &str) {
     // Detect Zig. Surface the actual error (not-found, permission-denied,
     // etc.) and the PATH we searched so the user can diagnose — previous
     // silent warnings led to confusing link-time failures.
-    let zig_bin = env::var_os("CON_ZIG_BIN").unwrap_or_else(|| std::ffi::OsString::from("zig"));
+    let zig_bin = env::var_os("VU_ZIG_BIN")
+        .or_else(|| env::var_os("CON_ZIG_BIN"))
+        .unwrap_or_else(|| std::ffi::OsString::from("zig"));
     let zig_global_cache_dir = zig_global_cache_dir(target_os);
     if let Some(dir) = &zig_global_cache_dir {
         println!("cargo:warning=using zig global cache dir {}", dir.display());

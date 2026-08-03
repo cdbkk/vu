@@ -1271,54 +1271,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75984efb6ed102a0d42db99afb6c1948f0380d1d91808d5529916e6c08b49d8d"
 
 [[package]]
-name = "con"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cc",
- "chrono",
- "cocoa 0.26.0",
- "con-agent",
- "con-core",
- "con-ghostty",
- "con-paths",
- "con-terminal",
- "crossbeam-channel",
- "dirs",
- "env_logger",
- "futures",
- "gpui",
- "gpui-component",
- "gpui-component-assets",
- "gpui_platform",
- "image",
- "log",
- "markdown",
- "mathjax-svg-rs",
- "mermaid-rs-renderer",
- "objc",
- "parking_lot",
- "raw-window-handle",
- "regex",
- "reqwest 0.12.28",
- "ropey",
- "rust-embed",
- "serde",
- "serde_json",
- "smallvec",
- "socket2",
- "tokio",
- "toml 0.8.23",
- "tracing",
- "unicode-width",
- "url",
- "uuid",
- "windows 0.61.3",
- "winresource",
- "x11rb",
-]
-
-[[package]]
 name = "con-agent"
 version = "0.1.0"
 dependencies = [
@@ -8417,6 +8369,54 @@ checksum = "fb067e4cbd1ff067d1df46c9194b5de0e98efd2810bbc95c5d5e5f25a3231150"
 dependencies = [
  "cc",
  "libc",
+]
+
+[[package]]
+name = "vu"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cc",
+ "chrono",
+ "cocoa 0.26.0",
+ "con-agent",
+ "con-core",
+ "con-ghostty",
+ "con-paths",
+ "con-terminal",
+ "crossbeam-channel",
+ "dirs",
+ "env_logger",
+ "futures",
+ "gpui",
+ "gpui-component",
+ "gpui-component-assets",
+ "gpui_platform",
+ "image",
+ "log",
+ "markdown",
+ "mathjax-svg-rs",
+ "mermaid-rs-renderer",
+ "objc",
+ "parking_lot",
+ "raw-window-handle",
+ "regex",
+ "reqwest 0.12.28",
+ "ropey",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "socket2",
+ "tokio",
+ "toml 0.8.23",
+ "tracing",
+ "unicode-width",
+ "url",
+ "uuid",
+ "windows 0.61.3",
+ "winresource",
+ "x11rb",
 ]
 
 [[package]]
