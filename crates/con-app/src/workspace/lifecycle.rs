@@ -66,6 +66,9 @@ impl ConWorkspace {
             Some(&background_image_position),
             Some(&background_image_fit),
             Some(background_image_repeat),
+            // Without this the tweaks only reach ghostty after the first
+            // settings change, so a configured tweak did nothing at startup.
+            Some(&config.terminal.tweaks.to_ghostty_config()),
         )
         .map(std::sync::Arc::new)
         .unwrap_or_else(|e| panic!("Fatal: failed to initialize Ghostty: {}", e));

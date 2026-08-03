@@ -486,6 +486,7 @@ impl GhosttyApp {
         background_image_position: Option<&str>,
         background_image_fit: Option<&str>,
         background_image_repeat: Option<bool>,
+        extra_config: Option<&str>,
     ) -> Result<Self, String> {
         ensure_ghostty_init()?;
 
@@ -504,7 +505,7 @@ impl GhosttyApp {
             background_image_position: background_image_position.map(ToOwned::to_owned),
             background_image_fit: background_image_fit.map(ToOwned::to_owned),
             background_image_repeat,
-            extra_config: None,
+            extra_config: extra_config.map(ToOwned::to_owned),
         };
         let config = build_ghostty_config(&appearance)?;
 

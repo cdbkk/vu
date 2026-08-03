@@ -609,3 +609,37 @@ fn lighten(c: Color, amount: f64) -> Color {
         (c.b as f64 + (255.0 - c.b as f64) * amount) as u8,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{generate_gpui_theme_json, set_chrome_strengths};
+    use con_terminal::TerminalTheme;
+
+    /// The strengths are read from a process global at generation time; if that
+    /// wiring breaks, the sliders silently do nothing.
+    #[test]
+    fn chrome_strengths_change_generated_surfaces() {
+        let tt = TerminalTheme::flexoki_dark();
+
+        set_chrome_strengths(1.0, 1.0);
+        let baseline = generate_gpui_theme_json(&tt);
+
+        set_chrome_strengths(3.0, 1.0);
+        let stronger = generate_gpui_theme_json(&tt);
+        assert_ne!(
+            baseline, stronger,
+            "surface strength must move the generated surfaces"
+        );
+
+        // 0 collapses chrome onto the terminal background exactly.
+        set_chrome_strengths(0.0, 0.0);
+        let flat = generate_gpui_theme_json(&tt);
+        let bg = format!("{:02X}{:02X}{:02X}", tt.background.r, tt.background.g, tt.background.b);
+        assert!(
+            flat.contains(&format!("\"title_bar.background\": \"#{bg}\"")),
+            "expected title bar to match terminal background, got:\n{flat}"
+        );
+
+        set_chrome_strengths(1.0, 1.0);
+    }
+}

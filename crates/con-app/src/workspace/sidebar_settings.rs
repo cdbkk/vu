@@ -973,15 +973,32 @@ impl ConWorkspace {
         let next_tabs_orientation = appearance_config.tabs_orientation;
 
         crate::ui_scale::set_icon_scale(appearance_config.icon_scale);
+        // Compare before overwriting: both of these gate whether the expensive
+        // sync below runs at all, and comparing after the assignment would make
+        // every change look like a no-op.
+        let chrome_changed = (self.config.appearance.chrome_surface_strength
+            - appearance_config.chrome_surface_strength)
+            .abs()
+            > f32::EPSILON
+            || (self.config.appearance.chrome_border_strength
+                - appearance_config.chrome_border_strength)
+                .abs()
+                > f32::EPSILON;
+        let next_tweaks_config = term_config.tweaks.to_ghostty_config();
+        let tweaks_changed = self.terminal_tweaks_config != next_tweaks_config;
+
         crate::theme::set_chrome_strengths(
             appearance_config.chrome_surface_strength,
             appearance_config.chrome_border_strength,
         );
         self.config.appearance.icon_scale = appearance_config.icon_scale;
+        self.config.appearance.chrome_surface_strength = appearance_config.chrome_surface_strength;
+        self.config.appearance.chrome_border_strength = appearance_config.chrome_border_strength;
 
         let font_changed = self.terminal_font_family != next_terminal_font_family
             || (self.font_size - next_font_size).abs() > f32::EPSILON;
-        let terminal_appearance_changed = font_changed
+        let terminal_appearance_changed = tweaks_changed
+            || font_changed
             || self.terminal_cursor_style != next_terminal_cursor_style
             || (self.terminal_opacity - next_terminal_opacity).abs() > f32::EPSILON
             || self.terminal_blur != next_terminal_blur
@@ -990,12 +1007,13 @@ impl ConWorkspace {
             || self.background_image_position != next_background_image_position
             || self.background_image_fit != next_background_image_fit
             || self.background_image_repeat != next_background_image_repeat;
-        let ui_theme_changed = font_changed
+        let ui_theme_changed = chrome_changed
+            || font_changed
             || self.ui_font_family != next_ui_font_family
             || (self.ui_font_size - next_ui_font_size).abs() > f32::EPSILON;
 
         self.terminal_font_family = next_terminal_font_family;
-        self.terminal_tweaks_config = term_config.tweaks.to_ghostty_config();
+        self.terminal_tweaks_config = next_tweaks_config;
         self.ui_font_family = next_ui_font_family;
         self.ui_font_size = next_ui_font_size;
         self.font_size = next_font_size;
