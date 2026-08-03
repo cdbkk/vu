@@ -204,8 +204,8 @@ pub struct SettingsPanel {
     provider_model_status: Option<String>,
     provider_model_status_error: bool,
 
-    terminal_font_select: Entity<SelectState<SearchableVec<String>>>,
-    ui_font_select: Entity<SelectState<SearchableVec<String>>>,
+    terminal_font_select: Entity<SelectState<SearchableVec<FontChoice>>>,
+    ui_font_select: Entity<SelectState<SearchableVec<FontChoice>>>,
     cursor_style_select: Entity<SelectState<Vec<String>>>,
     font_size_input: Entity<InputState>,
     ui_font_size_input: Entity<InputState>,
@@ -1135,6 +1135,20 @@ impl SettingsPanel {
         });
     }
 
+    fn make_font_select(
+        options: &[String],
+        current_value: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Entity<SelectState<SearchableVec<FontChoice>>> {
+        let items = SearchableVec::new(options.iter().cloned().map(FontChoice).collect::<Vec<_>>());
+        let selected_index = options
+            .iter()
+            .position(|item| item == current_value)
+            .map(IndexPath::new);
+        cx.new(|cx| SelectState::new(items, selected_index, window, cx).searchable(true))
+    }
+
     fn make_searchable_string_select(
         options: &[String],
         current_value: &str,
@@ -1323,13 +1337,13 @@ impl SettingsPanel {
             Self::prepare_terminal_font_families(&config, all_font_families.clone());
         let ui_font_families = Self::prepare_ui_font_families(&config, all_font_families);
         let terminal_font_family = sanitize_terminal_font_family(&config.terminal.font_family);
-        let terminal_font_select = Self::make_searchable_string_select(
+        let terminal_font_select = Self::make_font_select(
             &terminal_font_families,
             &terminal_font_family,
             window,
             cx,
         );
-        let ui_font_select = Self::make_searchable_string_select(
+        let ui_font_select = Self::make_font_select(
             &ui_font_families,
             &config.appearance.ui_font_family,
             window,
@@ -1613,7 +1627,7 @@ impl SettingsPanel {
         cx.subscribe_in(
             &terminal_font_select,
             window,
-            |this, _, ev: &SelectEvent<SearchableVec<String>>, _, cx| {
+            |this, _, ev: &SelectEvent<SearchableVec<FontChoice>>, _, cx| {
                 if let SelectEvent::Confirm(Some(value)) = ev {
                     this.config.terminal.font_family = sanitize_terminal_font_family(value);
                     cx.emit(AppearancePreview);
@@ -1625,7 +1639,7 @@ impl SettingsPanel {
         cx.subscribe_in(
             &ui_font_select,
             window,
-            |this, _, ev: &SelectEvent<SearchableVec<String>>, _, cx| {
+            |this, _, ev: &SelectEvent<SearchableVec<FontChoice>>, _, cx| {
                 if let SelectEvent::Confirm(Some(value)) = ev {
                     this.config.appearance.ui_font_family = value.clone();
                     cx.emit(AppearancePreview);
@@ -6551,6 +6565,54 @@ fn row_separator(_theme: &gpui_component::Theme) -> Div {
     div().h(px(6.0))
 }
 
+/// A font family in the font pickers, drawn in the face it names so the list
+/// shows the typeface itself instead of eighteen identical rows of UI text.
+#[derive(Clone)]
+struct FontChoice(String);
+
+impl gpui_component::select::SelectItem for FontChoice {
+    type Value = String;
+
+    fn title(&self) -> SharedString {
+        SharedString::from(self.0.clone())
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.0
+    }
+
+    fn display_title(&self) -> Option<AnyElement> {
+        Some(
+            div()
+                .font_family(self.0.clone())
+                .child(self.0.clone())
+                .into_any_element(),
+        )
+    }
+
+    fn render(&self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let muted = cx.theme().muted_foreground;
+        div()
+            .flex()
+            .flex_row()
+            .items_center()
+            .justify_between()
+            .gap(px(12.0))
+            .w_full()
+            // Both halves use the family being offered: the name shows its
+            // letterforms, the specimen shows digits and glyph width, which is
+            // what actually differs between the mono faces.
+            .font_family(self.0.clone())
+            .child(div().min_w_0().child(self.0.clone()))
+            .child(
+                div()
+                    .flex_shrink_0()
+                    .text_color(muted)
+                    .child("AaBbGg 0123 —> !="),
+            )
+    }
+}
+
 /// One editable colour in a terminal theme.
 ///
 /// `hint` says what the slot actually paints on screen, since "ANSI 6" tells you
@@ -6722,13 +6784,16 @@ fn slider_row(
         )
 }
 
-fn searchable_select_row(
+fn searchable_select_row<I>(
     label: &str,
     hint: &str,
-    select: &Entity<SelectState<SearchableVec<String>>>,
+    select: &Entity<SelectState<SearchableVec<I>>>,
     placeholder: &str,
     theme: &gpui_component::Theme,
-) -> Div {
+) -> Div
+where
+    I: gpui_component::select::SelectItem + 'static,
+{
     div()
         .flex()
         .items_start()
