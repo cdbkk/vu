@@ -15,16 +15,17 @@
 
 use std::ops::Range;
 use std::sync::Arc;
+use std::time::Duration;
 
-use vu_ghostty::{
-    ATTR_BOLD, ATTR_INVERSE, ATTR_ITALIC, ATTR_STRIKE, ATTR_UNDERLINE, GhosttyApp,
-    GhosttySplitDirection, GhosttyTerminal, ScreenSnapshot, SurfaceSize, VtCell, VtCursor,
-};
 use futures::StreamExt;
 use futures::channel::mpsc::unbounded;
 use gpui::*;
 use gpui_component::ActiveTheme;
 use gpui_component::menu::ContextMenuExt;
+use vu_ghostty::{
+    ATTR_BOLD, ATTR_INVERSE, ATTR_ITALIC, ATTR_STRIKE, ATTR_UNDERLINE, GhosttyApp,
+    GhosttySplitDirection, GhosttyTerminal, ScreenSnapshot, SurfaceSize, Tweaks, VtCell, VtCursor,
+};
 
 use crate::terminal_ime::{TerminalImeInputHandler, TerminalImeView};
 use crate::terminal_links::{self, TerminalLink};
@@ -56,12 +57,56 @@ fn effective_font_size(configured: f32) -> f32 {
     base.max(MIN_FONT_SIZE_PX)
 }
 
-fn cell_width_px(font_size_px: f32) -> f32 {
-    (font_size_px * DEFAULT_CELL_WIDTH_RATIO).round().max(7.0)
+fn adjusted_metric(base: f32, percent: f32, minimum: f32) -> f32 {
+    let percent = if percent.is_finite() { percent } else { 0.0 };
+    (base * (1.0 + percent / 100.0).max(0.01))
+        .round()
+        .max(minimum)
 }
 
-fn cell_height_px(font_size_px: f32) -> f32 {
-    (font_size_px * DEFAULT_CELL_HEIGHT_RATIO).round().max(14.0)
+fn cell_width_px(font_size_px: f32, letter_spacing_percent: f32) -> f32 {
+    adjusted_metric(
+        font_size_px * DEFAULT_CELL_WIDTH_RATIO,
+        letter_spacing_percent,
+        7.0,
+    )
+}
+
+fn cell_height_px(font_size_px: f32, line_height_percent: f32) -> f32 {
+    adjusted_metric(
+        font_size_px * DEFAULT_CELL_HEIGHT_RATIO,
+        line_height_percent,
+        14.0,
+    )
+}
+
+#[derive(Clone, Copy)]
+struct TerminalMetrics {
+    font_size: f32,
+    cell_width: f32,
+    cell_height: f32,
+    padding_x: f32,
+    padding_y: f32,
+}
+
+impl TerminalMetrics {
+    fn new(font_size: f32, tweaks: &Tweaks, scale_factor: f32) -> Self {
+        let font_size = effective_font_size(font_size) * scale_factor;
+        let configured_padding = |configured: f32, default: f32| {
+            if configured.is_finite() && configured > 0.0 {
+                configured * scale_factor
+            } else {
+                default * scale_factor
+            }
+        };
+        Self {
+            font_size,
+            cell_width: cell_width_px(font_size, tweaks.letter_spacing_percent),
+            cell_height: cell_height_px(font_size, tweaks.line_height_percent),
+            padding_x: configured_padding(tweaks.window_padding_x, TERMINAL_PADDING_X_PX),
+            padding_y: configured_padding(tweaks.window_padding_y, TERMINAL_PADDING_Y_PX),
+        }
+    }
 }
 
 actions!(ghostty, [ConsumeTab, ConsumeTabPrev]);
@@ -115,6 +160,8 @@ pub struct GhosttyView {
     last_mouse_position: Option<Point<Pixels>>,
     selection: Option<TerminalSelection>,
     drag_anchor: Option<(u16, u64)>,
+    cursor_visible: bool,
+    cursor_blink: Option<Task<()>>,
 }
 
 pub fn init(cx: &mut App) {
@@ -195,6 +242,8 @@ impl GhosttyView {
             last_mouse_position: None,
             selection: None,
             drag_anchor: None,
+            cursor_visible: true,
+            cursor_blink: None,
         }
     }
 
@@ -318,6 +367,15 @@ impl GhosttyView {
         if changed {
             cx.notify();
         }
+    }
+
+    pub fn appearance_changed(&mut self, cx: &mut Context<Self>) {
+        self.last_surface_size = None;
+        self.row_cache_style = None;
+        if let Some(bounds) = self.pane_bounds {
+            self.sync_surface_size(bounds, self.scale_factor);
+        }
+        cx.notify();
     }
 
     pub fn set_visible(&self, _visible: bool) {}
@@ -503,6 +561,15 @@ impl GhosttyView {
         false
     }
 
+    fn terminal_metrics(&self, scale_factor: f32) -> TerminalMetrics {
+        let config = self.app.backend_config();
+        TerminalMetrics::new(
+            config.font_size.unwrap_or(self.initial_font_size),
+            &config.tweaks,
+            scale_factor,
+        )
+    }
+
     fn estimate_surface_size(&self, bounds: Bounds<Pixels>, scale_factor: f32) -> SurfaceSize {
         let width_px = ((f32::from(bounds.size.width) * scale_factor).ceil() as u32).max(1);
         let height_px = ((f32::from(bounds.size.height) * scale_factor).ceil() as u32).max(1);
@@ -515,13 +582,15 @@ impl GhosttyView {
         // actually paint at — picking different floors here would
         // make text overrun the estimated column count and lines
         // wrap unexpectedly on the alternate screen.
-        let font_size_px = effective_font_size(self.initial_font_size) * scale_factor;
-        let cell_width = cell_width_px(font_size_px) as u32;
-        let cell_height = cell_height_px(font_size_px) as u32;
-        let columns = (width_px / cell_width.max(1))
+        let metrics = self.terminal_metrics(scale_factor);
+        let cell_width = metrics.cell_width as u32;
+        let cell_height = metrics.cell_height as u32;
+        let content_width = width_px.saturating_sub((metrics.padding_x * 2.0).ceil() as u32);
+        let content_height = height_px.saturating_sub((metrics.padding_y * 2.0).ceil() as u32);
+        let columns = (content_width / cell_width.max(1))
             .max(1)
             .min(u32::from(u16::MAX)) as u16;
-        let rows = (height_px / cell_height.max(1))
+        let rows = (content_height / cell_height.max(1))
             .max(1)
             .min(u32::from(u16::MAX)) as u16;
 
@@ -550,14 +619,12 @@ impl GhosttyView {
     ) -> Option<(u16, u16)> {
         let bounds = self.pane_bounds?;
         let snapshot = self.snapshot.as_ref()?;
-        let font_size_px = effective_font_size(self.initial_font_size);
-        let cell_width_px = cell_width_px(font_size_px);
-        let cell_height_px = cell_height_px(font_size_px);
+        let metrics = self.terminal_metrics(1.0);
 
-        let mut local_x = f32::from(pos.x) - f32::from(bounds.origin.x) - TERMINAL_PADDING_X_PX;
-        let mut local_y = f32::from(pos.y) - f32::from(bounds.origin.y) - TERMINAL_PADDING_Y_PX;
-        let grid_width = snapshot.cols as f32 * cell_width_px;
-        let grid_height = snapshot.rows as f32 * cell_height_px;
+        let mut local_x = f32::from(pos.x) - f32::from(bounds.origin.x) - metrics.padding_x;
+        let mut local_y = f32::from(pos.y) - f32::from(bounds.origin.y) - metrics.padding_y;
+        let grid_width = snapshot.cols as f32 * metrics.cell_width;
+        let grid_height = snapshot.rows as f32 * metrics.cell_height;
         if clamp_to_grid {
             local_x = local_x.clamp(0.0, (grid_width - f32::EPSILON).max(0.0));
             local_y = local_y.clamp(0.0, (grid_height - f32::EPSILON).max(0.0));
@@ -566,8 +633,8 @@ impl GhosttyView {
             return None;
         }
 
-        let col = (local_x / cell_width_px).floor() as u16;
-        let row = (local_y / cell_height_px).floor() as u16;
+        let col = (local_x / metrics.cell_width).floor() as u16;
+        let row = (local_y / metrics.cell_height).floor() as u16;
         if col >= snapshot.cols || row >= snapshot.rows {
             return None;
         }
@@ -668,11 +735,7 @@ impl GhosttyView {
         (cell.0, viewport_offset.saturating_add(cell.1 as u64))
     }
 
-    fn render_link_cursor_overlay(
-        &self,
-        cell_width_px: f32,
-        line_height_px: f32,
-    ) -> Option<AnyElement> {
+    fn render_link_cursor_overlay(&self, metrics: TerminalMetrics) -> Option<AnyElement> {
         let link = self.hovered_link.as_ref()?;
         let width_cols = link.end_col.saturating_sub(link.start_col).max(1);
 
@@ -680,11 +743,11 @@ impl GhosttyView {
             div()
                 .absolute()
                 .left(px(
-                    TERMINAL_PADDING_X_PX + link.start_col as f32 * cell_width_px
+                    metrics.padding_x + link.start_col as f32 * metrics.cell_width
                 ))
-                .top(px(TERMINAL_PADDING_Y_PX + link.row as f32 * line_height_px))
-                .w(px(width_cols as f32 * cell_width_px))
-                .h(px(line_height_px))
+                .top(px(metrics.padding_y + link.row as f32 * metrics.cell_height))
+                .w(px(width_cols as f32 * metrics.cell_width))
+                .h(px(metrics.cell_height))
                 .bg(gpui::transparent_black())
                 .cursor_pointer()
                 .into_any_element(),
@@ -843,18 +906,19 @@ impl GhosttyView {
     fn ime_cursor_bounds(&self) -> Option<Bounds<Pixels>> {
         let bounds = self.pane_bounds?;
         let snapshot = self.snapshot.as_ref()?;
-        let font_size_px = effective_font_size(self.initial_font_size);
-        let cell_width = cell_width_px(font_size_px);
-        let cell_height = cell_height_px(font_size_px);
+        let metrics = self.terminal_metrics(1.0);
         let col = snapshot.cursor.col.min(snapshot.cols.saturating_sub(1)) as f32;
         let row = snapshot.cursor.row.min(snapshot.rows.saturating_sub(1)) as f32;
 
         Some(Bounds::new(
             point(
-                bounds.origin.x + px(TERMINAL_PADDING_X_PX + col * cell_width),
-                bounds.origin.y + px(TERMINAL_PADDING_Y_PX + row * cell_height),
+                bounds.origin.x + px(metrics.padding_x + col * metrics.cell_width),
+                bounds.origin.y + px(metrics.padding_y + row * metrics.cell_height),
             ),
-            size(px(cell_width.max(1.0)), px(cell_height.max(1.0))),
+            size(
+                px(metrics.cell_width.max(1.0)),
+                px(metrics.cell_height.max(1.0)),
+            ),
         ))
     }
 
@@ -865,6 +929,7 @@ impl GhosttyView {
         base_font: &Font,
         font_size: Pixels,
         line_height: Pixels,
+        cursor: VtCursor,
     ) {
         let Some(snapshot) = self.snapshot.as_ref() else {
             self.row_cache.clear();
@@ -877,6 +942,7 @@ impl GhosttyView {
 
         let style = RowCacheStyleKey {
             font_family: base_font.family.clone(),
+            font_features: base_font.features.clone(),
             default_fg,
             default_bg,
             font_size,
@@ -901,6 +967,18 @@ impl GhosttyView {
             // Rebuilding all row elements for a changed snapshot is still
             // bounded by the visible grid and keeps TUI exits correct.
             (0..usize::from(snapshot.rows)).collect()
+        } else if self.row_cache_cursor != Some(cursor) {
+            let mut rows = Vec::with_capacity(2);
+            if let Some(previous) = self.row_cache_cursor
+                && previous.visible
+                && previous.row < snapshot.rows
+            {
+                rows.push(usize::from(previous.row));
+            }
+            if cursor.visible && cursor.row < snapshot.rows {
+                rows.push(usize::from(cursor.row));
+            }
+            rows
         } else {
             Vec::new()
         };
@@ -914,7 +992,7 @@ impl GhosttyView {
             let Some(cells) = snapshot.cells.get(row_start..row_end) else {
                 break;
             };
-            let cursor_for_row = cursor_col_for_row(snapshot.cursor, row_idx);
+            let cursor_for_row = cursor_col_for_row(cursor, row_idx);
             self.row_cache[row_idx] = build_terminal_row(
                 cells,
                 default_fg,
@@ -923,11 +1001,12 @@ impl GhosttyView {
                 cursor_for_row,
                 None,
                 default_bg,
+                None,
             );
         }
 
         self.row_cache_generation = Some(snapshot.generation);
-        self.row_cache_cursor = Some(snapshot.cursor);
+        self.row_cache_cursor = Some(cursor);
         self.row_cache_style = Some(style);
         self.row_cache_shape = Some(shape);
     }
@@ -1020,6 +1099,31 @@ impl TerminalImeView for GhosttyView {
 
 impl Render for GhosttyView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.cursor_blink.is_none() {
+            self.cursor_blink = Some(cx.spawn(async move |this, cx| {
+                loop {
+                    cx.background_executor()
+                        .timer(Duration::from_millis(550))
+                        .await;
+                    let _ = this.update(cx, |this, cx| {
+                        let should_blink = this.app.backend_config().tweaks.cursor_blink
+                            && this
+                                .snapshot
+                                .as_ref()
+                                .is_some_and(|snapshot| snapshot.cursor.visible);
+                        let next_visible = if should_blink {
+                            !this.cursor_visible
+                        } else {
+                            true
+                        };
+                        if this.cursor_visible != next_visible {
+                            this.cursor_visible = next_visible;
+                            cx.notify();
+                        }
+                    });
+                }
+            }));
+        }
         let theme = cx.theme();
         let focus = self.focus_handle.clone();
         let input_focus = focus.clone();
@@ -1027,12 +1131,23 @@ impl Render for GhosttyView {
         let menu_focus = focus.clone();
         let entity = cx.entity().downgrade();
         let input_entity = entity.clone();
-        let font_size_px = effective_font_size(self.initial_font_size);
-        let line_height_px = cell_height_px(font_size_px);
-        let cell_width_px = cell_width_px(font_size_px);
+        let config = self.app.backend_config();
+        let metrics = TerminalMetrics::new(
+            config.font_size.unwrap_or(self.initial_font_size),
+            &config.tweaks,
+            1.0,
+        );
         let mono_font = Font {
             family: theme.mono_font_family.clone(),
-            features: FontFeatures::default(),
+            features: if config.tweaks.ligatures {
+                FontFeatures::default()
+            } else {
+                FontFeatures(Arc::new(vec![
+                    ("calt".into(), 0),
+                    ("liga".into(), 0),
+                    ("dlig".into(), 0),
+                ]))
+            },
             fallbacks: None,
             weight: FontWeight::NORMAL,
             style: FontStyle::Normal,
@@ -1055,7 +1170,7 @@ impl Render for GhosttyView {
 
         let foreground = theme.foreground;
         let status_color = foreground.opacity(0.5);
-        let configured_pane_opacity = self.app.background_opacity().clamp(0.0, 1.0);
+        let configured_pane_opacity = config.background_opacity.clamp(0.0, 1.0);
         let pane_opacity = if self
             .snapshot
             .as_ref()
@@ -1068,13 +1183,33 @@ impl Render for GhosttyView {
         };
         let pane_background = theme.background.opacity(pane_opacity);
         let selection = self.selection;
-        let selection_bg = theme.selection.opacity(0.42);
+        let selection_bg = config
+            .tweaks
+            .selection_background
+            .as_deref()
+            .and_then(hex_color_to_hsla)
+            .unwrap_or_else(|| theme.selection.opacity(0.42));
+        let selection_fg = config
+            .tweaks
+            .selection_foreground
+            .as_deref()
+            .and_then(hex_color_to_hsla);
+        let cursor = self
+            .snapshot
+            .as_ref()
+            .map(|snapshot| VtCursor {
+                visible: snapshot.cursor.visible
+                    && (!config.tweaks.cursor_blink || self.cursor_visible),
+                ..snapshot.cursor
+            })
+            .unwrap_or_default();
         self.sync_row_cache(
             foreground,
             theme.background,
             &mono_font,
-            px(font_size_px),
-            px(line_height_px),
+            px(metrics.font_size),
+            px(metrics.cell_height),
+            cursor,
         );
 
         let mut rows: Vec<AnyElement> = Vec::with_capacity(
@@ -1085,8 +1220,8 @@ impl Render for GhosttyView {
             rows.push(
                 div()
                     .font_family(theme.mono_font_family.clone())
-                    .text_size(px(font_size_px))
-                    .line_height(px(line_height_px))
+                    .text_size(px(metrics.font_size))
+                    .line_height(px(metrics.cell_height))
                     .text_color(status_color)
                     .child(message.to_string())
                     .into_any_element(),
@@ -1101,7 +1236,7 @@ impl Render for GhosttyView {
                     let row_start = row_idx * usize::from(snapshot.cols);
                     let row_end = row_start + usize::from(snapshot.cols);
                     if let Some(cells) = snapshot.cells.get(row_start..row_end) {
-                        let cursor_for_row = cursor_col_for_row(snapshot.cursor, row_idx);
+                        let cursor_for_row = cursor_col_for_row(cursor, row_idx);
                         let row = build_terminal_row(
                             cells,
                             foreground,
@@ -1110,18 +1245,19 @@ impl Render for GhosttyView {
                             cursor_for_row,
                             Some(selection_cols),
                             selection_bg,
+                            selection_fg,
                         );
                         rows.push(render_cached_terminal_row(
                             &row,
-                            px(font_size_px),
-                            px(line_height_px),
+                            px(metrics.font_size),
+                            px(metrics.cell_height),
                         ));
                     }
                 } else if let Some(row) = self.row_cache.get(row_idx) {
                     rows.push(render_cached_terminal_row(
                         row,
-                        px(font_size_px),
-                        px(line_height_px),
+                        px(metrics.font_size),
+                        px(metrics.cell_height),
                     ));
                 }
             }
@@ -1131,8 +1267,8 @@ impl Render for GhosttyView {
             rows.push(
                 div()
                     .font_family(theme.mono_font_family.clone())
-                    .text_size(px(font_size_px))
-                    .line_height(px(line_height_px))
+                    .text_size(px(metrics.font_size))
+                    .line_height(px(metrics.cell_height))
                     .text_color(status_color)
                     .child("\u{00A0}".to_string())
                     .into_any_element(),
@@ -1147,14 +1283,14 @@ impl Render for GhosttyView {
             .min_h_0()
             .overflow_hidden()
             .bg(pane_background)
-            .px(px(TERMINAL_PADDING_X_PX))
-            .py(px(TERMINAL_PADDING_Y_PX))
+            .px(px(metrics.padding_x))
+            .py(px(metrics.padding_y))
             .text_color(foreground)
             .items_start()
             .justify_start()
             .children(rows);
         let mut terminal_children = vec![terminal_content.into_any_element()];
-        if let Some(overlay) = self.render_link_cursor_overlay(cell_width_px, line_height_px) {
+        if let Some(overlay) = self.render_link_cursor_overlay(metrics) {
             terminal_children.push(overlay);
         }
         let terminal_layer = div()
@@ -1515,6 +1651,7 @@ struct CachedTerminalRow {
 #[derive(Clone, PartialEq)]
 struct RowCacheStyleKey {
     font_family: SharedString,
+    font_features: FontFeatures,
     default_fg: Hsla,
     default_bg: Hsla,
     font_size: Pixels,
@@ -1593,6 +1730,7 @@ fn build_terminal_row(
     cursor_col: Option<usize>,
     selection_cols: Option<(usize, usize)>,
     selection_bg: Hsla,
+    selection_fg: Option<Hsla>,
 ) -> CachedTerminalRow {
     // First pass: find the last column we have to keep. A column
     // matters if it has a real glyph, OR if it carries a non-default
@@ -1663,6 +1801,7 @@ fn build_terminal_row(
             is_cursor,
             is_selected,
             selection_bg,
+            selection_fg,
         );
 
         let glyph: char = match cell.codepoint {
@@ -1722,6 +1861,7 @@ impl RowStyle {
         is_cursor: bool,
         is_selected: bool,
         selection_bg: Hsla,
+        selection_fg: Option<Hsla>,
     ) -> Self {
         let mut font = base_font.clone();
         if cell.attrs & ATTR_BOLD != 0 {
@@ -1742,6 +1882,9 @@ impl RowStyle {
 
         if is_selected {
             bg = Some(selection_bg);
+            if let Some(selection_fg) = selection_fg {
+                fg = selection_fg;
+            }
         }
 
         if is_cursor {
@@ -1802,6 +1945,23 @@ fn vt_color_to_hsla(packed: u32) -> Option<Hsla> {
     let b = ((packed >> 8) & 0xFF) as f32 / 255.0;
     let a = a as f32 / 255.0;
     Some(Rgba { r, g, b, a }.into())
+}
+
+fn hex_color_to_hsla(value: &str) -> Option<Hsla> {
+    let value = value.strip_prefix('#').unwrap_or(value);
+    if value.len() != 6 {
+        return None;
+    }
+    let rgb = u32::from_str_radix(value, 16).ok()?;
+    Some(
+        Rgba {
+            r: ((rgb >> 16) & 0xFF) as f32 / 255.0,
+            g: ((rgb >> 8) & 0xFF) as f32 / 255.0,
+            b: (rgb & 0xFF) as f32 / 255.0,
+            a: 1.0,
+        }
+        .into(),
+    )
 }
 
 fn xterm_modifier_param(modifiers: &Modifiers) -> Option<u8> {
@@ -1868,8 +2028,8 @@ mod tests {
         cell_width_px, effective_font_size, extract_selection_text, rows_needing_refresh,
         vt_color_to_hsla,
     };
-    use vu_ghostty::{ATTR_BOLD, ATTR_INVERSE, ATTR_UNDERLINE, ScreenSnapshot, VtCell, VtCursor};
     use gpui::{Font, FontFeatures, FontStyle, FontWeight, Hsla, Rgba};
+    use vu_ghostty::{ATTR_BOLD, ATTR_INVERSE, ATTR_UNDERLINE, ScreenSnapshot, VtCell, VtCursor};
 
     fn base_font() -> Font {
         Font {
@@ -1921,8 +2081,10 @@ mod tests {
     fn cell_metrics_match_font_size_clamping() {
         assert_eq!(effective_font_size(0.0), DEFAULT_FONT_SIZE);
         assert_eq!(effective_font_size(8.0), MIN_FONT_SIZE_PX);
-        assert_eq!(cell_width_px(14.0), 9.0);
-        assert_eq!(cell_height_px(14.0), 20.0);
+        assert_eq!(cell_width_px(14.0, 0.0), 9.0);
+        assert_eq!(cell_width_px(14.0, 100.0), 17.0);
+        assert_eq!(cell_height_px(14.0, 0.0), 20.0);
+        assert_eq!(cell_height_px(14.0, 20.0), 24.0);
     }
 
     #[test]
@@ -1933,9 +2095,10 @@ mod tests {
             make_cell(' ', 0, 0, 0),
             make_cell('!', ATTR_INVERSE, 0, 0),
         ];
-        let _no_cursor = build_terminal_row(&cells, fg(), bg(), &base_font(), None, None, bg());
+        let _no_cursor =
+            build_terminal_row(&cells, fg(), bg(), &base_font(), None, None, bg(), None);
         let _with_cursor =
-            build_terminal_row(&cells, fg(), bg(), &base_font(), Some(2), None, bg());
+            build_terminal_row(&cells, fg(), bg(), &base_font(), Some(2), None, bg(), None);
     }
 
     #[test]

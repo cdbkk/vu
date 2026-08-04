@@ -16,6 +16,69 @@
 // Suppress warnings from objc 0.2's `sel_impl!` and `class!` macros.
 #![allow(unexpected_cfgs)]
 
+/// Palette colors passed to a terminal backend.
+#[derive(Debug, Clone)]
+pub struct TerminalColors {
+    pub foreground: [u8; 3],
+    pub background: [u8; 3],
+    pub palette: [[u8; 3]; 16],
+}
+
+/// Structured terminal rendering tweaks shared by every backend.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Tweaks {
+    pub line_height_percent: f32,
+    pub letter_spacing_percent: f32,
+    pub ligatures: bool,
+    pub font_thicken: bool,
+    pub cursor_blink: bool,
+    pub bold_is_bright: bool,
+    pub minimum_contrast: f32,
+    pub unfocused_split_opacity: f32,
+    pub window_padding_x: f32,
+    pub window_padding_y: f32,
+    pub mouse_hide_while_typing: bool,
+    pub selection_background: Option<String>,
+    pub selection_foreground: Option<String>,
+}
+
+impl Default for Tweaks {
+    fn default() -> Self {
+        Self {
+            line_height_percent: 0.0,
+            letter_spacing_percent: 0.0,
+            ligatures: true,
+            font_thicken: false,
+            cursor_blink: true,
+            bold_is_bright: false,
+            minimum_contrast: 1.0,
+            unfocused_split_opacity: 1.0,
+            window_padding_x: 0.0,
+            window_padding_y: 0.0,
+            mouse_hide_while_typing: false,
+            selection_background: None,
+            selection_foreground: None,
+        }
+    }
+}
+
+/// Complete appearance state passed across the app/backend boundary.
+#[derive(Debug, Clone)]
+pub struct AppearanceConfig {
+    pub colors: TerminalColors,
+    pub font_family: String,
+    pub font_size: f32,
+    pub background_opacity: f32,
+    pub background_blur: bool,
+    pub cursor_style: String,
+    pub background_image: Option<String>,
+    pub background_image_opacity: f32,
+    pub background_image_position: Option<String>,
+    pub background_image_fit: Option<String>,
+    pub background_image_repeat: bool,
+    pub tweaks: Tweaks,
+}
+
 pub fn restored_terminal_output_text(lines: &[String]) -> Option<String> {
     if lines.is_empty() {
         return None;
@@ -42,10 +105,9 @@ pub mod ffi;
 #[cfg(target_os = "macos")]
 pub mod terminal;
 
-// `stub` defines the shared shape (TerminalColors, GhosttySplitDirection,
-// MouseButton, etc.) — also used by the Windows backend's facade as the
-// concrete type of cross-cutting values. On macOS the stub module isn't
-// compiled because all types come from `terminal.rs`.
+// `stub` defines non-appearance shared shapes (GhosttySplitDirection,
+// MouseButton, etc.) used by the Windows and Linux facades. On macOS the stub
+// module isn't compiled because those types come from `terminal.rs`.
 #[cfg(not(target_os = "macos"))]
 pub mod stub;
 
@@ -64,13 +126,13 @@ pub mod windows;
 pub use terminal::{
     CommandFinishedSignal, CommandRecord, GhosttyApp, GhosttyConfigPatch, GhosttyScrollbar,
     GhosttySplitDirection, GhosttySurfaceEvent, GhosttyTerminal, MouseButton, SurfaceSize,
-    TerminalColors, TerminalState,
+    TerminalState,
 };
 
 #[cfg(target_os = "windows")]
 pub use stub::{
     CommandFinishedSignal, CommandRecord, GhosttyConfigPatch, GhosttyScrollbar,
-    GhosttySplitDirection, GhosttySurfaceEvent, MouseButton, SurfaceSize, TerminalColors,
+    GhosttySplitDirection, GhosttySurfaceEvent, MouseButton, SurfaceSize,
 };
 #[cfg(target_os = "windows")]
 pub use windows::{WindowsGhosttyApp as GhosttyApp, WindowsGhosttyTerminal as GhosttyTerminal};
@@ -80,7 +142,7 @@ pub use linux::{LinuxGhosttyApp as GhosttyApp, LinuxGhosttyTerminal as GhosttyTe
 #[cfg(target_os = "linux")]
 pub use stub::{
     CommandFinishedSignal, CommandRecord, GhosttyConfigPatch, GhosttyScrollbar,
-    GhosttySplitDirection, GhosttySurfaceEvent, MouseButton, SurfaceSize, TerminalColors,
+    GhosttySplitDirection, GhosttySurfaceEvent, MouseButton, SurfaceSize,
 };
 /// Re-exports for the Linux GPUI-owned terminal renderer in
 /// `vu-app/src/linux_view.rs`. These types are part of the cross-
@@ -100,5 +162,4 @@ pub use vt::{
 pub use stub::{
     CommandFinishedSignal, CommandRecord, GhosttyApp, GhosttyConfigPatch, GhosttyScrollbar,
     GhosttySplitDirection, GhosttySurfaceEvent, GhosttyTerminal, MouseButton, SurfaceSize,
-    TerminalColors,
 };

@@ -23,7 +23,7 @@ use std::time::Instant;
 use dispatch::Queue;
 use parking_lot::Mutex;
 
-use crate::ffi;
+use crate::{AppearanceConfig, TerminalColors, Tweaks, ffi};
 
 const DEFAULT_GHOSTTY_FONT_FAMILY: &str = "Ioskeley Mono";
 const VU_SHELL_INTEGRATION_FEATURES: &str = "no-cursor,ssh-env,ssh-terminfo";
@@ -38,15 +38,6 @@ fn sanitize_font_family_for_ghostty(font_family: &str) -> &str {
 }
 
 // ── Theme colors for ghostty config ──────────────────────────
-
-/// Terminal colors in a format ghostty understands.
-/// Decoupled from vu-terminal's TerminalTheme to avoid cross-crate dependency.
-#[derive(Debug, Clone)]
-pub struct TerminalColors {
-    pub foreground: [u8; 3],
-    pub background: [u8; 3],
-    pub palette: [[u8; 3]; 16],
-}
 
 impl TerminalColors {
     fn append_config(&self, s: &mut String) {
@@ -67,6 +58,75 @@ impl TerminalColors {
     }
 }
 
+impl Tweaks {
+    fn append_ghostty_config(&self, s: &mut String) {
+        if self.line_height_percent != 0.0 {
+            s.push_str(&format!(
+                "adjust-cell-height = {:.0}%\n",
+                self.line_height_percent
+            ));
+        }
+        if self.letter_spacing_percent != 0.0 {
+            s.push_str(&format!(
+                "adjust-cell-width = {:.0}%\n",
+                self.letter_spacing_percent
+            ));
+        }
+        if !self.ligatures {
+            s.push_str("font-feature = -calt\nfont-feature = -liga\nfont-feature = -dlig\n");
+        }
+        if self.font_thicken {
+            s.push_str("font-thicken = true\n");
+        }
+        if !self.cursor_blink {
+            s.push_str("cursor-style-blink = false\n");
+        }
+        if self.bold_is_bright {
+            s.push_str("bold-is-bright = true\n");
+        }
+        if self.minimum_contrast > 1.0 {
+            s.push_str(&format!(
+                "minimum-contrast = {:.2}\n",
+                self.minimum_contrast
+            ));
+        }
+        if self.unfocused_split_opacity < 1.0 {
+            s.push_str(&format!(
+                "unfocused-split-opacity = {:.2}\n",
+                self.unfocused_split_opacity
+            ));
+        }
+        if self.window_padding_x > 0.0 {
+            s.push_str(&format!(
+                "window-padding-x = {:.0}\n",
+                self.window_padding_x
+            ));
+        }
+        if self.window_padding_y > 0.0 {
+            s.push_str(&format!(
+                "window-padding-y = {:.0}\n",
+                self.window_padding_y
+            ));
+        }
+        if self.mouse_hide_while_typing {
+            s.push_str("mouse-hide-while-typing = true\n");
+        }
+        if let Some(background) = &self.selection_background {
+            s.push_str(&format!("selection-background = {background}\n"));
+        }
+        if let Some(foreground) = &self.selection_foreground {
+            s.push_str(&format!("selection-foreground = {foreground}\n"));
+        }
+    }
+
+    #[cfg(test)]
+    fn to_ghostty_config(&self) -> String {
+        let mut config = String::new();
+        self.append_ghostty_config(&mut config);
+        config
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct GhosttyConfigPatch {
     pub colors: Option<TerminalColors>,
@@ -81,10 +141,7 @@ pub struct GhosttyConfigPatch {
     pub background_image_position: Option<String>,
     pub background_image_fit: Option<String>,
     pub background_image_repeat: Option<bool>,
-    /// Pre-rendered ghostty config lines from the app's terminal tweaks.
-    /// Passed as text so this crate keeps its zero-dependency-on-vu-core rule
-    /// and does not grow a typed field per ghostty option.
-    pub extra_config: Option<String>,
+    pub tweaks: Option<Tweaks>,
 }
 
 impl GhosttyConfigPatch {
@@ -125,8 +182,8 @@ impl GhosttyConfigPatch {
         if let Some(background_image_repeat) = patch.background_image_repeat {
             self.background_image_repeat = Some(background_image_repeat);
         }
-        if let Some(extra_config) = &patch.extra_config {
-            self.extra_config = Some(extra_config.clone());
+        if let Some(tweaks) = &patch.tweaks {
+            self.tweaks = Some(tweaks.clone());
         }
     }
 
@@ -198,10 +255,10 @@ impl GhosttyConfigPatch {
                 ));
             }
         }
-        if let Some(extra) = &self.extra_config {
+        if let Some(tweaks) = &self.tweaks {
             // Last: ghostty honours the final occurrence of a repeated key, so
             // a tweak can override anything written above it.
-            s.push_str(extra);
+            tweaks.append_ghostty_config(&mut s);
         }
         s
     }
@@ -214,6 +271,30 @@ impl GhosttyConfigPatch {
         f.write_all(self.to_config_string().as_bytes())
             .map_err(|e| format!("write: {}", e))?;
         Ok(path)
+    }
+}
+
+fn appearance_patch(config: &AppearanceConfig) -> GhosttyConfigPatch {
+    GhosttyConfigPatch {
+        colors: Some(config.colors.clone()),
+        font_family: Some(config.font_family.clone()),
+        font_size: Some(config.font_size),
+        background_opacity: Some(config.background_opacity),
+        background_opacity_cells: Some(config.background_opacity < 0.999),
+        background_blur: Some(config.background_blur),
+        cursor_style: Some(normalize_cursor_style(&config.cursor_style).to_string()),
+        background_image: config.background_image.clone(),
+        background_image_opacity: config
+            .background_image
+            .as_ref()
+            .map(|_| config.background_image_opacity),
+        background_image_position: config.background_image_position.clone(),
+        background_image_fit: config.background_image_fit.clone(),
+        background_image_repeat: config
+            .background_image
+            .as_ref()
+            .map(|_| config.background_image_repeat),
+        tweaks: Some(config.tweaks.clone()),
     }
 }
 
@@ -474,39 +555,10 @@ impl Default for GhosttyWakeHandle {
 
 impl GhosttyApp {
     /// Create a new ghostty app with the given terminal colors.
-    pub fn new(
-        colors: Option<&TerminalColors>,
-        font_family: Option<&str>,
-        font_size: Option<f32>,
-        background_opacity: Option<f32>,
-        background_blur: Option<bool>,
-        cursor_style: Option<&str>,
-        background_image: Option<&str>,
-        background_image_opacity: Option<f32>,
-        background_image_position: Option<&str>,
-        background_image_fit: Option<&str>,
-        background_image_repeat: Option<bool>,
-        extra_config: Option<&str>,
-    ) -> Result<Self, String> {
+    pub fn new(config: &AppearanceConfig) -> Result<Self, String> {
         ensure_ghostty_init()?;
 
-        let appearance = GhosttyConfigPatch {
-            colors: colors.cloned(),
-            font_family: font_family.map(ToOwned::to_owned),
-            font_size,
-            background_opacity,
-            background_opacity_cells: background_opacity.map(|opacity| opacity < 0.999),
-            background_blur,
-            cursor_style: cursor_style
-                .map(normalize_cursor_style)
-                .map(ToOwned::to_owned),
-            background_image: background_image.map(ToOwned::to_owned),
-            background_image_opacity,
-            background_image_position: background_image_position.map(ToOwned::to_owned),
-            background_image_fit: background_image_fit.map(ToOwned::to_owned),
-            background_image_repeat,
-            extra_config: extra_config.map(ToOwned::to_owned),
-        };
+        let appearance = appearance_patch(config);
         let config = build_ghostty_config(&appearance)?;
 
         let wake_handle = Arc::new(GhosttyWakeHandle::default());
@@ -585,51 +637,12 @@ impl GhosttyApp {
     pub fn update_colors(&self, colors: &TerminalColors) -> Result<(), String> {
         self.update_config(&GhosttyConfigPatch {
             colors: Some(colors.clone()),
-            font_family: None,
-            font_size: None,
-            background_opacity: None,
-            background_opacity_cells: None,
-            background_blur: None,
-            cursor_style: None,
-            background_image: None,
-            background_image_opacity: None,
-            background_image_position: None,
-            background_image_fit: None,
-            background_image_repeat: None,
-            extra_config: None,
+            ..Default::default()
         })
     }
 
-    pub fn update_appearance(
-        &self,
-        colors: &TerminalColors,
-        font_family: &str,
-        font_size: f32,
-        background_opacity: f32,
-        background_blur: bool,
-        cursor_style: &str,
-        background_image: Option<&str>,
-        background_image_opacity: f32,
-        background_image_position: Option<&str>,
-        background_image_fit: Option<&str>,
-        background_image_repeat: bool,
-        extra_config: Option<&str>,
-    ) -> Result<(), String> {
-        self.update_config(&GhosttyConfigPatch {
-            colors: Some(colors.clone()),
-            font_family: Some(font_family.to_string()),
-            font_size: Some(font_size),
-            background_opacity: Some(background_opacity),
-            background_opacity_cells: Some(background_opacity < 0.999),
-            background_blur: Some(background_blur),
-            cursor_style: Some(normalize_cursor_style(cursor_style).to_string()),
-            background_image: background_image.map(ToOwned::to_owned),
-            background_image_opacity: background_image.map(|_| background_image_opacity),
-            background_image_position: background_image_position.map(ToOwned::to_owned),
-            background_image_fit: background_image_fit.map(ToOwned::to_owned),
-            background_image_repeat: background_image.map(|_| background_image_repeat),
-            extra_config: extra_config.map(ToOwned::to_owned),
-        })
+    pub fn update_appearance(&self, config: &AppearanceConfig) -> Result<(), String> {
+        self.update_config(&appearance_patch(config))
     }
 
     pub fn update_config(&self, patch: &GhosttyConfigPatch) -> Result<(), String> {
@@ -869,36 +882,8 @@ impl GhosttyTerminal {
         Ok(())
     }
 
-    pub fn update_appearance(
-        &self,
-        colors: &TerminalColors,
-        font_family: &str,
-        font_size: f32,
-        background_opacity: f32,
-        background_blur: bool,
-        cursor_style: &str,
-        background_image: Option<&str>,
-        background_image_opacity: f32,
-        background_image_position: Option<&str>,
-        background_image_fit: Option<&str>,
-        background_image_repeat: bool,
-        extra_config: Option<&str>,
-    ) -> Result<(), String> {
-        self.update_config(&GhosttyConfigPatch {
-            colors: Some(colors.clone()),
-            font_family: Some(font_family.to_string()),
-            font_size: Some(font_size),
-            background_opacity: Some(background_opacity),
-            background_opacity_cells: Some(background_opacity < 0.999),
-            background_blur: Some(background_blur),
-            cursor_style: Some(normalize_cursor_style(cursor_style).to_string()),
-            background_image: background_image.map(ToOwned::to_owned),
-            background_image_opacity: background_image.map(|_| background_image_opacity),
-            background_image_position: background_image_position.map(ToOwned::to_owned),
-            background_image_fit: background_image_fit.map(ToOwned::to_owned),
-            background_image_repeat: background_image.map(|_| background_image_repeat),
-            extra_config: extra_config.map(ToOwned::to_owned),
-        })?;
+    pub fn update_appearance(&self, config: &AppearanceConfig) -> Result<(), String> {
+        self.update_config(&appearance_patch(config))?;
         self.refresh();
         Ok(())
     }
@@ -1675,7 +1660,7 @@ mod tests {
     use parking_lot::Mutex;
 
     use super::{
-        GhosttyConfigPatch, TerminalColors, TerminalState,
+        GhosttyConfigPatch, TerminalColors, TerminalState, Tweaks,
         installed_app_ghostty_resources_dir_for_exe, mark_child_exited_state,
     };
 
@@ -1778,6 +1763,69 @@ mod tests {
         let config = GhosttyConfigPatch::default().to_config_string();
 
         assert!(config.contains("shell-integration-features = no-cursor,ssh-env,ssh-terminfo"));
+    }
+
+    #[test]
+    fn tweaks_render_exact_ghostty_keys() {
+        let tweaks = Tweaks {
+            line_height_percent: 20.0,
+            letter_spacing_percent: -10.0,
+            ligatures: false,
+            font_thicken: true,
+            cursor_blink: false,
+            bold_is_bright: true,
+            minimum_contrast: 3.0,
+            unfocused_split_opacity: 0.75,
+            window_padding_x: 8.0,
+            window_padding_y: 6.0,
+            mouse_hide_while_typing: true,
+            selection_background: Some("#112233".into()),
+            selection_foreground: Some("AABBCC".into()),
+        };
+
+        assert_eq!(
+            tweaks.to_ghostty_config(),
+            concat!(
+                "adjust-cell-height = 20%\n",
+                "adjust-cell-width = -10%\n",
+                "font-feature = -calt\n",
+                "font-feature = -liga\n",
+                "font-feature = -dlig\n",
+                "font-thicken = true\n",
+                "cursor-style-blink = false\n",
+                "bold-is-bright = true\n",
+                "minimum-contrast = 3.00\n",
+                "unfocused-split-opacity = 0.75\n",
+                "window-padding-x = 8\n",
+                "window-padding-y = 6\n",
+                "mouse-hide-while-typing = true\n",
+                "selection-background = #112233\n",
+                "selection-foreground = AABBCC\n",
+            )
+        );
+    }
+
+    #[test]
+    fn ghostty_config_appends_tweaks_last() {
+        let tweaks = Tweaks {
+            line_height_percent: 20.0,
+            ..Tweaks::default()
+        };
+        let patch = GhosttyConfigPatch {
+            font_size: Some(14.0),
+            background_image: Some("wallpaper.png".into()),
+            background_image_repeat: Some(true),
+            tweaks: Some(tweaks.clone()),
+            ..GhosttyConfigPatch::default()
+        };
+        let config = patch.to_config_string();
+
+        assert!(config.ends_with(&tweaks.to_ghostty_config()), "{config}");
+        assert!(
+            config.find("background-image-repeat = true").unwrap()
+                < config.find("adjust-cell-height = 20%").unwrap(),
+            "{config}"
+        );
     }
 
     #[test]

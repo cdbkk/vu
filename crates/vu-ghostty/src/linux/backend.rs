@@ -8,9 +8,10 @@ use parking_lot::Mutex;
 use super::pty::{LinuxPtyOptions, LinuxPtySession, LinuxWakeCallback};
 use crate::stub::{
     CommandFinishedSignal, CommandRecord, GhosttyConfigPatch, GhosttySplitDirection,
-    GhosttySurfaceEvent, MouseButton, SurfaceSize, TerminalColors,
+    GhosttySurfaceEvent, MouseButton, SurfaceSize,
 };
 use crate::vt::ScreenSnapshot;
+use crate::{AppearanceConfig, TerminalColors, Tweaks};
 
 #[derive(Debug, Clone)]
 pub struct LinuxBackendConfig {
@@ -31,6 +32,7 @@ pub struct LinuxBackendConfig {
     /// itself — the `WindowBackgroundAppearance::Blurred` toggle is
     /// applied at the GPUI window level in `vu-app/main.rs`.
     pub background_blur: bool,
+    pub tweaks: Tweaks,
 }
 
 impl Default for LinuxBackendConfig {
@@ -42,6 +44,7 @@ impl Default for LinuxBackendConfig {
             colors: None,
             background_opacity: 1.0,
             background_blur: false,
+            tweaks: Tweaks::default(),
         }
     }
 }
@@ -54,29 +57,16 @@ pub struct LinuxGhosttyApp {
 }
 
 impl LinuxGhosttyApp {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        colors: Option<&TerminalColors>,
-        font_family: Option<&str>,
-        font_size: Option<f32>,
-        background_opacity: Option<f32>,
-        background_blur: Option<bool>,
-        _cursor_style: Option<&str>,
-        _background_image: Option<&str>,
-        _background_image_opacity: Option<f32>,
-        _background_image_position: Option<&str>,
-        _background_image_fit: Option<&str>,
-        _background_image_repeat: Option<bool>,
-        _extra_config: Option<&str>,
-    ) -> Result<Self, String> {
+    pub fn new(appearance: &AppearanceConfig) -> Result<Self, String> {
         Ok(Self {
             config: Mutex::new(LinuxBackendConfig {
                 shell_program: default_linux_shell_program(),
-                font_family: font_family.map(ToOwned::to_owned),
-                font_size,
-                colors: colors.cloned(),
-                background_opacity: clamp_opacity(background_opacity.unwrap_or(1.0)),
-                background_blur: background_blur.unwrap_or(false),
+                font_family: Some(appearance.font_family.clone()),
+                font_size: Some(appearance.font_size),
+                colors: Some(appearance.colors.clone()),
+                background_opacity: clamp_opacity(appearance.background_opacity),
+                background_blur: appearance.background_blur,
+                tweaks: appearance.tweaks.clone(),
             }),
             wake_generation: Arc::new(AtomicU64::new(1)),
         })
@@ -94,28 +84,14 @@ impl LinuxGhosttyApp {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_appearance(
-        &self,
-        colors: &TerminalColors,
-        font_family: &str,
-        font_size: f32,
-        background_opacity: f32,
-        background_blur: bool,
-        _cursor_style: &str,
-        _background_image: Option<&str>,
-        _background_image_opacity: f32,
-        _background_image_position: Option<&str>,
-        _background_image_fit: Option<&str>,
-        _background_image_repeat: bool,
-        _extra_config: Option<&str>,
-    ) -> Result<(), String> {
+    pub fn update_appearance(&self, appearance: &AppearanceConfig) -> Result<(), String> {
         let mut config = self.config.lock();
-        config.font_family = Some(font_family.to_string());
-        config.font_size = Some(font_size);
-        config.colors = Some(colors.clone());
-        config.background_opacity = clamp_opacity(background_opacity);
-        config.background_blur = background_blur;
+        config.font_family = Some(appearance.font_family.clone());
+        config.font_size = Some(appearance.font_size);
+        config.colors = Some(appearance.colors.clone());
+        config.background_opacity = clamp_opacity(appearance.background_opacity);
+        config.background_blur = appearance.background_blur;
+        config.tweaks = appearance.tweaks.clone();
         Ok(())
     }
 
@@ -144,6 +120,7 @@ impl LinuxGhosttyApp {
             program: config.shell_program,
             wake_generation: Some(self.wake_generation.clone()),
             theme: config.colors,
+            bold_is_bright: config.tweaks.bold_is_bright,
             ..LinuxPtyOptions::default()
         }
     }
@@ -292,24 +269,10 @@ impl LinuxGhosttyTerminal {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_appearance(
-        &self,
-        colors: &TerminalColors,
-        _font_family: &str,
-        _font_size: f32,
-        _background_opacity: f32,
-        _background_blur: bool,
-        _cursor_style: &str,
-        _background_image: Option<&str>,
-        _background_image_opacity: f32,
-        _background_image_position: Option<&str>,
-        _background_image_fit: Option<&str>,
-        _background_image_repeat: bool,
-        _extra_config: Option<&str>,
-    ) -> Result<(), String> {
+    pub fn update_appearance(&self, appearance: &AppearanceConfig) -> Result<(), String> {
         if let Some(session) = self.inner.lock().as_ref() {
-            session.set_theme(colors);
+            session.set_theme(&appearance.colors);
+            session.set_bold_is_bright(appearance.tweaks.bold_is_bright);
         }
         Ok(())
     }
