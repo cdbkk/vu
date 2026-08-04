@@ -6625,10 +6625,12 @@ impl Render for SettingsPanel {
             .pl(header_left_padding)
             .pr(px(12.0))
             .child(
-                // The app mark carries its own tile, so it reads on both the
-                // light and dark themes without a per-theme asset.
+                // The small master, not the full mark: at 18px the two
+                // letterforms crowd the tile and mush together. Both carry
+                // their own tile, so this reads on the light and dark themes
+                // without a per-theme asset.
                 div().size(px(18.0)).flex_none().child(
-                    img("Vu-macOS-Dark-256x256@2x.png")
+                    img("Vu-macOS-Dark-Small-256x256@2x.png")
                         .size_full()
                         .object_fit(ObjectFit::Contain),
                 ),

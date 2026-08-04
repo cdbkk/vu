@@ -64,12 +64,25 @@ iconset_dir="$iconset_parent/vu.iconset"
 mkdir -p "$iconset_dir"
 trap 'rm -rf "$iconset_parent"' EXIT
 
-for size in 16 32 128 256 512; do
+# The 16pt and 32pt slots get their own artwork. Downscaling the full mark
+# to that size turns it into a dark blob: the two letterforms crowd the
+# tile's curved edges and the strokes fall below a pixel. The small master
+# is a single `v` monogram on an apricot tile instead.
+icon_source_small="${VU_ICON_SOURCE_SMALL:-$REPO_ROOT/assets/Vu-macOS-Dark-Small-1024x1024@1x.png}"
+if [[ ! -r "$icon_source_small" ]]; then
+  icon_source_small="$VU_ICON_SOURCE"
+fi
+
+for size in 128 256 512; do
   sips -z "$size" "$size" "$VU_ICON_SOURCE" --out "$iconset_dir/icon_${size}x${size}.png" >/dev/null
 done
 
-sips -z 32 32 "$VU_ICON_SOURCE" --out "$iconset_dir/icon_16x16@2x.png" >/dev/null
-sips -z 64 64 "$VU_ICON_SOURCE" --out "$iconset_dir/icon_32x32@2x.png" >/dev/null
+for size in 16 32; do
+  sips -z "$size" "$size" "$icon_source_small" --out "$iconset_dir/icon_${size}x${size}.png" >/dev/null
+done
+
+sips -z 32 32 "$icon_source_small" --out "$iconset_dir/icon_16x16@2x.png" >/dev/null
+sips -z 64 64 "$icon_source_small" --out "$iconset_dir/icon_32x32@2x.png" >/dev/null
 sips -z 256 256 "$VU_ICON_SOURCE" --out "$iconset_dir/icon_128x128@2x.png" >/dev/null
 sips -z 512 512 "$VU_ICON_SOURCE" --out "$iconset_dir/icon_256x256@2x.png" >/dev/null
 cp "$VU_ICON_SOURCE" "$iconset_dir/icon_512x512@2x.png"
