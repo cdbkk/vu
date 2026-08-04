@@ -3,7 +3,7 @@
 ## Overview
 
 [Rig](https://rig.rs/) is the most mature Rust-native AI agent framework. MIT licensed.
-The workspace uses the published `rig-core` 0.40 release from crates.io. Con keeps
+The workspace uses the published `rig-core` 0.40 release from crates.io. Vu keeps
 provider construction, conversation persistence, terminal context, and approval
 policy in its own crates; Rig supplies provider clients and the agent run loop.
 
@@ -36,7 +36,7 @@ let agent = client
     .tool(ShellExecTool)
     .tool(FileReadTool)
     .max_tokens(4096)
-    .default_max_turns(12) // preserve Con's former max_turns = 10 ceiling
+    .default_max_turns(12) // preserve Vu's former max_turns = 10 ceiling
     .build();
 ```
 
@@ -136,13 +136,13 @@ MultiTurnStreamItem::StreamUserItem(...)  // completed tool result
 MultiTurnStreamItem::FinalResponse(...)   // unified PromptResponse
 ```
 
-## Integration with con
+## Integration with vu
 
-1. `con-agent/provider.rs` creates `anthropic::Client` from config
-2. Builds an `Agent` with Con's terminal, tmux, file, and workspace tools
+1. `vu-agent/provider.rs` creates `anthropic::Client` from config
+2. Builds an `Agent` with Vu's terminal, tmux, file, and workspace tools
 3. Uses `stream_prompt()` for live multi-turn conversation
-4. `con-agent/conversation.rs` converts our Message types to Rig's `Vec<Message>`
-5. `con-core/harness.rs` runs agent work on a shared tokio runtime
+4. `vu-agent/conversation.rs` converts our Message types to Rig's `Vec<Message>`
+5. `vu-core/harness.rs` runs agent work on a shared tokio runtime
 
 ## Key Differences from Rig 0.36
 

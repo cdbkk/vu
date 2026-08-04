@@ -1,6 +1,6 @@
 # Quick Terminal
 
-Quick Terminal is a macOS-only drop-down Con window for short terminal work
+Quick Terminal is a macOS-only drop-down Vu window for short terminal work
 from anywhere on the system.
 
 <img alt="Quick Terminal open over the desktop on macOS" src="https://github.com/user-attachments/assets/a668bca2-eb75-4fcc-a579-719f2babde45" />
@@ -16,17 +16,17 @@ open a terminal over the app you are using.
 4. Use the default <kbd>⌘</kbd> <kbd>Backslash</kbd> shortcut, or record a
    different shortcut if that conflicts with your setup.
 
-The shortcut is global. It works when another app is frontmost, as long as Con
+The shortcut is global. It works when another app is frontmost, as long as Vu
 is running.
 
 You can also open it from **View -> Quick Terminal** or the command palette
-while Con is active, even if the global shortcut is off.
+while Vu is active, even if the global shortcut is off.
 
 ## How It Feels
 
-Press the shortcut and Con slides a dedicated terminal down from the top of the
+Press the shortcut and Vu slides a dedicated terminal down from the top of the
 active display. Press it again and the window hides. When you hide it with the
-shortcut, Con returns focus to the app you were using before.
+shortcut, Vu returns focus to the app you were using before.
 
 Clicking another app also hides Quick Terminal. In that case macOS keeps focus
 on what you clicked.
@@ -40,7 +40,7 @@ The window is intentionally simple:
 
 ## What It Keeps
 
-Quick Terminal is a real Con workspace. As long as you hide it instead of
+Quick Terminal is a real Vu workspace. As long as you hide it instead of
 closing it, it keeps the things you expect a live terminal to keep:
 
 - tabs
@@ -50,7 +50,7 @@ closing it, it keeps the things you expect a live terminal to keep:
 - visible scrollback
 
 That makes it useful for small loops: check a server, run a one-off command,
-peek at logs, or keep a scratch shell close without moving your main Con
+peek at logs, or keep a scratch shell close without moving your main Vu
 windows.
 
 ## What Ends It
@@ -63,27 +63,27 @@ directory.
 
 Quick Terminal does not keep a separate saved layout, remembered height, or
 private workspace after it is destroyed. If a workspace matters, keep it in a
-normal Con window or save a [workspace profile](workspace-layout-profiles-guide.md).
+normal Vu window or save a [workspace profile](workspace-layout-profiles-guide.md).
 
-## Quick Terminal vs Summon / Hide Con
+## Quick Terminal vs Summon / Hide Vu
 
-Con has two macOS global-window features. They solve different problems.
+Vu has two macOS global-window features. They solve different problems.
 
 | Feature | What it does | Use it when |
 | --- | --- | --- |
 | Quick Terminal | Opens a dedicated top-pinned terminal window. | You want an iTerm-style scratch terminal from any app. |
-| Summon / Hide Con | Shows or hides the normal Con app window. | You want to jump back to your main Con workspace. |
+| Summon / Hide Vu | Shows or hides the normal Vu app window. | You want to jump back to your main Vu workspace. |
 
 Both are off by default because global shortcuts can collide with launchers,
 window managers, and other terminal apps.
 
 ## If the Shortcut Does Nothing
 
-- Make sure Con is running.
+- Make sure Vu is running.
 - Make sure **Settings -> Keys -> Quick Terminal** is enabled.
 - Try a different shortcut if another app already owns
   <kbd>⌘</kbd> <kbd>Backslash</kbd>.
-- If you are recording a shortcut in Settings, Con temporarily suspends its
+- If you are recording a shortcut in Settings, Vu temporarily suspends its
   global hotkeys so the shortcut can be captured instead of triggered.
 
 ## Credit
@@ -94,5 +94,5 @@ Quick Terminal was introduced by
 
 ## Platform Support
 
-Quick Terminal is macOS-only. Windows and Linux keep the normal Con window
+Quick Terminal is macOS-only. Windows and Linux keep the normal Vu window
 model for now.

@@ -2,12 +2,12 @@
 
 ## Goal
 
-Verify that Con can operate inside an `ssh -> tmux` workspace as a real terminal operator: choose a tmux shell target, edit files there, run code there, and keep long-running work separate.
+Verify that Vu can operate inside an `ssh -> tmux` workspace as a real terminal operator: choose a tmux shell target, edit files there, run code there, and keep long-running work separate.
 
 ## Setup
 
 - One pane already attached to `ssh haswell` and `tmux`
-- Remote workspace root such as `~/tmp/con-bench`
+- Remote workspace root such as `~/tmp/vu-bench`
 - Python 3 or another basic interpreter available on the remote host
 
 ## Prompt sequence
@@ -20,7 +20,7 @@ Verify that Con can operate inside an `ssh -> tmux` workspace as a real terminal
 
 ## Success looks like
 
-- The agent uses tmux-native targeting where available instead of treating the whole Con pane as one shell
+- The agent uses tmux-native targeting where available instead of treating the whole Vu pane as one shell
 - File creation, edit, and rerun happen in one stable tmux shell target
 - The long-running sleep target stays separate from the file-work target
 - The agent can explain which tmux target is for file work and which is for long-running work

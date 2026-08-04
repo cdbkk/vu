@@ -19,7 +19,7 @@ aren't pulling it in directly, and what we may want to borrow.
 ## Why we aren't pulling it in
 
 - **Different embedding model.** PR #12167 produces a *standalone*
-  Ghostty.exe. con needs `libghostty-vt` usable as a library inside
+  Ghostty.exe. vu needs `libghostty-vt` usable as a library inside
   a GPUI host window — a different decomposition. The PR's apprt
   owns the window and renderer; we own the window and want to feed
   libghostty-vt the bytes and render via our own D3D11 path inside a

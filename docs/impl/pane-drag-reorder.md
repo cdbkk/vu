@@ -7,7 +7,7 @@
 
 ## Overview
 
-Pane title dragging now uses the same high-level drag payload as tab dragging (`DraggedTab`), but pane-origin drags render their visible title preview from `ConWorkspace` instead of relying on GPUI's built-in drag-preview positioning.
+Pane title dragging now uses the same high-level drag payload as tab dragging (`DraggedTab`), but pane-origin drags render their visible title preview from `VuWorkspace` instead of relying on GPUI's built-in drag-preview positioning.
 
 The supported behaviors are:
 
@@ -16,7 +16,7 @@ The supported behaviors are:
 3. While over the tab strip, render a ghost tab in the strip so pane-to-tab movement feels like normal Chrome-style tab drag.
 4. While outside the tab strip, destroy the ghost tab and show only the pane split preview when a valid split target exists.
 
-The important design decision is that **pane-origin drags do not use GPUI's visible drag preview**. GPUI still carries the drag payload and routes `on_drag_move` / `on_drop`, but Con draws its own small floating pane title overlay at the live cursor position.
+The important design decision is that **pane-origin drags do not use GPUI's visible drag preview**. GPUI still carries the drag payload and routes `on_drag_move` / `on_drop`, but Vu draws its own small floating pane title overlay at the live cursor position.
 
 ---
 
@@ -45,7 +45,7 @@ So the title preview is centered under the mouse no matter where the user starts
 
 ### `DraggedTab`
 
-Defined in `crates/con-app/src/sidebar.rs`.
+Defined in `crates/vu-app/src/sidebar.rs`.
 
 `DraggedTab` is now the shared drag payload for:
 
@@ -86,7 +86,7 @@ Rules:
 
 ### `PaneTitleDragState`
 
-Defined in `crates/con-app/src/workspace/types.rs`.
+Defined in `crates/vu-app/src/workspace/types.rs`.
 
 Tracks the visible workspace overlay and pane drop target:
 
@@ -118,7 +118,7 @@ enum PaneDropTarget {
 
 ## Drag Source: Pane Title Bar
 
-Implemented in `crates/con-app/src/pane_tree.rs`.
+Implemented in `crates/vu-app/src/pane_tree.rs`.
 
 The entire pane title bar is the drag source:
 
@@ -150,7 +150,7 @@ The visible pane-origin preview is rendered by the workspace overlay rather than
 
 ### GPUI preview for pane-origin drags
 
-Implemented in `DraggedTab::render()` in `crates/con-app/src/sidebar.rs`.
+Implemented in `DraggedTab::render()` in `crates/vu-app/src/sidebar.rs`.
 
 For `DraggedTabOrigin::Pane`, the GPUI drag preview intentionally renders as a zero-size element:
 
@@ -164,7 +164,7 @@ This prevents the built-in GPUI preview from appearing at a position tied to the
 
 ### Workspace floating title overlay
 
-Implemented near the root render path in `crates/con-app/src/workspace/render.rs`.
+Implemented near the root render path in `crates/vu-app/src/workspace/render.rs`.
 
 When `pane_title_drag.active` is true, workspace renders a small title-like overlay:
 
@@ -324,7 +324,7 @@ When promoting a pane to a new tab, the created tab should preserve a useful lab
 
 ### Unit tests
 
-Relevant tests in `crates/con-app/src/workspace/tests.rs` cover:
+Relevant tests in `crates/vu-app/src/workspace/tests.rs` cover:
 
 - floating pane preview origin centers under cursor
 - tab-like preview size

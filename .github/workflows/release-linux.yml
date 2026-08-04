@@ -7,9 +7,9 @@ name: Release Linux
 # updater can discover new builds.
 #
 # Distribution shape is intentionally similar to the Windows preview:
-# unsigned, no installer, the user grabs `con-<version>-linux-<arch>.tar.gz`,
-# extracts it (or runs `install.sh`), and `con` lives at
-# ~/.local/bin/con. Auto-update applies via the same install.sh
+# unsigned, no installer, the user grabs `vu-<version>-linux-<arch>.tar.gz`,
+# extracts it (or runs `install.sh`), and `vu` lives at
+# ~/.local/bin/vu. Auto-update applies via the same install.sh
 # pipeline. Real packaging (.deb, AppImage, Flatpak) is a follow-up.
 
 on:
@@ -31,10 +31,10 @@ jobs:
     # on Debian 12 / Ubuntu 22.04 / RHEL 9 / Fedora 38 / ChromeOS
     # Crostini with errors like:
     #
-    #   ./con: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38'
-    #     not found (required by ./con)
-    #   ./con: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39'
-    #     not found (required by ./con)
+    #   ./vu: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38'
+    #     not found (required by ./vu)
+    #   ./vu: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39'
+    #     not found (required by ./vu)
     #
     # which is exactly what v0.1.0-beta.34 hit on a current
     # Chromebook (Crostini ships Debian 12, glibc 2.36).
@@ -76,7 +76,7 @@ jobs:
 
       - name: Install Zig 0.15.2
         # Same Zig the linux CI smoke test installs — needed for
-        # con-ghostty's libghostty-vt build.
+        # vu-ghostty's libghostty-vt build.
         shell: bash
         run: |
           set -euo pipefail
@@ -119,32 +119,32 @@ jobs:
         id: package
         shell: bash
         # scripts/linux/release.sh:
-        #   - cargo build -p con -p con-cli --release with the channel + version
-        #     baked in via CON_RELEASE_CHANNEL / CON_RELEASE_VERSION
-        #     (option_env! in con-core::release_channel reads them so
+        #   - cargo build -p vu -p vu-cli --release with the channel + version
+        #     baked in via VU_RELEASE_CHANNEL / VU_RELEASE_VERSION
+        #     (option_env! in vu-core::release_channel reads them so
         #     the notify-only updater knows which appcast to poll),
         #   - strip --strip-debug the debug-laden binaries,
-        #   - stage con + con-cli + LICENSE + README.md + a .desktop
+        #   - stage vu + vu-cli + LICENSE + README.md + a .desktop
         #     entry + a 256x256 icon into a versioned dir,
         #   - tar -czf the staging dir into
-        #     dist/con-<version>-linux-x86_64.tar.gz,
+        #     dist/vu-<version>-linux-x86_64.tar.gz,
         #   - emit dist/SHA256SUMS-linux.txt.
         env:
-          CON_RELEASE_CHANNEL: ${{ steps.meta.outputs.channel }}
-          CON_RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+          VU_RELEASE_CHANNEL: ${{ steps.meta.outputs.channel }}
+          VU_RELEASE_VERSION: ${{ steps.meta.outputs.version }}
         run: |
           ./scripts/linux/release.sh
           ./scripts/release/verify-artifacts.sh linux \
-            "dist/con-${{ steps.meta.outputs.version }}-linux-x86_64.tar.gz" \
+            "dist/vu-${{ steps.meta.outputs.version }}-linux-x86_64.tar.gz" \
             "dist/SHA256SUMS-linux.txt"
-          echo "tarball=dist/con-${{ steps.meta.outputs.version }}-linux-x86_64.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "tarball=dist/vu-${{ steps.meta.outputs.version }}-linux-x86_64.tar.gz" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
           name: linux-x86_64
           path: |
-            dist/con-*-linux-x86_64.tar.gz
+            dist/vu-*-linux-x86_64.tar.gz
             dist/SHA256SUMS-linux.txt
           if-no-files-found: error
 
@@ -175,7 +175,7 @@ jobs:
           # the GitHub UI release list — so neither install.sh nor
           # install.ps1 can resolve the tag while the draft is still
           # missing one or more platforms' assets. That's the race
-          # `irm https://nowled.ge/con-ps1 | iex` hit on
+          # `irm https://nowled.ge/vu-ps1 | iex` hit on
           # v0.1.0-beta.35: this Linux job won the create+upload
           # race, the release became `latest` immediately, and a
           # fresh Windows install fell over with
@@ -195,7 +195,7 @@ jobs:
           # --prerelease is still set on `v*-dev.*` so that even if
           # someone manually publishes a dev draft, it can never
           # appear in /releases/latest. Beta tags are NOT marked
-          # --prerelease: con is in an all-betas era (no stable
+          # --prerelease: vu is in an all-betas era (no stable
           # v0.1.0 has shipped), so the latest beta IS what every
           # fresh install.sh / install.ps1 should download once the
           # finalize step makes the release public.
@@ -226,7 +226,7 @@ jobs:
     # the macOS Sparkle distribution. Identical pattern to
     # release-windows.yml's appcast job — same Ed25519 keypair, same
     # gh-pages target. The Linux notify-only client (in
-    # crates/con-app/src/updater.rs::notify_impl) verifies the
+    # crates/vu-app/src/updater.rs::notify_impl) verifies the
     # signature server-side via GitHub Pages publishing today;
     # in-app verification is a follow-up that mirrors the Windows
     # hardening work tracked alongside it.
@@ -306,7 +306,7 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git remote add origin \
               "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
-            echo "con-releases.nowledge.co" > CNAME
+            echo "vu-releases.nowledge.co" > CNAME
             touch .nojekyll
             git add CNAME .nojekyll
             git commit -m "Initialize gh-pages"
@@ -353,13 +353,13 @@ jobs:
           # and the notify-only client ignores the field, so feed a
           # harmless sentinel like the Windows job does.
           # ITEM_SHORT_VERSION is the string the Linux client compares
-          # against its baked CON_RELEASE_VERSION via the SemVer-aware
+          # against its baked VU_RELEASE_VERSION via the SemVer-aware
           # is_newer check in updater.rs::notify_impl. Using the full
           # tag-derived version (0.1.0-beta.31) keeps prerelease
           # ordering correct.
           APPCAST_FILE="$appcast_file" \
-          APPCAST_TITLE="con" \
-          APPCAST_LINK="https://con-releases.nowledge.co" \
+          APPCAST_TITLE="vu" \
+          APPCAST_LINK="https://vu-releases.nowledge.co" \
           ITEM_TITLE="Version ${version}" \
           ITEM_VERSION="$build_number" \
           ITEM_SHORT_VERSION="$version" \

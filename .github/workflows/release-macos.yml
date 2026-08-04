@@ -101,13 +101,13 @@ jobs:
       - name: Build, sign, notarize, and package
         shell: bash
         env:
-          CON_CHANNEL: ${{ steps.meta.outputs.channel }}
-          CON_APP_VERSION: ${{ steps.meta.outputs.version }}
-          CON_BUILD_NUMBER: ${{ github.run_number }}
-          CON_ARCH: ${{ matrix.arch }}
-          CON_RUST_TARGET: ${{ matrix.rust_target }}
-          CON_REQUIRE_NOTARIZATION: "1"
-          CON_SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
+          VU_CHANNEL: ${{ steps.meta.outputs.channel }}
+          VU_APP_VERSION: ${{ steps.meta.outputs.version }}
+          VU_BUILD_NUMBER: ${{ github.run_number }}
+          VU_ARCH: ${{ matrix.arch }}
+          VU_RUST_TARGET: ${{ matrix.rust_target }}
+          VU_REQUIRE_NOTARIZATION: "1"
+          VU_SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
           APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
@@ -117,21 +117,21 @@ jobs:
       - name: Verify release artifact contract
         shell: bash
         env:
-          CON_CHANNEL: ${{ steps.meta.outputs.channel }}
-          CON_APP_VERSION: ${{ steps.meta.outputs.version }}
-          CON_BUILD_NUMBER: ${{ github.run_number }}
-          CON_ARCH: ${{ matrix.arch }}
-          CON_RUST_TARGET: ${{ matrix.rust_target }}
-          CON_SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
+          VU_CHANNEL: ${{ steps.meta.outputs.channel }}
+          VU_APP_VERSION: ${{ steps.meta.outputs.version }}
+          VU_BUILD_NUMBER: ${{ github.run_number }}
+          VU_ARCH: ${{ matrix.arch }}
+          VU_RUST_TARGET: ${{ matrix.rust_target }}
+          VU_SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
         run: |
           set -euo pipefail
           source ./scripts/macos/common.sh
           setup_release_env
           ./scripts/release/verify-artifacts.sh macos \
-            "$CON_APP_BUNDLE_PATH" \
-            "$CON_APP_ZIP_PATH" \
-            "$CON_DMG_PATH" \
-            "$CON_CHECKSUM_PATH"
+            "$VU_APP_BUNDLE_PATH" \
+            "$VU_APP_ZIP_PATH" \
+            "$VU_DMG_PATH" \
+            "$VU_CHECKSUM_PATH"
 
       - name: Upload notarized artifacts
         uses: actions/upload-artifact@v5
@@ -179,7 +179,7 @@ jobs:
           #   ✗ no ZIP found for windows-x86_64
           # (or the macOS/Linux equivalents) until the slower
           # platforms caught up. That's the bug
-          # `irm https://nowled.ge/con-ps1 | iex` hit on
+          # `irm https://nowled.ge/vu-ps1 | iex` hit on
           # v0.1.0-beta.35.
           #
           # Drafts are atomically promoted to public by
@@ -191,7 +191,7 @@ jobs:
           #
           # --prerelease is still set on `v*-dev.*` as defence in
           # depth (in case someone publishes the draft manually).
-          # Beta tags are NOT marked --prerelease today: con is in an
+          # Beta tags are NOT marked --prerelease today: vu is in an
           # all-betas era and the latest beta IS what fresh
           # install.sh should download once the finalize step
           # promotes the release.
@@ -281,7 +281,7 @@ jobs:
             git checkout -b gh-pages
             git remote add origin \
               "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
-            echo "con-releases.nowledge.co" > CNAME
+            echo "vu-releases.nowledge.co" > CNAME
             touch .nojekyll
             git add CNAME .nojekyll
             git commit -m "Initialize gh-pages"
@@ -331,8 +331,8 @@ jobs:
             appcast_file="gh-pages/appcast/${channel}-macos-${arch}.xml"
 
             APPCAST_FILE="$appcast_file" \
-            APPCAST_TITLE="con" \
-            APPCAST_LINK="https://con-releases.nowledge.co" \
+            APPCAST_TITLE="vu" \
+            APPCAST_LINK="https://vu-releases.nowledge.co" \
             ITEM_TITLE="Version ${marketing}" \
             ITEM_VERSION="$build_number" \
             ITEM_SHORT_VERSION="$marketing" \
@@ -410,11 +410,11 @@ jobs:
 
           # Determine cask name
           if [[ "$channel" == "beta" ]]; then
-            cask="con-beta"
-            app_name="con Beta"
+            cask="vu-beta"
+            app_name="vu Beta"
           else
-            cask="con"
-            app_name="con"
+            cask="vu"
+            app_name="vu"
           fi
 
           # Compute SHA256 for each arch DMG
@@ -471,12 +471,12 @@ jobs:
             depends_on macos: ">= :catalina"
 
             app "${app_name}.app"
-            binary "#{appdir}/${app_name}.app/Contents/MacOS/con-cli", target: "con-cli"
+            binary "#{appdir}/${app_name}.app/Contents/MacOS/vu-cli", target: "vu-cli"
 
             zap trash: [
-              "~/.config/con",
-              "~/Library/Caches/co.nowledge.con${bundle_suffix}",
-              "~/Library/Preferences/co.nowledge.con${bundle_suffix}.plist",
+              "~/.config/vu",
+              "~/Library/Caches/co.nowledge.vu${bundle_suffix}",
+              "~/Library/Preferences/co.nowledge.vu${bundle_suffix}.plist",
             ]
           end
           EOF

@@ -1,29 +1,29 @@
 [workspace]
 members = [
-    "crates/con-app",
-    "crates/con-core",
-    "crates/con-paths",
-    "crates/con-terminal",
-    "crates/con-ghostty",
-    "crates/con-agent",
-    "crates/con-cli",
-    "crates/con-test",
+    "crates/vu-app",
+    "crates/vu-core",
+    "crates/vu-paths",
+    "crates/vu-terminal",
+    "crates/vu-ghostty",
+    "crates/vu-agent",
+    "crates/vu-cli",
+    "crates/vu-test",
 ]
-default-members = ["crates/con-app"]
+default-members = ["crates/vu-app"]
 resolver = "2"
 
 [workspace.package]
 edition = "2024"
 license = "MIT"
-version = "0.2.0"
+version = "0.3.0"
 
 [workspace.dependencies]
 # Internal crates
-con-core = { path = "crates/con-core" }
-con-paths = { path = "crates/con-paths" }
-con-terminal = { path = "crates/con-terminal" }
-con-ghostty = { path = "crates/con-ghostty" }
-con-agent = { path = "crates/con-agent" }
+vu-core = { path = "crates/vu-core" }
+vu-paths = { path = "crates/vu-paths" }
+vu-terminal = { path = "crates/vu-terminal" }
+vu-ghostty = { path = "crates/vu-ghostty" }
+vu-agent = { path = "crates/vu-agent" }
 
 # UI — upstream GPUI
 gpui = { git = "https://github.com/zed-industries/zed" }

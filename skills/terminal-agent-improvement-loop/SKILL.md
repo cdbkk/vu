@@ -1,11 +1,11 @@
 ---
 name: terminal-agent-improvement-loop
-description: Run a benchmark-driven improvement loop for Con's terminal agent. Use when iterating on pane awareness, SSH/tmux behavior, coding-cli flows, benchmark scoring, or progress tracking across many runs.
+description: Run a benchmark-driven improvement loop for Vu's terminal agent. Use when iterating on pane awareness, SSH/tmux behavior, coding-cli flows, benchmark scoring, or progress tracking across many runs.
 ---
 
 # Terminal Agent Improvement Loop
 
-Use this skill when improving Con as a terminal-native agent, not just fixing a one-off bug.
+Use this skill when improving Vu as a terminal-native agent, not just fixing a one-off bug.
 
 Primary references:
 
@@ -22,7 +22,7 @@ Primary references:
 3. Score the resulting run with the matching rubric:
    - `python3 benchmarks/terminal-agent/score.py --profile ... --record ... --score ...`
    - or ask the built-in agent to judge the raw record and transcript first:
-     `python3 benchmarks/terminal-agent/judge_llm.py --profile ... --record ... --socket /tmp/con.sock`
+     `python3 benchmarks/terminal-agent/judge_llm.py --profile ... --record ... --socket /tmp/vu.sock`
    - then turn that judge artifact into a normal scorecard:
      `python3 benchmarks/terminal-agent/score.py --profile ... --record ... --judge-file ...`
 4. Record one short summary, a few lessons, and a few next-focus bullets in the score record.

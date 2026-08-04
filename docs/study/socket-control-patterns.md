@@ -43,13 +43,13 @@ Key commands worth supporting:
 
 ```text
 off           — socket disabled
-con_only      — only processes spawned inside con can connect
+vu_only      — only processes spawned inside vu can connect
 automation    — external local clients allowed
 password      — socket requires auth token
 allow_all     — fully open (unsafe, dev only)
 ```
 
-Default: `con_only`
+Default: `vu_only`
 
 ## Threading Model
 
@@ -71,7 +71,7 @@ Critical for performance:
 ## Socket Path Convention
 
 ```text
-/tmp/con.sock              # production
-/tmp/con-debug.sock        # debug builds
-/tmp/con-debug-<tag>.sock  # tagged builds
+/tmp/vu.sock              # production
+/tmp/vu-debug.sock        # debug builds
+/tmp/vu-debug-<tag>.sock  # tagged builds
 ```

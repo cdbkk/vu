@@ -1,13 +1,13 @@
 # Built-in agent
 
-The agent in con is not the product. The terminal is.
+The agent in vu is not the product. The terminal is.
 
 The agent panel is there when terminal context matters and a model can help. It
 reads the pane you are using, acts in view, and asks before doing work that
 should not happen silently.
 
 <p align="center">
-  <img width="1080" alt="Con agent panel next to a terminal workspace" src="https://github.com/user-attachments/assets/e1972fac-9df3-443b-be08-c0eec4697cf3" />
+  <img width="1080" alt="Vu agent panel next to a terminal workspace" src="https://github.com/user-attachments/assets/e1972fac-9df3-443b-be08-c0eec4697cf3" />
 </p>
 
 ## When to use it
@@ -42,13 +42,13 @@ objects instead of loose screenshots:
 That context is useful, but it is not a license to act silently. Destructive or
 high-impact actions still require approval.
 
-When the agent streams markdown, con renders code, tables, math, and diagrams in
+When the agent streams markdown, vu renders code, tables, math, and diagrams in
 the panel instead of treating the answer as a separate web page. Long responses
 stay scrollable so the terminal remains usable.
 
 ## SSH, tmux, and TUIs
 
-con is built for terminal-native workflows. The agent can help while you are
+vu is built for terminal-native workflows. The agent can help while you are
 inside SSH, tmux, shells, editors, and coding-agent CLIs.
 
 Keep the same rule in mind: the terminal remains the source of truth. If the
@@ -63,13 +63,13 @@ claims or taking action.
 - Use the terminal directly for simple commands.
 - Hide the agent panel when you want a plain terminal.
 
-con should feel like a serious terminal with help available, not a chat app
+vu should feel like a serious terminal with help available, not a chat app
 wrapped around a shell.
 
 ## External agents
 
 If you are building an orchestrator or subagent workflow, use
-[con-cli and surfaces](con-cli.md). Surfaces let another agent create worker
+[vu-cli and surfaces](vu-cli.md). Surfaces let another agent create worker
 terminal sessions inside a pane without taking over the main terminal layout.
 
 The built-in agent harness and benchmark loop are open in the repository. They

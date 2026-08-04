@@ -15,8 +15,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / ".context" / "benchmarks" / "batches"
-DEFAULT_CON_BIN = REPO_ROOT / "target" / "debug" / "con"
-DEFAULT_CON_CLI_BIN = REPO_ROOT / "target" / "debug" / "con-cli"
+DEFAULT_VU_BIN = REPO_ROOT / "target" / "debug" / "vu"
+DEFAULT_VU_CLI_BIN = REPO_ROOT / "target" / "debug" / "vu-cli"
 RUBRIC_DIR = REPO_ROOT / "benchmarks" / "terminal-agent" / "rubrics"
 
 
@@ -55,14 +55,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--socket",
         type=Path,
-        help="Reuse an existing Con control socket. Each iteration runs in a fresh tab instead of relaunching the app.",
+        help="Reuse an existing Vu control socket. Each iteration runs in a fresh tab instead of relaunching the app.",
     )
     parser.add_argument(
         "--judge",
         dest="judge",
         action="store_true",
         default=True,
-        help="After a passing operator/all run, ask Con's built-in agent to judge the raw record and transcript, then emit a scorecard.",
+        help="After a passing operator/all run, ask Vu's built-in agent to judge the raw record and transcript, then emit a scorecard.",
     )
     parser.add_argument(
         "--no-judge",
@@ -111,12 +111,12 @@ def terminate_process(proc: subprocess.Popen[str]) -> None:
 
 
 def run_json(socket_path: Path, *args: str) -> dict:
-    cli = [str(DEFAULT_CON_CLI_BIN)] if DEFAULT_CON_CLI_BIN.exists() else [
+    cli = [str(DEFAULT_VU_CLI_BIN)] if DEFAULT_VU_CLI_BIN.exists() else [
         "cargo",
         "run",
         "-q",
         "-p",
-        "con-cli",
+        "vu-cli",
         "--",
     ]
     proc = subprocess.run(
@@ -246,9 +246,9 @@ def run_iteration(
     runtime_root = REPO_ROOT / ".context" / "bench-runtime" / f"{stamp}-{index:02d}-{profile}"
     data_home = runtime_root / "data"
     config_home = runtime_root / "config"
-    log_path = runtime_root / "con.log"
+    log_path = runtime_root / "vu.log"
     record_path = REPO_ROOT / ".context" / "benchmarks" / f"{stamp}-{index:02d}-{profile}.json"
-    socket_path = Path(f"/tmp/con-bench-{stamp}-{index:02d}.sock")
+    socket_path = Path(f"/tmp/vu-bench-{stamp}-{index:02d}.sock")
 
     data_home.mkdir(parents=True, exist_ok=True)
     config_home.mkdir(parents=True, exist_ok=True)
@@ -320,21 +320,21 @@ def run_iteration(
                 pass
 
     env = os.environ.copy()
-    env["CON_SOCKET_PATH"] = str(socket_path)
+    env["VU_SOCKET_PATH"] = str(socket_path)
     env["XDG_DATA_HOME"] = str(data_home)
     env["XDG_CONFIG_HOME"] = str(config_home)
-    env["CON_SESSION_PATH"] = str(runtime_root / "session.json")
-    env["CON_CONVERSATIONS_DIR"] = str(runtime_root / "conversations")
+    env["VU_SESSION_PATH"] = str(runtime_root / "session.json")
+    env["VU_CONVERSATIONS_DIR"] = str(runtime_root / "conversations")
 
     attempts: list[dict[str, object]] = []
     for attempt in range(1, 4):
         with log_path.open("w") as log_file:
-            app_cmd = [str(DEFAULT_CON_BIN)] if DEFAULT_CON_BIN.exists() else [
+            app_cmd = [str(DEFAULT_VU_BIN)] if DEFAULT_VU_BIN.exists() else [
                 "cargo",
                 "run",
                 "-q",
                 "-p",
-                "con",
+                "vu",
             ]
             app = subprocess.Popen(
                 app_cmd,

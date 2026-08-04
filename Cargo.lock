@@ -1271,106 +1271,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75984efb6ed102a0d42db99afb6c1948f0380d1d91808d5529916e6c08b49d8d"
 
 [[package]]
-name = "con-agent"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "bytes",
- "chrono",
- "con-paths",
- "crossbeam-channel",
- "dirs",
- "futures",
- "gethostname",
- "http",
- "log",
- "rig-core",
- "schemars",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "con-cli"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "clap",
- "con-agent",
- "con-core",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "con-core"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "con-agent",
- "con-paths",
- "crossbeam-channel",
- "dirs",
- "futures",
- "log",
- "objc",
- "parking_lot",
- "serde",
- "serde_json",
- "tokio",
- "toml 0.8.23",
- "uuid",
-]
-
-[[package]]
-name = "con-ghostty"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "cc",
- "core-foundation 0.10.0",
- "dispatch",
- "etagere",
- "log",
- "objc",
- "parking_lot",
- "portable-pty",
- "raw-window-handle",
- "serde_json",
- "unicode-width",
- "windows 0.61.3",
- "windows-numerics 0.2.0",
-]
-
-[[package]]
-name = "con-paths"
-version = "0.2.0"
-dependencies = [
- "dirs",
-]
-
-[[package]]
-name = "con-terminal"
-version = "0.2.0"
-dependencies = [
- "con-paths",
-]
-
-[[package]]
-name = "con-test"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "clap",
- "serde_json",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8373,17 +8273,12 @@ dependencies = [
 
 [[package]]
 name = "vu"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "cc",
  "chrono",
  "cocoa 0.26.0",
- "con-agent",
- "con-core",
- "con-ghostty",
- "con-paths",
- "con-terminal",
  "crossbeam-channel",
  "dirs",
  "env_logger",
@@ -8414,9 +8309,114 @@ dependencies = [
  "unicode-width",
  "url",
  "uuid",
+ "vu-agent",
+ "vu-core",
+ "vu-ghostty",
+ "vu-paths",
+ "vu-terminal",
  "windows 0.61.3",
  "winresource",
  "x11rb",
+]
+
+[[package]]
+name = "vu-agent"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
+ "crossbeam-channel",
+ "dirs",
+ "futures",
+ "gethostname",
+ "http",
+ "log",
+ "rig-core",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "url",
+ "uuid",
+ "vu-paths",
+]
+
+[[package]]
+name = "vu-cli"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde",
+ "serde_json",
+ "tokio",
+ "vu-agent",
+ "vu-core",
+]
+
+[[package]]
+name = "vu-core"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "crossbeam-channel",
+ "dirs",
+ "futures",
+ "log",
+ "objc",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 0.8.23",
+ "uuid",
+ "vu-agent",
+ "vu-paths",
+]
+
+[[package]]
+name = "vu-ghostty"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "cc",
+ "core-foundation 0.10.0",
+ "dispatch",
+ "etagere",
+ "log",
+ "objc",
+ "parking_lot",
+ "portable-pty",
+ "raw-window-handle",
+ "serde_json",
+ "unicode-width",
+ "windows 0.61.3",
+ "windows-numerics 0.2.0",
+]
+
+[[package]]
+name = "vu-paths"
+version = "0.3.0"
+dependencies = [
+ "dirs",
+]
+
+[[package]]
+name = "vu-terminal"
+version = "0.3.0"
+dependencies = [
+ "vu-paths",
+]
+
+[[package]]
+name = "vu-test"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde_json",
 ]
 
 [[package]]

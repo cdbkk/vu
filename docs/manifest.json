@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "repository": "nowledge-co/con-terminal",
+  "repository": "nowledge-co/vu-terminal",
   "defaultRef": "main",
   "extra": [
     { "label": "Changelog", "path": "CHANGELOG.md", "route": "/changelog/" },
@@ -19,7 +19,7 @@
       ]
     },
     {
-      "label": "Use con",
+      "label": "Use vu",
       "items": [
         { "label": "Terminal workflows", "path": "docs/terminal-workflows.md" },
         { "label": "Skills and workflows", "path": "docs/skills-and-workflows.md" },
@@ -28,9 +28,9 @@
       ]
     },
     {
-      "label": "Build on con",
+      "label": "Build on vu",
       "items": [
-        { "label": "con-cli and surfaces", "path": "docs/cli.md" }
+        { "label": "vu-cli and surfaces", "path": "docs/cli.md" }
       ]
     }
   ]

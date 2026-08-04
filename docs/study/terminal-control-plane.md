@@ -13,7 +13,7 @@ The terminal world is split across several narrower control surfaces:
 - app-native RPC protocols
 - OS and PTY process inspection
 
-If con wants to become the terminal whose agent actually understands the terminal, it needs a layered control plane, not one guessed runtime snapshot.
+If vu wants to become the terminal whose agent actually understands the terminal, it needs a layered control plane, not one guessed runtime snapshot.
 
 ## The Closest Thing To "CDP" In Terminals
 
@@ -78,11 +78,11 @@ Examples:
 
 This is the best source for foreground runtime identity, but it is not a VT feature.
 
-## What Ghostty Gives con Today
+## What Ghostty Gives vu Today
 
 ### Embedded C API
 
-con currently embeds full Ghostty through the application and surface C API.
+vu currently embeds full Ghostty through the application and surface C API.
 
 That gives us:
 
@@ -132,11 +132,11 @@ Examples from the source:
 - tmux control mode parser and viewer
 - semantic prompt state
 
-Those are valuable facts for con's direction, but today they are not a stable embedded control plane we can consume directly.
+Those are valuable facts for vu's direction, but today they are not a stable embedded control plane we can consume directly.
 
 ## What Ghostty Does Not Currently Give Us At The Embedded Boundary
 
-For con's target product, the important missing facts are:
+For vu's target product, the important missing facts are:
 
 - authoritative PTY foreground process identity
 - authoritative PTY foreground process group
@@ -162,7 +162,7 @@ It provides:
 
 This is exactly why Ghostty has a dedicated tmux parser and viewer internally.
 
-For con, tmux control mode should be treated as a first-class adapter, not a special case of screen text.
+For vu, tmux control mode should be treated as a first-class adapter, not a special case of screen text.
 
 ### Shell Integration
 
@@ -204,11 +204,11 @@ Examples:
 - Neovim Msgpack-RPC
 - future agent CLI control sockets
 
-This is how con should think about editors and advanced TUIs: not as things to pattern match, but as attachable runtimes when the app cooperates.
+This is how vu should think about editors and advanced TUIs: not as things to pattern match, but as attachable runtimes when the app cooperates.
 
-## What This Means For con
+## What This Means For vu
 
-con should not chase a fake universal protocol.
+vu should not chase a fake universal protocol.
 
 It should build its own control plane as a graph of typed adapters.
 
@@ -222,7 +222,7 @@ This answers:
 
 Examples:
 
-- con pane
+- vu pane
 - local shell
 - SSH connection
 - remote shell
@@ -274,7 +274,7 @@ Each attachment should carry:
 
 ### 3. Evidence Tiers
 
-con should treat every runtime claim according to its authority.
+vu should treat every runtime claim according to its authority.
 
 Suggested tiers:
 
@@ -291,7 +291,7 @@ Rules:
 
 ### 4. Tool Families By Control Layer
 
-con tools should be designed around control layers, not just `pane + command`.
+vu tools should be designed around control layers, not just `pane + command`.
 
 Suggested families:
 
@@ -314,7 +314,7 @@ Examples:
 
 ### 5. Explicit Attachment Lifecycle
 
-For strong protocol adapters, con should model:
+For strong protocol adapters, vu should model:
 
 - discover
 - attach
@@ -327,15 +327,15 @@ That is a better long-term fit than ad hoc runtime inference.
 
 ### 6. Stateful Pane Tracker
 
-Even with good adapters, con should not rebuild pane identity from a single screen snapshot.
+Even with good adapters, vu should not rebuild pane identity from a single screen snapshot.
 
 Each pane needs a reducer-backed tracker that merges:
 
 - the latest Ghostty observation frame
 - the latest typed shell or protocol probe
-- con-originated actions such as pane creation, visible shell exec, raw input, and process exit
+- vu-originated actions such as pane creation, visible shell exec, raw input, and process exit
 
-This gives con an important advantage:
+This gives vu an important advantage:
 
 - current facts stay explicit
 - recent causality stays available
@@ -366,7 +366,7 @@ This should be read-only and explicitly tagged as shell-scope evidence.
 
 ### Phase 1.5: Reducer-Backed Pane State
 
-Before tmux-native control, con should persist shell probes and con-originated actions on each pane.
+Before tmux-native control, vu should persist shell probes and vu-originated actions on each pane.
 
 This phase should add:
 
@@ -390,7 +390,7 @@ This is the highest-value adapter after shell probing.
 
 ### Phase 3: tmux Control Attachment
 
-Add an explicit tmux control attachment when con can prove that it is talking to the same tmux server.
+Add an explicit tmux control attachment when vu can prove that it is talking to the same tmux server.
 
 This should enable:
 
@@ -426,7 +426,7 @@ High-value exports would be:
 
 ## Product Rule
 
-con should aim to feel like it has a CDP for terminals.
+vu should aim to feel like it has a CDP for terminals.
 
 It should not pretend that the terminal ecosystem already has one.
 

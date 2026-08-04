@@ -2,7 +2,7 @@
 
 ## Why this exists
 
-con now has a usable pane runtime tracker.
+vu now has a usable pane runtime tracker.
 
 That solves only half of the problem.
 
@@ -14,12 +14,12 @@ The built-in agent must answer three different questions correctly before it act
 2. what target the user actually means
 3. what control channel can operate on that target safely
 
-Current con tools do not separate those questions strongly enough.
+Current vu tools do not separate those questions strongly enough.
 
 That is why the agent can still drift into failures such as:
 
 - running `shell_exec` locally while the user means a remote tmux workflow
-- confusing a con pane index with a tmux pane/window index
+- confusing a vu pane index with a tmux pane/window index
 - typing a shell command into `nvim`
 - treating "I can see tmux" as "I can safely execute inside tmux"
 
@@ -33,57 +33,57 @@ See also:
 
 ## Current foundation
 
-con now ships the first typed control-plane layer:
+vu now ships the first typed control-plane layer:
 
 - every observed pane can be reduced to a `PaneControlState`
 - every pane now keeps a reducer-backed runtime tracker instead of recomputing state from one frame
 - `list_panes` exposes address space, visible target, nested target stack, explicit control attachments, control channels, capabilities, and notes
 - the system prompt embeds the same control state for the focused pane and peer panes
 - the system prompt now also embeds a deterministic whole-tab pane layout summary so session-state answers can distinguish materially different peer panes without treating every question as focused-pane-only
-- the tool surface now includes a typed work-target resolver so the model can ask con which pane or tmux target is best for a given task instead of rebuilding that judgment from raw pane metadata
+- the tool surface now includes a typed work-target resolver so the model can ask vu which pane or tmux target is best for a given task instead of rebuilding that judgment from raw pane metadata
 - the prompt now also carries typed work-target hints for the current tab, so the model sees the best visible shell target and best tmux workspace target before it makes a selection
 - visible execution is gated by `exec_visible_shell`, not by ad hoc prompt wording
 - panes with a proven fresh shell prompt now expose a read-only `probe_shell_context` capability for typed shell-scoped facts
 - before each agent turn, the harness now gathers the strongest safe non-intrusive facts available on the focused pane: it never types a visible shell probe into the terminal automatically, but it does preload tmux inventory when a real tmux query attachment already exists
-- typed shell probes and con-originated actions are preserved as causal history on the pane, with freshness and invalidation rules
+- typed shell probes and vu-originated actions are preserved as causal history on the pane, with freshness and invalidation rules
 - current verified foreground state is now modeled separately from the last verified shell frame, so stale shell history cannot masquerade as the live visible target
-- the prompt now carries a typed `remote_workspaces` inventory for the whole tab, so follow-up SSH work can reuse existing host panes from proven host facts or con-managed SSH continuity instead of re-creating them
+- the prompt now carries a typed `remote_workspaces` inventory for the whole tab, so follow-up SSH work can reuse existing host panes from proven host facts or vu-managed SSH continuity instead of re-creating them
 
 This is still phase one.
 
 What it solves:
 
-- the model can see that a con pane showing tmux is still only addressable as a con pane
+- the model can see that a vu pane showing tmux is still only addressable as a vu pane
 - the model can represent nested situations such as `remote shell -> tmux -> agent CLI` instead of flattening them into one label
-- a fresh shell prompt inside tmux can now be modeled as `remote shell -> tmux -> shell`, which keeps visible shell execution safe without pretending con has tmux-native control
+- a fresh shell prompt inside tmux can now be modeled as `remote shell -> tmux -> shell`, which keeps visible shell execution safe without pretending vu has tmux-native control
 - shell execution safety is computed from typed capability data
 - shell-scoped probing is explicit instead of being hidden behind generic terminal execution
 - prompt, tools, and runtime guards share one vocabulary
 - tmux now has an explicit inspectable adapter slot, rather than being implied only through generic pane metadata
-- pane and tmux target choice can now be delegated back to con through a typed resolver instead of staying implicit in model reasoning
-- recent con actions stay available as causal evidence so the agent can understand how a pane was reached without treating history as present-tense truth
+- pane and tmux target choice can now be delegated back to vu through a typed resolver instead of staying implicit in model reasoning
+- recent vu actions stay available as causal evidence so the agent can understand how a pane was reached without treating history as present-tense truth
 - when the current foreground target is unproven, control falls back to `unknown` while `last_verified_shell_stack` remains available as historical orientation
-- con-managed SSH continuity is now a first-class middle layer for remote shell work: if con created or recently drove an SSH pane, and the current screen still looks prompt-like without tmux/TUI contradictions, that pane stays reusable for follow-up host work even when fresh shell integration is absent
-- that continuity now has explicit stop conditions too: if the current screen shows a closed SSH connection, or if the pane only looks tmux-like rather than plain-shell-like, con keeps the host history for orientation but stops treating that pane as a reusable plain remote shell target
+- vu-managed SSH continuity is now a first-class middle layer for remote shell work: if vu created or recently drove an SSH pane, and the current screen still looks prompt-like without tmux/TUI contradictions, that pane stays reusable for follow-up host work even when fresh shell integration is absent
+- that continuity now has explicit stop conditions too: if the current screen shows a closed SSH connection, or if the pane only looks tmux-like rather than plain-shell-like, vu keeps the host history for orientation but stops treating that pane as a reusable plain remote shell target
 - tmux-like titles and screens now live in the observation tier, not the fact tier. They can influence summaries and target suggestions, but they do not create tmux-native control by themselves
 
-con now also ships the first true protocol attachment beyond raw pane observation:
+vu now also ships the first true protocol attachment beyond raw pane observation:
 
 - if a pane has a fresh shell prompt
 - and a typed shell probe confirms same-session tmux
 
-then con can expose a native tmux control attachment for that pane.
+then vu can expose a native tmux control attachment for that pane.
 
-con now also accepts one more truthful tmux-anchor source:
+vu now also accepts one more truthful tmux-anchor source:
 
 - if the visible shell prompt is still fresh
-- and con itself just created or targeted a tmux session from that same shell
+- and vu itself just created or targeted a tmux session from that same shell
 
 then that shell can become a tmux control anchor immediately, even before a later shell probe re-enters tmux.
 
-con now retains one more honest tmux-anchor state too:
+vu now retains one more honest tmux-anchor state too:
 
-- if con recently prepared or targeted a tmux session from this pane
+- if vu recently prepared or targeted a tmux session from this pane
 - and the visible screen still looks like a prompt inside that tmux workspace
 - and the pane does not currently look disconnected
 
@@ -99,12 +99,12 @@ That attachment currently supports:
 - tmux agent-target preparation for Codex CLI, Claude Code, and OpenCode
 - tmux-native command launch into a new window or split pane
 - tmux-native send-keys to a chosen tmux target
-- remote-shell target preparation for SSH workspaces, so con can reuse an existing host pane or create one with explicit split placement instead of duplicating remote panes across turns
+- remote-shell target preparation for SSH workspaces, so vu can reuse an existing host pane or create one with explicit split placement instead of duplicating remote panes across turns
 - disconnected remote-shell recovery hints, so typed target resolution can preserve host identity and point the agent at selective recovery for only the affected SSH workspace
-- local paired-workspace preparation for local coding-agent workflows, so con can reuse or create the full local coding pair in one step: one interactive Codex / Claude Code / OpenCode pane plus one separate shell pane
+- local paired-workspace preparation for local coding-agent workflows, so vu can reuse or create the full local coding pair in one step: one interactive Codex / Claude Code / OpenCode pane plus one separate shell pane
 - local-shell target preparation for local coding-agent workflows, so Codex / Claude Code / OpenCode can stay in one pane while shell-oriented file/test work happens in a separate reusable local shell pane
 - local agent-target preparation for local coding-agent workflows, so Codex / Claude Code / OpenCode can be reused or launched intentionally instead of being inferred only from the visible pane
-- interactive agent-cli turns for local and tmux workflows, so con can send a prompt into an existing Codex / Claude Code / OpenCode target, wait for that target to settle, and return a fresh snapshot without dropping back to raw keystroke timing guesses
+- interactive agent-cli turns for local and tmux workflows, so vu can send a prompt into an existing Codex / Claude Code / OpenCode target, wait for that target to settle, and return a fresh snapshot without dropping back to raw keystroke timing guesses
 
 This is the right abstraction because it scales across:
 
@@ -117,8 +117,8 @@ without needing app-specific screen scraping.
 For external agent CLIs, the control rule is now explicit:
 
 - a normal Codex / Claude Code / OpenCode session inside tmux is a tmux target first
-- con may reuse or create those targets through tmux-native helpers
-- con must not pretend it has app-native Codex/OpenCode control unless a separate explicit attachment is proven
+- vu may reuse or create those targets through tmux-native helpers
+- vu must not pretend it has app-native Codex/OpenCode control unless a separate explicit attachment is proven
 - Codex app-server mode and OpenCode server mode are future attachment surfaces, not assumptions
 
 What it does not solve yet:
@@ -134,14 +134,14 @@ What it does not solve yet:
 
 Seeing `ssh -> tmux -> nvim` is not the same as being able to operate on it.
 
-The runtime tracker says what con currently believes is visible.
-The control plane says what con can safely do.
+The runtime tracker says what vu currently believes is visible.
+The control plane says what vu can safely do.
 
 ### 2. Addressing is not identity
 
-`pane_index=1` is a con pane address snapshot.
+`pane_index=1` is a vu pane address snapshot.
 
-`pane_id=17` is the stable con-pane identity for that pane while it exists in the tab.
+`pane_id=17` is the stable vu-pane identity for that pane while it exists in the tab.
 
 It is not:
 
@@ -185,7 +185,7 @@ If the capability is absent, the tool must refuse.
 
 ### 5. Unknown is a valid state
 
-If con cannot prove a target or control channel, it must say `unknown` and stop.
+If vu cannot prove a target or control channel, it must say `unknown` and stop.
 
 False confidence is the worst product failure here.
 
@@ -193,7 +193,7 @@ False confidence is the worst product failure here.
 
 The terminal world does not have one universal protocol like CDP.
 
-So con needs explicit protocol attachments.
+So vu needs explicit protocol attachments.
 
 Examples:
 
@@ -205,11 +205,11 @@ Examples:
 An attachment is the real unit of authority.
 
 Observation says what may be visible.
-An attachment says what con can actually talk to.
+An attachment says what vu can actually talk to.
 
 ### 7. Causality matters, but it is not truth
 
-con often knows how it entered a pane:
+vu often knows how it entered a pane:
 
 - it created the pane with `ssh haswell`
 - it executed `tmux attach -t work`
@@ -221,25 +221,25 @@ That causality is extremely useful. But it must stay source-tagged and freshness
 The correct product rule is:
 
 - current backend facts and fresh typed probes define active runtime truth
-- con action history explains how the pane got here
+- vu action history explains how the pane got here
 - historical action history must never unlock control by itself
 
 ### 8. Current state and historical shell state are different products
 
 The current foreground target answers:
 
-`what can con safely act on right now?`
+`what can vu safely act on right now?`
 
 The last verified shell frame answers:
 
-`what shell context did con last verify in this pane?`
+`what shell context did vu last verify in this pane?`
 
 Those are both valuable, but they are not interchangeable.
 
 Examples:
 
-- If con verified `remote_shell -> tmux -> shell` and the user then opened `nvim`, the current target must become `unknown` until the backend or a fresh probe proves more.
-- If con still has the old shell frame, it should keep it as historical orientation for the model and the user, not as the live control target.
+- If vu verified `remote_shell -> tmux -> shell` and the user then opened `nvim`, the current target must become `unknown` until the backend or a fresh probe proves more.
+- If vu still has the old shell frame, it should keep it as historical orientation for the model and the user, not as the live control target.
 
 ## Core model
 
@@ -254,7 +254,7 @@ This graph answers:
 Example:
 
 ```text
-ConPane(tab=2,pane=1)
+VuPane(tab=2,pane=1)
   -> SshConnection(host=haswell)
   -> RemoteShell(kind=zsh)
   -> TmuxSession(name=model-serving)
@@ -278,12 +278,12 @@ Every node should carry:
 
 This graph answers:
 
-`how can con safely act on this runtime?`
+`how can vu safely act on this runtime?`
 
 Example channels:
 
 - `LocalHiddenExec`
-- `VisibleConShell`
+- `VisibleVuShell`
 - `RemoteShellAnchor`
 - `TmuxCommandChannel`
 - `TmuxPaneInput`
@@ -333,7 +333,7 @@ These should be explicit product-level types, not just strings in prompt XML.
 
 ### Container targets
 
-- `ConPane`
+- `VuPane`
 - `SshConnection`
 - `RemoteShell`
 - `TmuxSession`
@@ -422,7 +422,7 @@ Constraint:
 
 Purpose:
 
-- run hidden local subprocesses inside the con workspace machine
+- run hidden local subprocesses inside the vu workspace machine
 
 Maps to:
 
@@ -450,7 +450,7 @@ It needs a control channel anchored in the same tmux scope.
 Possible channel sources:
 
 - an existing shell prompt inside the same remote scope
-- a dedicated con-managed tmux control anchor
+- a dedicated vu-managed tmux control anchor
 - a future remote helper
 
 Without one of those, tmux should be inspect-only.
@@ -504,8 +504,8 @@ These answer:
 
 - what exists
 - what it is
-- how certain con is
-- what con can safely do with it
+- how certain vu is
+- what vu can safely do with it
 - which existing pane or tmux target is the best fit for the requested work
 
 ### Shell tools
@@ -534,8 +534,8 @@ Rules:
 
 Rules:
 
-- all tmux tools address tmux targets, not con panes
-- helper tools such as `tmux_find_targets` and `tmux_ensure_shell_target` may start from a con pane, but they must resolve down to explicit tmux targets before any mutation happens
+- all tmux tools address tmux targets, not vu panes
+- helper tools such as `tmux_find_targets` and `tmux_ensure_shell_target` may start from a vu pane, but they must resolve down to explicit tmux targets before any mutation happens
 - `tmux_exec_in_pane` requires a tmux control channel plus a shell-capable tmux pane target
 - `tmux_send_keys` is explicit TUI input, not a generic exec fallback
 
@@ -574,13 +574,13 @@ The built-in agent should follow this sequence:
 
 Mandatory prompt rules:
 
-- `pane_index` always means a con pane
-- `pane_id` is the stable identity of that con pane for the life of the pane
+- `pane_index` always means a vu pane
+- `pane_id` is the stable identity of that vu pane for the life of the pane
 - tmux panes/windows use tmux-specific target ids
 - `shell_exec` is always local
 - do not substitute local execution for remote intent
 - do not substitute raw key input for shell execution
-- if the visible target is an editor or unknown TUI, con is inspect-only unless an explicit editor/tmux channel exists
+- if the visible target is an editor or unknown TUI, vu is inspect-only unless an explicit editor/tmux channel exists
 
 ## Approval model
 
@@ -621,7 +621,7 @@ Consumers must not skip layers.
 That means:
 
 - sidebar naming reads resolved targets
-- `list_panes` becomes a con-pane summary only
+- `list_panes` becomes a vu-pane summary only
 - `list_runtime_targets` becomes the real nested runtime view
 - execution tools resolve through capabilities, not raw pane state
 
@@ -653,9 +653,9 @@ That means:
 
 ## Success criteria
 
-con is credible here when all of the following are true:
+vu is credible here when all of the following are true:
 
-- it never confuses a con pane with a tmux pane
+- it never confuses a vu pane with a tmux pane
 - it never runs local hidden execution for a remote task unless the user explicitly asks
 - it never types shell commands into `vim` / `nvim`
 - it can inspect nested `ssh -> tmux -> editor/agent-cli` state honestly

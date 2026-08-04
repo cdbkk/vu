@@ -2,7 +2,7 @@
 
 ## Goal
 
-Verify that Con can prepare and reuse a local Codex CLI workspace on this machine without losing the pane target across turns.
+Verify that Vu can prepare and reuse a local Codex CLI workspace on this machine without losing the pane target across turns.
 
 ## Setup
 

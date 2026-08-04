@@ -1,8 +1,8 @@
 # Linux Port — Plan and Status
 
-con ships on macOS, has a working Windows beta, and now has a real
+vu ships on macOS, has a working Windows beta, and now has a real
 Linux preview built around Unix PTY + `libghostty-vt` + a GPUI-owned
-per-row `StyledText` paint path. The same `con` binary that runs on
+per-row `StyledText` paint path. The same `vu` binary that runs on
 macOS now opens on Linux with client-side decorations (no native WM
 titlebar stacked on top of the GPUI shell), a transparent ARGB
 window with rounded corners, the same caption cluster Windows
@@ -28,14 +28,14 @@ Current platform state:
 
 | Target | UI binary | Terminal pane | Control socket | Agent / settings / CLI |
 |:-------|:---------:|:-------------:|:--------------:|:----------------------:|
-| macOS  | ✅ real   | ✅ libghostty + Metal | `/tmp/con.sock` | ✅ |
-| Windows | ✅ real  | ✅ libghostty-vt + ConPTY + D3D11/DirectWrite | `\\.\pipe\con` | ✅ |
-| Linux  | ✅ real   | ✅ Unix PTY + `libghostty-vt` + GPUI per-row `StyledText` paint (preview — long-term glyph-atlas grid renderer pending) | `/tmp/con.sock` | ✅ |
+| macOS  | ✅ real   | ✅ libghostty + Metal | `/tmp/vu.sock` | ✅ |
+| Windows | ✅ real  | ✅ libghostty-vt + ConPTY + D3D11/DirectWrite | `\\.\pipe\vu` | ✅ |
+| Linux  | ✅ real   | ✅ Unix PTY + `libghostty-vt` + GPUI per-row `StyledText` paint (preview — long-term glyph-atlas grid renderer pending) | `/tmp/vu.sock` | ✅ |
 
 On Linux today:
 
 ```bash
-cargo build -p con --release
+cargo build -p vu --release
 ```
 
 What that gives you:
@@ -45,8 +45,8 @@ What that gives you:
   the in-app top bar carries the same minimize / maximize / close
   caption cluster Windows uses
 - tabs, sidebar, agent panel, settings, command palette
-- Unix-domain control socket at `/tmp/con.sock`
-- `con-cli` and all portable crates working
+- Unix-domain control socket at `/tmp/vu.sock`
+- `vu-cli` and all portable crates working
 - a real Linux terminal pane backed by Unix PTY + `libghostty-vt` and
   rendered as one GPUI `StyledText` per VT row, with one `TextRun`
   per styled span: SGR colors, bold (`FontWeight::BOLD`), italic
@@ -70,7 +70,7 @@ What that gives you:
 - the user's `TerminalColors` (foreground / background / 16-color
   ANSI palette) plumbed into `VtScreen::set_theme` at session spawn
   and live whenever the user picks a theme in settings
-- OSC 7 cwd updates are captured by Con's Rust VT wrapper instead of
+- OSC 7 cwd updates are captured by Vu's Rust VT wrapper instead of
   relying on libghostty-vt's terminal-only stream handler, so Linux
   pane/session state can follow shell-reported directory changes
 - transparent ARGB window with rounded corners (14 px on Linux, no
@@ -107,7 +107,7 @@ What it still does **not** give you:
 - mouse reporting for terminal apps that request it
 - native packaging artifacts (`.deb`, AppImage, Flatpak, …); the
   current release pipeline already ships a tarball, one-line installer,
-  `co.nowledge.con.desktop` launcher identity, icon install, appcast,
+  `co.nowledge.vu.desktop` launcher identity, icon install, appcast,
   and notify-only updater
 
 Current verification note:
@@ -127,7 +127,7 @@ The Linux CI job already installs the GPUI runtime dependencies on
 `ubuntu-latest` (`libxcb-*`, `libxkbcommon-x11-dev`, `libwayland-dev`,
 `libvulkan-dev`, `libfreetype-dev`, `libfontconfig1-dev`) and verifies
 that the workspace still compiles there. The local Linux backend
-also requires Zig so `con-ghostty` can build `libghostty-vt`, just like
+also requires Zig so `vu-ghostty` can build `libghostty-vt`, just like
 the Windows backend does.
 
 Linux release builds pass an explicit generic Zig target to the
@@ -135,7 +135,7 @@ Linux release builds pass an explicit generic Zig target to the
 artifact) instead of relying on Zig's native host target. This keeps the
 static VT archive from inheriting CI-runner CPU extensions that may not
 exist inside WSL, older desktops, or virtualized Linux environments. Use
-`CON_GHOSTTY_VT_TARGET` only when intentionally testing a different Zig
+`VU_GHOSTTY_VT_TARGET` only when intentionally testing a different Zig
 target triple.
 
 ## Upstream status
@@ -154,11 +154,11 @@ Zed's upstream Linux backend is real and production-grade:
 - Window kinds on Linux are `Normal`, `PopUp`, `Floating`, `Dialog`,
   plus Wayland-only `LayerShell`.
 
-Important consequence for con:
+Important consequence for vu:
 
 - GPUI Linux gives us a real host app shell, clipboard, menus, input,
   and top-level windows.
-- It does **not** currently give con a "host an arbitrary foreign Linux
+- It does **not** currently give vu a "host an arbitrary foreign Linux
   surface/widget inside the view tree" API analogous to the macOS
   `NSView` embedding boundary.
 
@@ -173,16 +173,16 @@ Ghostty itself has real Linux support upstream:
 That means Linux is not in the same place as Windows. We do not need to
 assume "Ghostty has no Linux runtime."
 
-But con does not consume Ghostty as a standalone GTK app. It consumes the
-**embedded C API** via `con-ghostty`, and that is the critical boundary:
+But vu does not consume Ghostty as a standalone GTK app. It consumes the
+**embedded C API** via `vu-ghostty`, and that is the critical boundary:
 
 - the public `ghostty.h` platform enum still only exposes `MACOS` and
   `IOS`
 - the embedded runtime's `Platform` union still only accepts macOS/iOS
   host views
 
-So from con's point of view today, upstream Ghostty Linux support exists
-but is not yet exposed through the embedding interface con uses on macOS.
+So from vu's point of view today, upstream Ghostty Linux support exists
+but is not yet exposed through the embedding interface vu uses on macOS.
 
 One more important detail from the feasibility study: Ghostty's OpenGL
 renderer already contains an `apprt.embedded` code path, but it is
@@ -198,7 +198,7 @@ Ghostty already owns PTY, terminal runtime, and renderer on Linux.
 
 Linux is **not yet equivalent to macOS in embedding shape**:
 
-- con is a GPUI app, not a GTK app
+- vu is a GPUI app, not a GTK app
 - Ghostty's embeddable C API does not yet expose a Linux host surface
 - GPUI Linux does not currently expose a child/foreign-surface embedding
   primitive inside the view tree
@@ -206,7 +206,7 @@ Linux is **not yet equivalent to macOS in embedding shape**:
 We no longer need a split-brain Linux plan. The architecture decision is
 now frozen:
 
-- **con will ship a local Linux backend**
+- **vu will ship a local Linux backend**
 - **we will not block Linux on upstream Ghostty or GPUI embed work**
 
 Upstream improvements remain welcome future optimizations, but they are
@@ -217,7 +217,7 @@ not the delivery plan.
 ### Option A — upstream-first Linux embedding
 
 Extend Ghostty's embedded C API so Linux is a first-class platform, then
-teach con to host that Linux surface inside its GPUI shell.
+teach vu to host that Linux surface inside its GPUI shell.
 
 What this would require:
 
@@ -232,7 +232,7 @@ Why this is attractive:
 
 - maximum reuse of Ghostty's real Linux PTY/runtime/renderer stack
 - best long-term semantic alignment with macOS
-- fewer duplicated terminal behaviors in con
+- fewer duplicated terminal behaviors in vu
 
 Why this is risky:
 
@@ -240,9 +240,9 @@ Why this is risky:
 - may also require upstream GPUI work
 - Wayland/X11 host-surface semantics are more fragmented than AppKit
 
-### Option B — local Linux backend in con
+### Option B — local Linux backend in vu
 
-Build a real Linux backend inside `con-ghostty`, using a Unix PTY plus a
+Build a real Linux backend inside `vu-ghostty`, using a Unix PTY plus a
 GPUI-native render path, in the same spirit as the Windows backend.
 
 Likely ingredients:
@@ -273,12 +273,12 @@ Linux now follows the same delivery principle that worked on Windows:
 
 Concretely, that means:
 
-- Unix PTY ownership lives in `con-ghostty/src/linux/`
+- Unix PTY ownership lives in `vu-ghostty/src/linux/`
 - terminal rendering will be GPUI-owned on Linux
 - Ghostty's Linux runtime remains relevant study material, but not a
-  ship blocker for con
+  ship blocker for vu
 
-This preserves control over schedule and keeps Linux aligned with con's
+This preserves control over schedule and keeps Linux aligned with vu's
 actual product boundary: a GPUI application with a terminal backend it
 can ship.
 
@@ -286,15 +286,15 @@ can ship.
 
 | Phase | Goal | Deliverable | Exit criteria | Status |
 |---|---|---|---|---|
-| 0 | Portable groundwork | Linux CI smoke test, stub backend, Unix socket transport | `cargo build -p con` works on Linux with a placeholder pane | ✅ landed |
+| 0 | Portable groundwork | Linux CI smoke test, stub backend, Unix socket transport | `cargo build -p vu` works on Linux with a placeholder pane | ✅ landed |
 | 1 | Architecture freeze | `docs/impl/linux-port.md`, tracker refresh, upstream constraints written down, Linux-specific placeholder module boundaries | Linux plan is explicit and no longer piggy-backs on the Windows plan | ✅ landed |
 | 2a | Ghostty feasibility spike | confirm exact upstream delta needed for Linux embed (`ghostty_platform_*` additions, host-surface contract) | bounded upstream worklist exists, or path is ruled out | ✅ landed |
-| 2b | GPUI feasibility spike | confirm whether con needs foreign-surface embedding, texture interop, or neither | bounded GPUI worklist exists, or path is ruled out | ✅ landed |
+| 2b | GPUI feasibility spike | confirm whether vu needs foreign-surface embedding, texture interop, or neither | bounded GPUI worklist exists, or path is ruled out | ✅ landed |
 | 2c | Architecture decision | pick Linux backend lane | one recommended implementation path, no split-brain plan | ✅ landed |
-| 3 | Linux backend scaffold | `con-ghostty/src/linux/` plus `con-app/src/linux_view.rs` (or equivalent) with real lifecycle types | Linux no longer routes through the generic stub path conceptually | ✅ landed |
+| 3 | Linux backend scaffold | `vu-ghostty/src/linux/` plus `vu-app/src/linux_view.rs` (or equivalent) with real lifecycle types | Linux no longer routes through the generic stub path conceptually | ✅ landed |
 | 4 | First real terminal surface | PTY spawn, resize, exit, `libghostty-vt` state, GPUI-owned pane paint, real product chrome (no native WM titlebar), embedded mono font, transparent + rounded window | VT-backed Linux pane compiles and displays live shell state with SGR colors / bold / italic / underline / strikethrough / inverse, cursor block, theme palette synced from settings, IoskeleyMono shaping, client-side titlebar with min/max/close caption cluster, transparent ARGB window with rounded corners and per-pane / per-surface opacity, fast paint pipeline (16 ms keystroke-echo round-trip), no placeholder flash on alt-screen TUIs | ✅ landed (preview) |
 | 5 | Input + selection + glyph-atlas grid renderer | keyboard, mouse, clipboard, bracketed paste, DECCKM, CJK IME text/preedit input, selection, plus the long-term GPUI-owned glyph-atlas grid renderer matching the D3D11/DirectWrite path Windows uses | vim/tmux/fzf/less usable on Linux at full speed | 🚧 in progress (DECCKM, bracketed paste, CJK IME text/preedit input, terminal-local Tab / Shift+Tab capture, and basic left-drag text selection are wired; mouse reporting, scrollback gestures, desktop IME validation matrix, and the glyph-atlas renderer remain) |
-| 6 | Packaging | one-line installer, tarball release, desktop entry, icon integration, appcast / notify-only updater, plus native artifact strategy (`.deb`, AppImage, Flatpak, etc.) | tarball installer exists; runtime Linux app id, desktop-file basename, and `StartupWMClass` are aligned as `co.nowledge.con`; native package format decision remains | 🚧 partially landed |
+| 6 | Packaging | one-line installer, tarball release, desktop entry, icon integration, appcast / notify-only updater, plus native artifact strategy (`.deb`, AppImage, Flatpak, etc.) | tarball installer exists; runtime Linux app id, desktop-file basename, and `StartupWMClass` are aligned as `co.nowledge.vu`; native package format decision remains | 🚧 partially landed |
 
 ## Immediate next work
 
@@ -329,7 +329,7 @@ With phase 4 landed (preview), the remaining Linux tasks are:
    transparent rounded chrome, htop in the alternate screen,
    keystroke-echo benchmark), but the hardware path still wants a
    real-desktop pass before we drop the "preview" label.
-4. Packaging: the tarball + one-line installer + `co.nowledge.con.desktop`
+4. Packaging: the tarball + one-line installer + `co.nowledge.vu.desktop`
    launcher entry + icon + notify-only appcast path is landed. The remaining
    packaging decision is whether to add `.deb`, AppImage, Flatpak, or another
    native artifact for Linux distributions.
@@ -352,7 +352,7 @@ landed milestone, so the rationale survives outside of GitHub. Keep
 this list in chronological order:
 
 - `docs/impl/linux-port-tracker-updates/2026-04-23-styled-cell-renderer.md` — phase 4 milestone landing. Covers the styled-cell paint over `libghostty-vt`, theme plumbing, block cursor, env-bootstrap notes for a fresh Ubuntu cloud VM, plus the seven follow-on fixes that got the preview to ship-ready state: client-side decorations + caption cluster, IoskeleyMono normalization, transparent + rounded window, KWin Wayland blur, the 16 ms → 8 ms paint-loop tightening (keystroke echo 32.6 ms → 16.6 ms mean), and the alt-screen `seen_any_output` placeholder fix. Corresponds to merged PR #58.
-- `docs/impl/linux-port-tracker-updates/2026-04-23-release-pipeline.md` — full milestone summary covering both #58 (runtime backend) and #59 (release pipeline). One-liner installer (`install.sh` Unix dispatcher), tarball release script, `release-linux.yml` workflow, and the notify-only updater extension (Sparkle-shaped appcast XML + `apply_update_in_place` re-runs install.sh with `CON_INSTALL_VERSION` so beta-channel users never get silently downgraded to stable). Corresponds to PR #59.
+- `docs/impl/linux-port-tracker-updates/2026-04-23-release-pipeline.md` — full milestone summary covering both #58 (runtime backend) and #59 (release pipeline). One-liner installer (`install.sh` Unix dispatcher), tarball release script, `release-linux.yml` workflow, and the notify-only updater extension (Sparkle-shaped appcast XML + `apply_update_in_place` re-runs install.sh with `VU_INSTALL_VERSION` so beta-channel users never get silently downgraded to stable). Corresponds to PR #59.
 - `docs/impl/linux-port-tracker-updates/2026-04-26-render-latency-followup.md` — post-preview latency and correctness follow-up. Covers PR #65 row-level `StyledText` cache, PR #68 direct PTY wake / shared profiling, and the final htop/vim stale-row fix that rebuilds visible rows on each VT generation update.
 
 ## References

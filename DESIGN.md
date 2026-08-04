@@ -1,10 +1,10 @@
-# con: The Native Terminal Emulator with a Built-in AI Harness
+# vu: The Native Terminal Emulator with a Built-in AI Harness
 
 ## Vision
 
 An open-source, GPU-accelerated terminal emulator that treats AI agents as first-class citizens. It aims for high terminal correctness, native performance, and a deeply integrated agent harness — all in Rust.
 
-**Why con exists:**
+**Why vu exists:**
 
 - Existing terminals bolt AI on as an afterthought
 - Agent-native workflows deserve deep terminal integration, not wrapper hacks
@@ -16,7 +16,7 @@ An open-source, GPU-accelerated terminal emulator that treats AI agents as first
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     con (binary)                        │
+│                     vu (binary)                        │
 │                                                         │
 │  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐  │
 │  │  GPUI Shell  │  │  Agent Panel │  │  Command Bar  │  │
@@ -26,7 +26,7 @@ An open-source, GPU-accelerated terminal emulator that treats AI agents as first
 │  └──────┬───────┘  └──────┬───────┘  └──────┬────────┘  │
 │         │                 │                  │           │
 │  ┌──────┴─────────────────┴──────────────────┴────────┐  │
-│  │                    con-core                        │  │
+│  │                    vu-core                        │  │
 │  │  ┌────────────┐ ┌────────────┐ ┌────────────────┐  │  │
 │  │  │ Terminal    │ │ Agent      │ │ Session        │  │  │
 │  │  │ Manager    │ │ Harness    │ │ Manager        │  │  │
@@ -37,12 +37,12 @@ An open-source, GPU-accelerated terminal emulator that treats AI agents as first
 │  └────────┼──────────────┼────────────────────────────┘  │
 │           │              │                               │
 │  ┌────────┴────────┐  ┌──┴──────────────┐               │
-│  │ con-ghostty     │  │ con-agent       │               │
+│  │ vu-ghostty     │  │ vu-agent       │               │
 │  │ (platform       │  │ (rig 0.34,      │               │
 │  │  terminal       │  │  multi-provider)│               │
 │  │  backend)       │  │                 │               │
 │  ├─────────────────┤  └─────────────────┘               │
-│  │ con-terminal    │                                    │
+│  │ vu-terminal    │                                    │
 │  │ (themes +       │                                    │
 │  │  palette data)  │                                    │
 │  └─────────────────┘                                    │
@@ -57,7 +57,7 @@ An open-source, GPU-accelerated terminal emulator that treats AI agents as first
 kingston/
 ├── Cargo.toml                 # workspace root
 ├── crates/
-│   ├── con/                   # main binary — GPUI app shell
+│   ├── vu/                   # main binary — GPUI app shell
 │   │   └── src/
 │   │       ├── main.rs         # Application bootstrap + keybindings
 │   │       ├── workspace/      # window, tabs, splits, render, session wiring
@@ -69,36 +69,36 @@ kingston/
 │   │       ├── sidebar.rs      # vertical-tabs side panel (rail / hover-peek / pinned)
 │   │       └── theme.rs        # Flexoki themes (Light default, Dark available)
 │   │
-│   ├── con-core/              # shared logic, no UI dependency
+│   ├── vu-core/              # shared logic, no UI dependency
 │   │   └── src/
 │   │       ├── lib.rs
 │   │       ├── harness.rs     # AgentHarness (shared) + AgentSession (per-tab)
 │   │       ├── session.rs     # persist/restore workspace state
-│   │       ├── config.rs      # con config (TOML)
+│   │       ├── config.rs      # vu config (TOML)
 │   │       └── suggestions.rs # AI shell command suggestions
 │   │
-│   ├── con-terminal/          # terminal themes and palette helpers
+│   ├── vu-terminal/          # terminal themes and palette helpers
 │   │   └── src/
 │   │       ├── lib.rs
 │   │       └── theme.rs       # built-in themes + Ghostty theme import
 │   │
-│   ├── con-ghostty/           # ghostty FFI — primary macOS backend
+│   ├── vu-ghostty/           # ghostty FFI — primary macOS backend
 │   │   └── src/
 │   │       ├── lib.rs
 │   │       ├── ffi.rs         # C API bindings (libghostty types, functions)
 │   │       └── terminal.rs    # GhosttyApp, GhosttyTerminal, TerminalState, action callbacks
 │   │
-│   ├── con-agent/             # AI agent harness (Rig 0.40)
+│   ├── vu-agent/             # AI agent harness (Rig 0.40)
 │   │   └── src/
 │   │       ├── lib.rs
 │   │       ├── provider.rs    # Multi-provider Rig agent construction and streaming
-│   │       ├── hook.rs        # ConHook — AgentHook lifecycle bridge
+│   │       ├── hook.rs        # VuHook — AgentHook lifecycle bridge
 │   │       ├── tools.rs       # Rig Tool impls for terminals, tmux, files, and workspaces
 │   │       ├── context.rs     # terminal context extraction for agent
 │   │       ├── conversation.rs # conversation state + Rig Message conversion
 │   │       └── skills.rs      # skill registry + AGENTS.md parser
 │   │
-│   └── con-cli/               # headless CLI + socket client (stub)
+│   └── vu-cli/               # headless CLI + socket client (stub)
 │       └── src/main.rs
 │
 ├── postmortem/                # incident & integration postmortems
@@ -131,14 +131,14 @@ GPUI gives us Zed-level text rendering quality (critical for a terminal) and a p
 
 ### 2. Terminal Core: Ghostty-Only Runtime
 
-con now runs one terminal runtime: full Ghostty embedded via its C API.
+vu now runs one terminal runtime: full Ghostty embedded via its C API.
 
 - Ghostty owns PTY lifecycle, VT parsing, scrollback, and rendering
-- con embeds one shared Ghostty app per window and one Ghostty surface per split inside GPUI layouts
-- `con-ghostty` stays thin: app lifecycle, surface lifecycle, callbacks, and safe Rust accessors
-- `con-terminal` now only owns theme and palette data used to drive Ghostty config
+- vu embeds one shared Ghostty app per window and one Ghostty surface per split inside GPUI layouts
+- `vu-ghostty` stays thin: app lifecycle, surface lifecycle, callbacks, and safe Rust accessors
+- `vu-terminal` now only owns theme and palette data used to drive Ghostty config
 
-Native Ghostty splits do not imply a single monolithic surface. Ghostty's own macOS architecture also uses a host-managed surface tree with one surface per split. The right migration path for con is therefore a Ghostty-driven surface-tree controller, not collapsing the whole window into one terminal surface.
+Native Ghostty splits do not imply a single monolithic surface. Ghostty's own macOS architecture also uses a host-managed surface tree with one surface per split. The right migration path for vu is therefore a Ghostty-driven surface-tree controller, not collapsing the whole window into one terminal surface.
 
 `TerminalPane` still exists, but it is now a product abstraction around one kind of pane, not a multi-backend compatibility layer.
 
@@ -161,24 +161,24 @@ The architecture must model that explicitly.
 **Three-layer design:**
 
 1. **Backend facts** — Ghostty action callbacks, process-exited state, titles, PWD, command-finished events, PTY input generations, visible text
-2. **Pane runtime tracker** — reducer over backend observations, typed shell probes, and con-originated actions; command-boundary freshness; scope-stack inference; confidence
+2. **Pane runtime tracker** — reducer over backend observations, typed shell probes, and vu-originated actions; command-boundary freshness; scope-stack inference; confidence
 3. **Consumers** — agent prompt, `list_panes`, approvals, sidebar, notifications, resume surfaces
 
-**Important constraint:** shell metadata and visible-app identity are not the same thing. If con cannot prove the foreground runtime, it must say `unknown` instead of promoting title or screen-pattern guesses into product state.
+**Important constraint:** shell metadata and visible-app identity are not the same thing. If vu cannot prove the foreground runtime, it must say `unknown` instead of promoting title or screen-pattern guesses into product state.
 
-**Current foundation:** Ghostty already gives con strong terminal facts, but the embedded C API does not yet expose foreground-process identity, authoritative command text, alternate-screen state, remote-host identity, or Ghostty's richer internal semantic prompt/runtime state. con therefore needs its own pane runtime tracker instead of pushing more product logic into prompt heuristics.
+**Current foundation:** Ghostty already gives vu strong terminal facts, but the embedded C API does not yet expose foreground-process identity, authoritative command text, alternate-screen state, remote-host identity, or Ghostty's richer internal semantic prompt/runtime state. vu therefore needs its own pane runtime tracker instead of pushing more product logic into prompt heuristics.
 
 **Reducer model:** every pane now has a stateful tracker that merges three classes of input:
 
 - backend observations from Ghostty
 - typed shell-scope probes such as `probe_shell_context`
-- con-originated action history such as pane creation, visible shell exec, raw input, and process exit
+- vu-originated action history such as pane creation, visible shell exec, raw input, and process exit
 
-This lets con preserve causal history without confusing it for current foreground truth. A fresh shell prompt clears active tmux/app identity unless a fresh typed probe re-establishes it. Historical actions remain visible as evidence for how the pane was reached.
+This lets vu preserve causal history without confusing it for current foreground truth. A fresh shell prompt clears active tmux/app identity unless a fresh typed probe re-establishes it. Historical actions remain visible as evidence for how the pane was reached.
 
-One important middle layer now exists for remote work: **con-managed SSH continuity**. When con created or recently drove an SSH pane, and the current screen still looks prompt-like without tmux or TUI contradictions, that pane remains a reusable remote workspace even if fresh shell integration is absent. This is not promoted to foreground truth, but it is strong enough to prevent duplicate remote panes across follow-up turns.
+One important middle layer now exists for remote work: **vu-managed SSH continuity**. When vu created or recently drove an SSH pane, and the current screen still looks prompt-like without tmux or TUI contradictions, that pane remains a reusable remote workspace even if fresh shell integration is absent. This is not promoted to foreground truth, but it is strong enough to prevent duplicate remote panes across follow-up turns.
 
-**Long-term direction:** if con needs process-group identity or richer semantic prompt exports, the right move is to extend libghostty's C API upstream rather than reintroducing a second terminal runtime locally.
+**Long-term direction:** if vu needs process-group identity or richer semantic prompt exports, the right move is to extend libghostty's C API upstream rather than reintroducing a second terminal runtime locally.
 
 See `docs/impl/pane-runtime-observer.md`.
 
@@ -188,20 +188,20 @@ Observability alone is not enough.
 
 The agent also needs an explicit control plane that separates:
 
-- con pane addresses
+- vu pane addresses
 - nested runtime targets such as SSH scopes, tmux sessions, tmux panes, and editors
 - control channels such as visible shell exec, local hidden exec, tmux control, and raw TUI input
 
 This is the architectural boundary that prevents failures like:
 
 - running a local hidden command for a remote task
-- confusing a tmux pane with a con pane
+- confusing a tmux pane with a vu pane
 - typing shell commands into `nvim`
 
 The long-term tool model should therefore be split by control layer, not just by "pane plus command." See `docs/impl/agent-runtime-control-plane.md`.
 
 There is no single terminal-wide protocol comparable to Chrome DevTools Protocol.
-con therefore needs a layered control plane with explicit protocol attachments:
+vu therefore needs a layered control plane with explicit protocol attachments:
 
 - Ghostty surface and VT facts
 - shell prompt attachments
@@ -209,9 +209,9 @@ con therefore needs a layered control plane with explicit protocol attachments:
 - app-native RPC attachments
 - OS and PTY process facts
 
-The first concrete attachment after the Ghostty surface is a proven shell-prompt attachment. That is where con can safely expose read-only shell probes such as `$TMUX`, `$SSH_CONNECTION`, tmux session/window/pane ids, and editor socket hints.
+The first concrete attachment after the Ghostty surface is a proven shell-prompt attachment. That is where vu can safely expose read-only shell probes such as `$TMUX`, `$SSH_CONNECTION`, tmux session/window/pane ids, and editor socket hints.
 
-The harness now only preloads **silent** attachments automatically. Visible shell probes stay explicit tool calls. This keeps the terminal calm on the first turn while still letting con reuse tmux state and remote workspace anchors across follow-up turns.
+The harness now only preloads **silent** attachments automatically. Visible shell probes stay explicit tool calls. This keeps the terminal calm on the first turn while still letting vu reuse tmux state and remote workspace anchors across follow-up turns.
 
 See `docs/study/terminal-control-plane.md`.
 
@@ -236,15 +236,15 @@ See `docs/study/terminal-control-plane.md`.
 - `anthropic::Client::new(api_key)` — direct Anthropic provider with model constants (`CLAUDE_4_SONNET`)
 - Agent loop with automatic tool calling (up to N turns)
 
-**Current integration:** con-agent implements 34 Rig tools spanning visible terminal control, tmux, local files, remote workspaces, and agent CLI orchestration. Provider-native clients and OpenAI-compatible endpoints share one harness path, with configurable models, credentials, and base URLs. The harness runs on a shared tokio runtime. Provider settings are configurable from the settings window.
+**Current integration:** vu-agent implements 34 Rig tools spanning visible terminal control, tmux, local files, remote workspaces, and agent CLI orchestration. Provider-native clients and OpenAI-compatible endpoints share one harness path, with configurable models, credentials, and base URLs. The harness runs on a shared tokio runtime. Provider settings are configurable from the settings window.
 
-**Agent lifecycle (AgentHook):** Each agent request builds a streaming prompt with its conversation history and a `ConHook` registered on the agent. The hook maps Rig's typed lifecycle events into Con's UI events for tool-call start, tool result, and text deltas. For dangerous tools (`shell_exec`, `terminal_exec`, `file_write`, `edit_file`), the hook waits on a per-request approval channel before execution. Safe tools (`file_read`, `list_files`, `search`) execute immediately. A 5-minute timeout prevents indefinite hangs if the UI becomes unresponsive. Rig 0.40 uses an exact total model-call budget; Con converts its existing `max_turns` setting through a compatibility function that preserves the previously shipped ceiling.
+**Agent lifecycle (AgentHook):** Each agent request builds a streaming prompt with its conversation history and a `VuHook` registered on the agent. The hook maps Rig's typed lifecycle events into Vu's UI events for tool-call start, tool result, and text deltas. For dangerous tools (`shell_exec`, `terminal_exec`, `file_write`, `edit_file`), the hook waits on a per-request approval channel before execution. Safe tools (`file_read`, `list_files`, `search`) execute immediately. A 5-minute timeout prevents indefinite hangs if the UI becomes unresponsive. Rig 0.40 uses an exact total model-call budget; Vu converts its existing `max_turns` setting through a compatibility function that preserves the previously shipped ceiling.
 
-**Visible terminal tool:** The `terminal_exec` tool is con's core differentiator. Instead of running commands in a hidden subprocess, it writes commands to the user's visible Ghostty pane. Output is captured via Ghostty's command-finished signal, with a bounded recent-output fallback when shell integration is unavailable. The user sees every command the agent runs in real time — full transparency.
+**Visible terminal tool:** The `terminal_exec` tool is vu's core differentiator. Instead of running commands in a hidden subprocess, it writes commands to the user's visible Ghostty pane. Output is captured via Ghostty's command-finished signal, with a bounded recent-output fallback when shell integration is unavailable. The user sees every command the agent runs in real time — full transparency.
 
 **Streaming cancellation:** Agent requests can be cancelled mid-stream. The harness maintains an `Arc<AtomicBool>` cancellation flag checked between stream items. The agent panel shows a "Stop" button during streaming. Cancellation preserves the partial response accumulated so far.
 
-**Per-request approval channels:** Each `send_message()` creates a fresh crossbeam channel pair. The sender is delivered to the UI via `ToolApprovalNeeded` events. The receiver is owned by the `ConHook` for that request. This eliminates race conditions between concurrent agent requests — only one hook instance reads from each channel.
+**Per-request approval channels:** Each `send_message()` creates a fresh crossbeam channel pair. The sender is delivered to the UI via `ToolApprovalNeeded` events. The receiver is owned by the `VuHook` for that request. This eliminates race conditions between concurrent agent requests — only one hook instance reads from each channel.
 
 **Per-tab agent sessions:** Each tab owns an independent `AgentSession` — its own conversation, event channels, terminal exec channels, and cancellation flag. The `AgentHarness` (shared per window) holds only infrastructure: the tokio runtime (2 worker threads), config, and skill registry. When the user switches tabs, the agent panel swaps its `PanelState` in and out via `std::mem::replace()`, preserving each tab's conversation history and in-flight state. Background tabs continue processing agent events into their cached `PanelState`. Terminal exec requests route to the originating tab's pane tree, not the active tab — so an agent running in Tab 2 executes commands in Tab 2 even if the user has switched to Tab 1.
 
@@ -254,7 +254,7 @@ See `docs/study/terminal-control-plane.md`.
 
 ### 5. Platform Strategy
 
-con now has three platform states:
+vu now has three platform states:
 
 - macOS: shipped, using the embedded libghostty + AppKit path
 - Windows: beta, using `libghostty-vt` + ConPTY + a local D3D11/DirectWrite renderer
@@ -273,12 +273,12 @@ The platform architecture is no longer "macOS only," but it is still not
 
 Important consequence:
 
-- Windows proved that con can ship a local backend when upstream
+- Windows proved that vu can ship a local backend when upstream
   embedding is unavailable.
 - Linux feasibility work showed that upstream Ghostty and GPUI both have
   real Linux stacks, but their embedding boundaries do not line up for
-  con today.
-- con therefore takes the same delivery stance on Linux that it used on
+  vu today.
+- vu therefore takes the same delivery stance on Linux that it used on
   Windows: ship a local backend instead of waiting on upstream embed
   hooks.
 
@@ -371,7 +371,7 @@ Important consequence:
 - [x] Configurable keybindings (config.toml keybindings section)
 - [ ] Plugin system (Lua or WASM)
 - [ ] Auto-update (Sparkle on macOS)
-- [ ] CLI tool (`con` command for scripting)
+- [ ] CLI tool (`vu` command for scripting)
 
 ### Phase 7: Agent Capabilities & Terminal Polish
 
@@ -390,7 +390,7 @@ Important consequence:
 
 ## Agent ↔ Terminal Integration Design
 
-This is what makes con different from "terminal + chatbot sidebar."
+This is what makes vu different from "terminal + chatbot sidebar."
 
 ### Terminal Context Awareness
 
@@ -434,7 +434,7 @@ This is the current baseline. The next step is a runtime scope stack with eviden
 When the agent needs to run a command:
 
 1. Agent produces a `ShellExec` tool call via Rig
-2. con-core creates a new (or reuses) terminal pane
+2. vu-core creates a new (or reuses) terminal pane
 3. Command is written to PTY
 4. Output is captured via Ghostty `COMMAND_FINISHED`, with bounded recent-output fallback when shell integration is unavailable
 5. Result is fed back to agent with exit code and duration metadata
@@ -445,16 +445,16 @@ This means the user **sees** what the agent does — no hidden subprocess. Full 
 
 For agent CLIs and other tools that run *inside* the terminal:
 
-- con should detect them through the pane runtime tracker, using strong evidence first:
+- vu should detect them through the pane runtime tracker, using strong evidence first:
   - shell/runtime transitions
   - typed shell probes and reducer-backed action history
   - backend facts such as command lifecycle and future alternate-screen exports
-- con must not promote pane-title or screen-structure heuristics into typed runtime state
+- vu must not promote pane-title or screen-structure heuristics into typed runtime state
 - Provides enhanced UX: notification rings, focus management
-- Does NOT try to "take over" — con is the host, not the agent
-- Optional: pipe agent's stderr/notifications to con's notification system
+- Does NOT try to "take over" — vu is the host, not the agent
+- Optional: pipe agent's stderr/notifications to vu's notification system
 
-This is a product boundary, not a convenience feature. con must support these tools without pretending that con itself owns the pane.
+This is a product boundary, not a convenience feature. vu must support these tools without pretending that vu itself owns the pane.
 
 ---
 
@@ -472,7 +472,7 @@ brew install rustup cmake
 ```bash
 cargo build                    # debug build
 cargo build --release          # release build
-cargo run -p con               # run the terminal
+cargo run -p vu               # run the terminal
 cargo test --workspace         # test everything
 ```
 
@@ -480,14 +480,14 @@ cargo test --workspace         # test everything
 
 1. Cargo resolves workspace deps from upstream git sources and crates.io as declared in the workspace manifest
 2. GPUI compiles Metal shaders at runtime (`runtime_shaders` feature — no Xcode.app needed for dev)
-3. `cargo build` produces the `con` binary with all crates linked
+3. `cargo build` produces the `vu` binary with all crates linked
 
 ---
 
 ## Config
 
 ```toml
-# ~/.config/con/config.toml
+# ~/.config/vu/config.toml
 
 [terminal]
 font-family = "JetBrains Mono"
@@ -538,7 +538,7 @@ new-tab = "cmd+t"
 - Ghostty provides production-grade VT compliance (Kitty keyboard, sixel, hyperlinks, OSC 133) without reimplementing it
 - GPU-accelerated Metal rendering via native NSView — superior performance to software rasterization
 - Action callback system gives us COMMAND_FINISHED (exit code + duration), eliminating blind timeouts for agent command execution
-- The `con-ghostty` crate is a thin FFI wrapper (~800 lines), not a fork — upstream Ghostty updates flow through cleanly
+- The `vu-ghostty` crate is a thin FFI wrapper (~800 lines), not a fork — upstream Ghostty updates flow through cleanly
 - `TerminalPane` remains as a stable pane-facing API for the workspace and agent layers
 
 ### 2. GPUI IME: Production-Ready
@@ -547,24 +547,24 @@ GPUI implements the full `InputHandler` trait (modeled after `NSTextInputClient`
 
 - `marked_text_range()` / `replace_and_mark_text_in_range()` for IME composition
 - `bounds_for_range()` for candidate window positioning
-- GPUI has broader platform support, and con now ships macOS plus a
+- GPUI has broader platform support, and vu now ships macOS plus a
   Windows beta and a Linux preview; see `docs/impl/linux-port.md`.
 - CJK input works. No blocker.
 
 ### 3. GPU Fallback: Not Needed
 
-Ghostty has no software renderer — GPU-only. Same for con.
+Ghostty has no software renderer — GPU-only. Same for vu.
 
 **Rationale:** A desktop terminal emulator always has a GPU. The scenarios where it doesn't:
 
-- **Headless servers** — users SSH in, they use the remote machine's terminal, not con
-- **Containers** — con doesn't run inside Docker; it runs on the host
+- **Headless servers** — users SSH in, they use the remote machine's terminal, not vu
+- **Containers** — vu doesn't run inside Docker; it runs on the host
 
 If we ever need headless testing, we add a test-only software rasterizer. Not a user feature.
 
 ### 4. Plugin System: Node.js + Python via Sidecar IPC
 
-**Decision:** Plugins run as external processes. con communicates via JSON-RPC over Unix domain sockets.
+**Decision:** Plugins run as external processes. vu communicates via JSON-RPC over Unix domain sockets.
 
 **Why Node.js + Python:**
 
@@ -576,13 +576,13 @@ If we ever need headless testing, we add a test-only software rasterizer. Not a 
 **How it works:**
 
 ```
-con (Rust)  ─── Unix socket (JSON-RPC) ───  plugin process (Node/Python/any)
+vu (Rust)  ─── Unix socket (JSON-RPC) ───  plugin process (Node/Python/any)
 ```
 
-- con exposes a socket API: `notification.create`, `terminal.write`, `context.get`, etc.
+- vu exposes a socket API: `notification.create`, `terminal.write`, `context.get`, etc.
 - Plugin manifest declares: name, runtime, entry point, requested capabilities
-- con spawns the plugin process, passes socket path via env var
-- Plugin SDK: thin npm package (`@con/sdk`) and pip package (`con-sdk`) wrapping the JSON-RPC protocol
+- vu spawns the plugin process, passes socket path via env var
+- Plugin SDK: thin npm package (`@vu/sdk`) and pip package (`vu-sdk`) wrapping the JSON-RPC protocol
 
 **Phase 4 deliverable.** Socket API comes from the same external automation work introduced earlier in the product plan.
 
@@ -591,7 +591,7 @@ con (Rust)  ─── Unix socket (JSON-RPC) ───  plugin process (Node/Pyt
 - **GPUI**: Apache 2.0 (compatible with MIT, allows sublicensing)
 - **Ghostty libghostty**: MIT
 - **Rig**: MIT
-- **con**: MIT (already in LICENSE)
+- **vu**: MIT (already in LICENSE)
 
 All clear. No copyleft, no GPL contamination.
 
@@ -601,9 +601,9 @@ All clear. No copyleft, no GPL contamination.
 
 The product should not depend on a built-in model to be useful. A socket control API for external agents keeps the system composable and lets built-in automation remain only one client of the platform.
 
-**con should have both:**
+**vu should have both:**
 
 1. **Built-in agent** (via Rig) — for users who want native AI without installing anything else
-2. **Socket API** — for external agents and plugins to control con
+2. **Socket API** — for external agents and plugins to control vu
 
 The socket API is the foundation. The built-in agent is just the first client of that API.

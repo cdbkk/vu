@@ -2,11 +2,11 @@
 
 ## Goal
 
-Verify that Con reuses the right SSH workspace across turns instead of spawning duplicate panes or silently falling back to local execution.
+Verify that Vu reuses the right SSH workspace across turns instead of spawning duplicate panes or silently falling back to local execution.
 
 ## Setup
 
-- One live Con tab
+- One live Vu tab
 - Two reachable hosts
 - Example names used here: `haswell`, `cinnamon`
 
@@ -42,6 +42,6 @@ Score each dimension 0-3:
 
 Capture:
 
-- `con-cli --json panes list --tab <tab>`
+- `vu-cli --json panes list --tab <tab>`
 - the assistant reply
 - whether pane count changed unexpectedly

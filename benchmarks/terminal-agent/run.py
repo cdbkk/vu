@@ -17,10 +17,10 @@ from typing import Any, Callable
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_SOCKET = os.environ.get("CON_SOCKET_PATH", "/tmp/con.sock")
+DEFAULT_SOCKET = os.environ.get("VU_SOCKET_PATH", "/tmp/vu.sock")
 DEFAULT_RECORD_DIR = REPO_ROOT / ".context" / "benchmarks"
 PROFILE_DIR = REPO_ROOT / "benchmarks" / "terminal-agent" / "profiles"
-DEFAULT_CON_CLI_BIN = REPO_ROOT / "target" / "debug" / "con-cli"
+DEFAULT_VU_CLI_BIN = REPO_ROOT / "target" / "debug" / "vu-cli"
 
 
 class BenchError(RuntimeError):
@@ -63,15 +63,15 @@ class BenchmarkContext:
     def __init__(self, socket_path: str, default_tab: int | None) -> None:
         self.socket_path = socket_path
         self.default_tab = default_tab
-        override = os.environ.get("CON_BENCH_CON_CLI")
+        override = os.environ.get("VU_BENCH_VU_CLI")
         if override:
             self.cli_base = shlex.split(override)
-        elif DEFAULT_CON_CLI_BIN.exists():
-            self.cli_base = [str(DEFAULT_CON_CLI_BIN)]
-        elif shutil.which("con-cli"):
-            self.cli_base = ["con-cli"]
+        elif DEFAULT_VU_CLI_BIN.exists():
+            self.cli_base = [str(DEFAULT_VU_CLI_BIN)]
+        elif shutil.which("vu-cli"):
+            self.cli_base = ["vu-cli"]
         else:
-            self.cli_base = ["cargo", "run", "-q", "-p", "con-cli", "--"]
+            self.cli_base = ["cargo", "run", "-q", "-p", "vu-cli", "--"]
 
     def run_json(self, *args: str) -> dict[str, Any]:
         cmd = [*self.cli_base, "--json", "--socket", self.socket_path, *args]
@@ -194,7 +194,7 @@ class BenchmarkContext:
                     ) from exc
 
             message = proc.stderr.strip() or proc.stdout.strip()
-            pending_turn = "pending con-cli agent request" in message
+            pending_turn = "pending vu-cli agent request" in message
             if not pending_turn:
                 raise BenchError(
                     f"`{' '.join(cmd)}` failed with exit {proc.returncode}: {message}"
@@ -412,7 +412,7 @@ def run_case(
 
 def case_socket_identify(ctx: BenchmarkContext) -> tuple[str, dict[str, Any]]:
     identify = ctx.identify()
-    if identify.get("app") != "con":
+    if identify.get("app") != "vu":
         raise BenchError(f"identify returned unexpected app: {identify.get('app')!r}")
     methods = identify.get("methods", [])
     if not methods:
@@ -481,7 +481,7 @@ def case_panes_list(ctx: BenchmarkContext) -> tuple[str, dict[str, Any]]:
 def case_visible_shell_exec(ctx: BenchmarkContext) -> tuple[str, dict[str, Any]]:
     tab_index = ctx.active_tab_index()
     pane_id, pane_index, pane = ctx.choose_exec_visible_shell(tab_index)
-    token = f"CON_BENCH_READY_{int(time.time() * 1000)}"
+    token = f"VU_BENCH_READY_{int(time.time() * 1000)}"
     exec_result = ctx.panes_exec(tab_index, pane_id, "/bin/echo", token)
     wait_result = ctx.panes_wait(
         tab_index,
@@ -513,15 +513,15 @@ def case_visible_shell_exec(ctx: BenchmarkContext) -> tuple[str, dict[str, Any]]
 
 
 def case_agent_ready(ctx: BenchmarkContext) -> tuple[str, dict[str, Any]]:
-    enabled = os.environ.get("CON_BENCH_ENABLE_AGENT", "").lower()
+    enabled = os.environ.get("VU_BENCH_ENABLE_AGENT", "").lower()
     if enabled not in {"1", "true", "yes"}:
         return (
-            "skipped; set CON_BENCH_ENABLE_AGENT=1 to run live in-tab agent verification",
+            "skipped; set VU_BENCH_ENABLE_AGENT=1 to run live in-tab agent verification",
             {"skipped": True},
         )
 
     tab_index = ctx.active_tab_index()
-    token = f"CON_BENCH_AGENT_READY_{int(time.time() * 1000)}"
+    token = f"VU_BENCH_AGENT_READY_{int(time.time() * 1000)}"
     result = ctx.agent_ask(tab_index, f"Reply with ONLY {token}")
     message = result.get("message", {})
     content = str(message.get("content", "")).strip()
@@ -745,7 +745,7 @@ def operator_case_for(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run Con terminal-agent benchmark suites against a live con-cli socket.",
+        description="Run Vu terminal-agent benchmark suites against a live vu-cli socket.",
     )
     parser.add_argument(
         "--list-profiles",
@@ -765,7 +765,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--socket",
         default=DEFAULT_SOCKET,
-        help="Path to the running Con control socket.",
+        help="Path to the running Vu control socket.",
     )
     parser.add_argument(
         "--tab",

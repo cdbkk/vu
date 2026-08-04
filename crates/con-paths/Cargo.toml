@@ -1,8 +1,0 @@
-[package]
-name = "con-paths"
-edition.workspace = true
-license.workspace = true
-version.workspace = true
-
-[dependencies]
-dirs.workspace = true

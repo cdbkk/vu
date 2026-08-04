@@ -1,0 +1,8 @@
+[package]
+name = "vu-terminal"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+vu-paths.workspace = true

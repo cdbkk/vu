@@ -1,0 +1,8 @@
+[package]
+name = "vu-paths"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+dirs.workspace = true

@@ -8,7 +8,7 @@ The agent is an **orchestrator**, not a keyboard user. It has direct API access 
 
 The agent must distinguish three types of keystrokes:
 
-1. **con application shortcuts** (Cmd+T, Cmd+W, Cmd+N): Control the con app. The agent CANNOT send these. Use tools instead.
+1. **vu application shortcuts** (Cmd+T, Cmd+W, Cmd+N): Control the vu app. The agent CANNOT send these. Use tools instead.
 2. **Terminal protocol sequences** (\\x02c for tmux prefix+c, \\x1b for Escape, \\x03 for Ctrl-C): Travel through the PTY to the remote program. send_keys is the correct tool for these.
 3. **Shell commands** (ls, apt update, git status): Use terminal_exec when exec_visible_shell is available. Otherwise, send_keys to type the command + Enter in a shell prompt.
 

@@ -1,0 +1,103 @@
+[package]
+name = "vu"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+default-run = "vu"
+
+# Two binaries pointing at the same `main.rs`, gated by mutually-exclusive
+# features. Upstream needed this because `CON` is a reserved DOS device name
+# and `vu.exe` is rejected by the Win32 file APIs. `vu.exe` is not reserved,
+# so the split is now vestigial and the Windows path could collapse onto the
+# default binary; kept for now so the release scripts keep working.
+#
+# Windows builds use `--no-default-features --features bin-vu-app` via the
+# `cargo wbuild` / `cargo wrun` aliases in the workspace `.cargo/config.toml`.
+[[bin]]
+name = "vu"
+path = "src/main.rs"
+required-features = ["bin-vu"]
+
+[[bin]]
+name = "vu-app"
+path = "src/main.rs"
+required-features = ["bin-vu-app"]
+
+[features]
+default = ["bin-vu"]
+bin-vu = []
+bin-vu-app = []
+
+[dependencies]
+vu-core.workspace = true
+vu-paths.workspace = true
+vu-terminal.workspace = true
+vu-agent.workspace = true
+vu-ghostty.workspace = true
+gpui.workspace = true
+gpui_platform.workspace = true
+gpui-component = { workspace = true, features = ["tree-sitter-languages"] }
+gpui-component-assets.workspace = true
+anyhow.workspace = true
+log.workspace = true
+env_logger.workspace = true
+tracing = { version = "0.1", features = ["log"] }
+crossbeam-channel.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+futures.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+toml.workspace = true
+rust-embed.workspace = true
+dirs.workspace = true
+chrono.workspace = true
+reqwest.workspace = true
+url.workspace = true
+markdown = { version = "1.0.0", features = ["serde"] }
+ropey.workspace = true
+mermaid-rs-renderer.workspace = true
+mathjax-svg-rs.workspace = true
+regex = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "=0.26.0"
+objc = "0.2"
+raw-window-handle = "0.6"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+raw-window-handle = "0.6"
+unicode-width.workspace = true
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_Debug",  # AddVectoredExceptionHandler
+    "Win32_System_Kernel",             # EXCEPTION_POINTERS definition
+    "Win32_System_Pipes",              # WaitNamedPipeW
+    "Win32_Graphics_Dwm",              # DwmSetWindowAttribute — Mica/Acrylic backdrop
+] }
+# Used only by the Windows `GhosttyView` to wrap D3D11-readback BGRA into
+# a GPUI `RenderImage` (GPUI's `RenderImage::new` takes a
+# `SmallVec<[image::Frame; 1]>` and it does not re-export either crate).
+image = { version = "0.25", default-features = false }
+smallvec = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+raw-window-handle = "0.6"
+unicode-width.workspace = true
+x11rb = "0.13.2"
+
+[target.'cfg(unix)'.dependencies]
+socket2 = "0.6"
+
+[build-dependencies]
+cc = "1"
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+winresource = "0.1"
+
+[package.metadata.bundle]
+icon = ["resources/app-icon@2x.png", "resources/app-icon.png"]
+identifier = "co.cdbkk.vu"
+name = "vu"
+osx_minimum_system_version = "10.15.7"

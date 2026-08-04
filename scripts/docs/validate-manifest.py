@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the docs manifest that powers con.nowledge.co/docs."""
+"""Validate the docs manifest that powers vu.nowledge.co/docs."""
 
 from __future__ import annotations
 
@@ -50,8 +50,8 @@ def main() -> int:
 
     if manifest.get("version") != 1:
         errors.append("manifest.version must be 1")
-    if manifest.get("repository") != "nowledge-co/con-terminal":
-        errors.append("manifest.repository must be nowledge-co/con-terminal")
+    if manifest.get("repository") != "nowledge-co/vu-terminal":
+        errors.append("manifest.repository must be nowledge-co/vu-terminal")
     if not manifest.get("groups"):
         errors.append("manifest.groups must not be empty")
 

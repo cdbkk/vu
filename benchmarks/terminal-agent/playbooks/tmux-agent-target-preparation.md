@@ -2,7 +2,7 @@
 
 ## Goal
 
-Verify that Con can prepare or reuse a Codex / Claude Code / OpenCode target inside tmux without confusing the outer pane with the inner tmux pane.
+Verify that Vu can prepare or reuse a Codex / Claude Code / OpenCode target inside tmux without confusing the outer pane with the inner tmux pane.
 
 ## Setup
 
@@ -24,7 +24,7 @@ Verify that Con can prepare or reuse a Codex / Claude Code / OpenCode target ins
 ## Failure looks like
 
 - Outer-pane raw key injection is used as the primary path even when tmux-native control exists
-- The agent confuses the Con pane with the tmux target
+- The agent confuses the Vu pane with the tmux target
 - Missing CLI state is hidden or misreported
 - A fresh tmux target is created on every turn
 

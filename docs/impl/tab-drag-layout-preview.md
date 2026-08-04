@@ -9,7 +9,7 @@
 
 This is a forward-looking design note for a tab-to-tab split-merge workflow. It is not part of the current pane-title drag implementation.
 
-When dragging a horizontal tab over another tab, Con could preview the layout that will result if the dragged tab is dropped into the target tab as a split. The preview starts only when the cursor is in a non-center edge zone of another tab.
+When dragging a horizontal tab over another tab, Vu could preview the layout that will result if the dragged tab is dropped into the target tab as a split. The preview starts only when the cursor is in a non-center edge zone of another tab.
 
 The proposed visual direction is **Live split preview**: the target tab content area visually splits in-place, with the dragged tab layout tinted differently from the target tab layout. On drop, the dragged tab's entire pane layout is merged into the target tab and the dragged tab is removed from the tab strip.
 
@@ -88,7 +88,7 @@ On mouse release / drop:
 
 ## Visual Design
 
-The preview follows Con's existing design language:
+The preview follows Vu's existing design language:
 
 - No shadows.
 - Avoid heavy borders.

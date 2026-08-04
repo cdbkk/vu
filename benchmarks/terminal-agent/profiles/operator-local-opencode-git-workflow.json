@@ -4,7 +4,7 @@
   "recommended_suite": "all",
   "fresh_conversation": true,
   "setup_visible_shell_commands": [
-    "rm -rf ~/dev/temp/con-bench-opencode-git && mkdir -p ~/dev/temp"
+    "rm -rf ~/dev/temp/vu-bench-opencode-git && mkdir -p ~/dev/temp"
   ],
   "env_checks": [
     {
@@ -41,12 +41,12 @@
       "steps": [
         {
           "label": "prepare_opencode_workspace",
-          "prompt": "Please prepare an OpenCode workspace in ~/dev/temp/con-bench-opencode-git by launching OpenCode there and preparing a paired local shell target for file, git, and test work.",
+          "prompt": "Please prepare an OpenCode workspace in ~/dev/temp/vu-bench-opencode-git by launching OpenCode there and preparing a paired local shell target for file, git, and test work.",
           "timeout_secs": 90
         },
         {
           "label": "bootstrap_project_and_commit",
-          "prompt": "Keep the OpenCode target prepared, but use its paired local shell target to create a tiny Python project in ~/dev/temp/con-bench-opencode-git with mathops.py and test_mathops.py, initialize git, make an initial commit, and run `python3 -m unittest -q`. Only touch the OpenCode pane if a blocking trust or continue prompt must be cleared first.",
+          "prompt": "Keep the OpenCode target prepared, but use its paired local shell target to create a tiny Python project in ~/dev/temp/vu-bench-opencode-git with mathops.py and test_mathops.py, initialize git, make an initial commit, and run `python3 -m unittest -q`. Only touch the OpenCode pane if a blocking trust or continue prompt must be cleared first.",
           "timeout_secs": 180
         },
         {

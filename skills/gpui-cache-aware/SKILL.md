@@ -1,10 +1,10 @@
 # GPUI Cache-Aware Review
 
-Use this skill when reviewing or changing Con UI performance, especially when a view feels janky, expensive, or unexpectedly re-renders during unrelated updates.
+Use this skill when reviewing or changing Vu UI performance, especially when a view feels janky, expensive, or unexpectedly re-renders during unrelated updates.
 
 ## Goal
 
-Keep Con visually rich without paying repeated GPUI layout/render cost for work that could be cached or isolated.
+Keep Vu visually rich without paying repeated GPUI layout/render cost for work that could be cached or isolated.
 
 ## Core Rule
 
@@ -80,7 +80,7 @@ If a cached view causes overlap, clipping, or stale layout, the cache boundary i
 - If there are many repeated items, consider virtualization before micro-optimizing item chrome.
 - If the item count is small but each item is expensive, focus on item-level caches instead.
 
-## Con-Specific Guidance
+## Vu-Specific Guidance
 
 ### Markdown and chat surfaces
 
@@ -111,7 +111,7 @@ If a cached view causes overlap, clipping, or stale layout, the cache boundary i
 - If a view needs `.on_hover(...)`, call `.id(stable_id)` first. Use a stable id
   such as the pane's `FocusHandle`, not a changing row/index.
 - For platform-selected files (`ghostty_view.rs`, `windows_view.rs`,
-  `linux_view.rs`), a macOS `cargo check -p con` only checks the macOS path.
+  `linux_view.rs`), a macOS `cargo check -p vu` only checks the macOS path.
   Validate the touched platform path on its target or wait for portable CI
   before treating the fix as closed.
 
@@ -119,7 +119,7 @@ If a cached view causes overlap, clipping, or stale layout, the cache boundary i
 
 After a cache-related change:
 
-- verify `cargo check -p con`
+- verify `cargo check -p vu`
 - run targeted tests if the subsystem has them
 - confirm there is no layout regression
 - confirm the cache invalidates on real content/theme changes

@@ -1,16 +1,16 @@
-# Implementation: Socket API and `con-cli`
+# Implementation: Socket API and `vu-cli`
 
 ## Overview
 
-con now ships a real local control plane:
+vu now ships a real local control plane:
 
 - the app listens on a Unix domain socket
 - requests use newline-delimited JSON-RPC 2.0
-- `con-cli` is the first client on top of that socket
+- `vu-cli` is the first client on top of that socket
 
 This is the first automation slice, not the final surface. The important architectural move is that the CLI does not invent new terminal semantics. It routes into the same pane runtime, tmux adapter, visible-shell execution guard, and per-tab agent session that the built-in UI already uses.
 
-That keeps CLI automation honest: if a pane is not a proven shell in the app, `con-cli panes exec` is refused for the same reason.
+That keeps CLI automation honest: if a pane is not a proven shell in the app, `vu-cli panes exec` is refused for the same reason.
 
 ## Local references that shaped the design
 
@@ -20,21 +20,21 @@ The CLI shape is intentionally informed by the local 3pp references in this repo
 - `3pp/waveterm/cmd/wsh` — app control over a local socket with a small RPC boundary instead of bolting automation directly onto UI code
 - `3pp/cmux/CLI/cmux.swift` — explicit socket-path discovery and the idea that the socket client should stay thin while the app remains the authority
 
-The result in con is a hybrid:
+The result in vu is a hybrid:
 
 - user-facing CLI commands are grouped by domain: `tabs`, `panes`, `tmux`, `agent`
 - the transport methods are namespaced JSON-RPC methods such as `panes.list` and `agent.ask`
 
 ## Socket path
 
-- Release default: `/tmp/con.sock`
-- Debug default: `/tmp/con-debug.sock`
-- Override: `CON_SOCKET_PATH`
-- CLI override: `con-cli --socket /custom/path ...`
+- Release default: `/tmp/vu.sock`
+- Debug default: `/tmp/vu-debug.sock`
+- Override: `VU_SOCKET_PATH`
+- CLI override: `vu-cli --socket /custom/path ...`
 
 The app removes stale socket files on startup and creates the live socket with
 user-only permissions. Debug builds intentionally use a separate default
-endpoint so `cargo run -p con` can run beside an installed Con without making
+endpoint so `cargo run -p vu` can run beside an installed Vu without making
 startup treat the dev process as another window for the production app.
 
 ## Protocol
@@ -109,40 +109,40 @@ JSON-RPC 2.0 over a Unix domain socket, one JSON request per line and one JSON r
 
 ## CLI surface
 
-The first shipped client is `con-cli`.
+The first shipped client is `vu-cli`.
 
 Examples:
 
 ```bash
-con-cli identify
-con-cli capabilities
+vu-cli identify
+vu-cli capabilities
 
-con-cli tabs list
-con-cli panes list --tab 1
-con-cli panes read --tab 1 --pane-id 3 --lines 120
-con-cli panes exec --tab 1 --pane-id 3 cargo test -q
-con-cli panes send-keys --tab 1 --pane-id 3 $'\u0003'
-con-cli panes create --tab 1 --location right --command "htop"
-con-cli panes wait --tab 1 --pane-id 3 --timeout 20
+vu-cli tabs list
+vu-cli panes list --tab 1
+vu-cli panes read --tab 1 --pane-id 3 --lines 120
+vu-cli panes exec --tab 1 --pane-id 3 cargo test -q
+vu-cli panes send-keys --tab 1 --pane-id 3 $'\u0003'
+vu-cli panes create --tab 1 --location right --command "htop"
+vu-cli panes wait --tab 1 --pane-id 3 --timeout 20
 
-con-cli tree --tab 1
-con-cli surfaces list --tab 1
-con-cli surfaces split --tab 1 --pane-id 3 --location right --title worker-1 --owner subagent --command "codex"
-con-cli surfaces create --tab 1 --pane-id 4 --title worker-2 --owner subagent --command "codex"
-con-cli surfaces wait-ready --tab 1 --surface-id 7 --timeout 10
-con-cli surfaces focus --tab 1 --surface-id 7
-con-cli surfaces send-text --surface-id 7 "explain this repo"
-con-cli surfaces send-key --surface-id 7 enter
-con-cli surfaces read --surface-id 7 --lines 120
-con-cli surfaces close --surface-id 7 --close-empty-owned-pane
+vu-cli tree --tab 1
+vu-cli surfaces list --tab 1
+vu-cli surfaces split --tab 1 --pane-id 3 --location right --title worker-1 --owner subagent --command "codex"
+vu-cli surfaces create --tab 1 --pane-id 4 --title worker-2 --owner subagent --command "codex"
+vu-cli surfaces wait-ready --tab 1 --surface-id 7 --timeout 10
+vu-cli surfaces focus --tab 1 --surface-id 7
+vu-cli surfaces send-text --surface-id 7 "explain this repo"
+vu-cli surfaces send-key --surface-id 7 enter
+vu-cli surfaces read --surface-id 7 --lines 120
+vu-cli surfaces close --surface-id 7 --close-empty-owned-pane
 
-con-cli tmux list --tab 1 --pane-id 3
-con-cli tmux capture --tab 1 --pane-id 3 --target %17 --lines 80
-con-cli tmux run --tab 1 --pane-id 3 --location new-window -- cargo test
+vu-cli tmux list --tab 1 --pane-id 3
+vu-cli tmux capture --tab 1 --pane-id 3 --target %17 --lines 80
+vu-cli tmux run --tab 1 --pane-id 3 --location new-window -- cargo test
 
-con-cli agent ask --tab 1 "Summarize what is happening in this tab"
-con-cli agent ask --tab 1 --auto-approve-tools "Run the test suite and explain failures"
-con-cli agent new-conversation --tab 1
+vu-cli agent ask --tab 1 "Summarize what is happening in this tab"
+vu-cli agent ask --tab 1 --auto-approve-tools "Run the test suite and explain failures"
+vu-cli agent new-conversation --tab 1
 ```
 
 For automation, every command also supports `--json`.
@@ -154,7 +154,7 @@ For automation, every command also supports `--json`.
 - `tab_index` is 1-based in the control API and CLI
 - omitting `tab_index` means "use the active tab"
 
-### Pane targets reuse con's stable pane model
+### Pane targets reuse vu's stable pane model
 
 - `pane_index` is the current visible position in the split layout
 - `pane_id` is the stable identity for the life of that pane inside the tab
@@ -188,7 +188,7 @@ That means:
 
 - it reuses the tab's conversation history
 - it reuses the tab's focused-pane context and peer-pane summary
-- the response also appears in con's own agent UI for that tab
+- the response also appears in vu's own agent UI for that tab
 
 This is what makes CLI-driven end-to-end evaluation possible. A coding agent outside the app can drive panes, inspect tmux state, call the built-in agent in a real tab session, and verify the visible result without a human acting as the bridge.
 
@@ -208,7 +208,7 @@ The render loop stays authoritative, but the socket never blocks on it directly.
 - no window-focus or pane-focus RPC yet
 - no auth modes beyond local socket file permissions yet
 - `agent.ask` assumes one automation request at a time per tab
-- the socket surface only exposes capabilities that already exist in con's runtime and agent layers; it does not yet add a new app-native Codex/OpenCode attachment
+- the socket surface only exposes capabilities that already exist in vu's runtime and agent layers; it does not yet add a new app-native Codex/OpenCode attachment
 - pane-local surfaces are live-session control primitives; session restore
   persists the active pane layout as before, not every hidden live surface
 
@@ -216,17 +216,17 @@ Those are acceptable limits for phase one. The important part is that the contro
 
 ## Live E2E status
 
-Live app-backed smoke tests were rerun on April 10, 2026 against a real `cargo run -p con` session.
+Live app-backed smoke tests were rerun on April 10, 2026 against a real `cargo run -p vu` session.
 
 Verified end to end:
 
-- `con-cli identify`
-- `con-cli tabs list`
-- `con-cli panes list`
-- `con-cli panes read`
-- `con-cli panes exec`
-- `con-cli panes wait`
-- `con-cli agent ask`
+- `vu-cli identify`
+- `vu-cli tabs list`
+- `vu-cli panes list`
+- `vu-cli panes read`
+- `vu-cli panes exec`
+- `vu-cli panes wait`
+- `vu-cli agent ask`
 
 Verified behavior notes:
 

@@ -31,7 +31,7 @@ if [[ ! -x "$generate_keys" ]]; then
     echo "Store the private key as GitHub secret: SPARKLE_SIGNING_KEY"
     echo "Store the public key as GitHub secret:  SPARKLE_PUBLIC_ED_KEY"
     echo ""
-    echo "The public key is also baked into Info.plist via CON_SPARKLE_PUBLIC_ED_KEY."
+    echo "The public key is also baked into Info.plist via VU_SPARKLE_PUBLIC_ED_KEY."
     exit 0
   fi
 
@@ -47,4 +47,4 @@ echo ""
 echo "Store the private key as GitHub secret: SPARKLE_SIGNING_KEY"
 echo "Store the public key as GitHub secret:  SPARKLE_PUBLIC_ED_KEY"
 echo ""
-echo "The public key is also baked into Info.plist via CON_SPARKLE_PUBLIC_ED_KEY."
+echo "The public key is also baked into Info.plist via VU_SPARKLE_PUBLIC_ED_KEY."

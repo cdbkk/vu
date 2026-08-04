@@ -11,7 +11,7 @@ Linux preview shipped.
 - PR #68 changed Linux PTY output to wake the terminal view directly.
   The workspace idle poll is no longer the intended wake path for normal
   shell output.
-- Shared `CON_GHOSTTY_PROFILE` instrumentation now logs `vt_snapshot`
+- Shared `VU_GHOSTTY_PROFILE` instrumentation now logs `vt_snapshot`
   timing for Linux and Windows through the same path.
 - The final Linux stale-screen regression after exiting `htop` / `vim`
   was fixed by treating each new VT generation as a visible-row cache

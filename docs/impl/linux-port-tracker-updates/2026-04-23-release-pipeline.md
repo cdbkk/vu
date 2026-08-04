@@ -12,7 +12,7 @@ The Linux preview milestone landed in two PRs:
 What ships now
 --------------
 
-The same `con` binary that runs on macOS and Windows now opens on
+The same `vu` binary that runs on macOS and Windows now opens on
 Linux with a real terminal pane:
 
 - **Real PTY pane** via Unix PTY + `libghostty-vt` (the shared
@@ -74,18 +74,18 @@ Linux with a real terminal pane:
   screen via the alternate-screen switch and hadn't drawn their
   UI yet.
 - **One-line installer** (PR #59):
-    `curl -fsSL https://con-releases.nowledge.co/install.sh | sh`
+    `curl -fsSL https://vu-releases.nowledge.co/install.sh | sh`
   Same one-liner macOS uses; `install.sh` is now a Unix dispatcher
   that detects the host OS and routes Darwin to the existing DMG
-  flow or Linux to a new tarball flow that drops `con` into
+  flow or Linux to a new tarball flow that drops `vu` into
   `~/.local/bin`, registers a `.desktop` launcher entry, and
   installs the 256×256 hicolor icon. No sudo.
 - **Notify-only in-app updater** (PR #59): polls the same
   Sparkle-shaped appcast XML as the Windows backend at
-  `https://con-releases.nowledge.co/appcast/{channel}-linux-x86_64.xml`,
+  `https://vu-releases.nowledge.co/appcast/{channel}-linux-x86_64.xml`,
   surfaces "Update now" in Settings → Updates, and re-runs
   `install.sh` on apply with the appcast-pinned version
-  (`CON_INSTALL_VERSION`) so beta-channel users never get silently
+  (`VU_INSTALL_VERSION`) so beta-channel users never get silently
   downgraded to stable when GitHub's `/releases/latest` skips
   prereleases.
 

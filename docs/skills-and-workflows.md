@@ -1,10 +1,10 @@
 # Skills and workflows
 
-A skill is a slash command backed by a `SKILL.md` file. In con, that matters
+A skill is a slash command backed by a `SKILL.md` file. In vu, that matters
 because the skill runs through an agent that understands the terminal you are
 already using.
 
-This is the workflow loop con is built for:
+This is the workflow loop vu is built for:
 
 1. Do the work once with the agent in the loop.
 2. Keep the parts that worked.
@@ -16,9 +16,9 @@ The point is not to hide the terminal. The point is to turn a messy terminal
 routine into something you can rerun with context, panes, SSH, tmux, and
 approvals still visible.
 
-## Why skills fit con
+## Why skills fit vu
 
-Most agents can run a prompt. con can run a prompt while seeing the terminal
+Most agents can run a prompt. vu can run a prompt while seeing the terminal
 shape around it:
 
 - focused pane output
@@ -63,7 +63,7 @@ After the run is good, ask:
 
 ```text
 Turn this release routine into a project skill. Keep approval points for tag,
-upload, deploy, and anything destructive. Save it under .con/skills/release/SKILL.md.
+upload, deploy, and anything destructive. Save it under .vu/skills/release/SKILL.md.
 ```
 
 The next release can start with:
@@ -92,7 +92,7 @@ Use a skill when the workflow has repeatable judgment:
 - what needs approval
 - what should be reported at the end
 
-Together, they give you a repeatable starting point without turning con into a
+Together, they give you a repeatable starting point without turning vu into a
 closed workflow runner.
 
 ## Where skills live
@@ -101,16 +101,16 @@ Project skills travel with the workspace:
 
 - `skills/`
 - `.agents/skills/`
-- `.con/skills/`
+- `.vu/skills/`
 
 Global skills follow you across projects:
 
-- `~/.config/con/skills`
+- `~/.config/vu/skills`
 - `~/.agents/skills`
 
-On Windows, the con config skills folder is:
+On Windows, the vu config skills folder is:
 
-- `~/.config/con-terminal/skills`
+- `~/.config/vu-terminal/skills`
 
 Project skills override global skills with the same name. That lets a repo
 define its own `/release` without changing your personal `/release` elsewhere.
@@ -120,7 +120,7 @@ define its own `/release` without changing your personal `/release` elsewhere.
 Each skill is a folder with a `SKILL.md` file:
 
 ```text
-.con/skills/release/SKILL.md
+.vu/skills/release/SKILL.md
 ```
 
 Minimal example:
@@ -133,7 +133,7 @@ description: Prepare and verify a project release.
 
 # Release
 
-You are helping with a project release from inside con.
+You are helping with a project release from inside vu.
 
 First inspect the current panes and working directory. Reuse existing local,
 SSH, and tmux workspaces when they match the task. Do not create duplicate panes

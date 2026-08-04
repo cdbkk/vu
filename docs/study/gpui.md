@@ -2,7 +2,7 @@
 
 ## Overview
 
-con currently builds against the upstream GPUI crates from the Zed repository, not a local GPUI-CE checkout. The framework remains Apache 2.0 licensed.
+vu currently builds against the upstream GPUI crates from the Zed repository, not a local GPUI-CE checkout. The framework remains Apache 2.0 licensed.
 
 ## Key Properties
 
@@ -51,7 +51,7 @@ GPUI reserves dot-prefixed font family names for framework-level virtual fonts:
 - `.SystemUIFont` resolves to the platform UI font (`.AppleSystemUIFont` on macOS, the Windows system UI font on Windows, and the platform default on Linux). This is correct for GPUI-rendered prose, settings, labels, and other native UI text.
 - `.ZedMono` resolves inside GPUI through `font_name_with_fallbacks` to Zed's bundled/editor mono family (`Lilex` upstream). It is a GPUI alias, not a terminal renderer font.
 
-Do not pass dot-prefixed GPUI virtual family names into terminal backends. Ghostty config, DirectWrite terminal rendering, and the Linux terminal renderer need concrete terminal-capable font family names. Con keeps `appearance.ui_font_family = ".SystemUIFont"` as the UI default, but sanitizes `terminal.font_family` so pseudo families fall back to `Ioskeley Mono`.
+Do not pass dot-prefixed GPUI virtual family names into terminal backends. Ghostty config, DirectWrite terminal rendering, and the Linux terminal renderer need concrete terminal-capable font family names. Vu keeps `appearance.ui_font_family = ".SystemUIFont"` as the UI default, but sanitizes `terminal.font_family` so pseudo families fall back to `Ioskeley Mono`.
 
 ## Terminal Canvas Pattern
 

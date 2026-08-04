@@ -1,6 +1,6 @@
-# Hacking on con
+# Hacking on vu
 
-Quick contributor map for `con`.
+Quick contributor map for `vu`.
 
 Read these first:
 - `README.md` — public project overview
@@ -14,15 +14,15 @@ Terminal crates do not depend on the UI. The agent crate does not depend on a sp
 
 | Crate | Role |
 |-------|------|
-| `con` | GPUI shell: windows, tabs, panes, agent UI, settings, command surfaces |
-| `con-core` | Config, sessions, shared app logic, harness wiring |
-| `con-terminal` | Theme + palette helpers shared across backends |
-| `con-ghostty` | Per-platform terminal backends: macOS embedded libghostty + Metal, Windows libghostty-vt + ConPTY + D3D11/DirectWrite, Linux Unix PTY + libghostty-vt + GPUI-owned `StyledText` paint |
-| `con-agent` | Rig integration, tools, hooks, conversation, skills |
-| `con-cli` | CLI + socket client for the live local control plane |
+| `vu` | GPUI shell: windows, tabs, panes, agent UI, settings, command surfaces |
+| `vu-core` | Config, sessions, shared app logic, harness wiring |
+| `vu-terminal` | Theme + palette helpers shared across backends |
+| `vu-ghostty` | Per-platform terminal backends: macOS embedded libghostty + Metal, Windows libghostty-vt + ConPTY + D3D11/DirectWrite, Linux Unix PTY + libghostty-vt + GPUI-owned `StyledText` paint |
+| `vu-agent` | Rig integration, tools, hooks, conversation, skills |
+| `vu-cli` | CLI + socket client for the live local control plane |
 
 Each platform exposes the same `GhosttyApp` / `GhosttyTerminal` /
-`TerminalColors` type names from `con-ghostty`, so the rest of the
+`TerminalColors` type names from `vu-ghostty`, so the rest of the
 workspace consumes the backend without per-call-site `cfg` gates.
 See `docs/impl/{linux,windows}-port.md` for the per-platform plans
 and the path to the long-term GPU-accelerated grid renderer.
@@ -43,7 +43,7 @@ For the full breakdown, see `docs/impl/agent-harness.md`.
 - **Zig**: use **Zig 0.15.2 exactly** for full terminal builds.
   Do not read this as `0.15.2+`: Zig `0.16.0` changes build APIs
   that the pinned Ghostty revision does not support yet, and
-  `con-ghostty` will fail while compiling libghostty.
+  `vu-ghostty` will fail while compiling libghostty.
 
 ### Quick setup with mise (recommended)
 
@@ -62,7 +62,7 @@ If you do not use mise, install the prerequisites yourself:
 
 - **Zig**: download the official 0.15.2 archive from
   `https://ziglang.org/download/0.15.2/` and put the directory on
-  `PATH`, or set `CON_ZIG_BIN=/path/to/zig`.
+  `PATH`, or set `VU_ZIG_BIN=/path/to/zig`.
 - **macOS**: `cmake` plus Zig 0.15.2. The macOS release workflow installs Zig 0.15.2 explicitly before building embedded libghostty.
 - **Windows**: Zig 0.15.2, Visual Studio 2022 Build Tools with the Windows 10/11 SDK. Run full builds from a _Developer Command Prompt for VS 2022_ so `rc.exe` is on `PATH`. If Windows Defender is on, either add an exclusion for the repo dir or disable real-time scanning — Zig's sub-build exes get briefly locked by MpEngine and spawn with `FileNotFound`.
 - **Linux**: Zig 0.15.2, plus the GPUI runtime apt deps the CI job already installs:
@@ -77,8 +77,8 @@ If you do not use mise, install the prerequisites yourself:
 
 CI mirrors this deliberately:
 - `release-macos.yml`, `release-linux.yml`, and `release-windows.yml` install Zig 0.15.2 before release builds.
-- The Linux PR smoke check in `ci-portable.yml` also installs Zig 0.15.2 because it type-checks `con-ghostty` with `libghostty-vt`.
-- The Windows PR smoke check sets `CON_SKIP_GHOSTTY_VT=1` because `cargo check` does not link and GitHub's Windows image does not ship our required Zig. That keeps PR checks fast, but it is not a substitute for a full Windows release build.
+- The Linux PR smoke check in `ci-portable.yml` also installs Zig 0.15.2 because it type-checks `vu-ghostty` with `libghostty-vt`.
+- The Windows PR smoke check sets `VU_SKIP_GHOSTTY_VT=1` because `cargo check` does not link and GitHub's Windows image does not ship our required Zig. That keeps PR checks fast, but it is not a substitute for a full Windows release build.
 
 ## Build
 
@@ -86,12 +86,10 @@ CI mirrors this deliberately:
 # macOS / Linux
 cargo build
 
-# Windows — must use the `w*` aliases. The default `con` binary cannot
-# exist on Windows because `CON` is a reserved DOS device name, so the
-# Windows build ships as `con-app.exe` via a feature-gated alias bin
-# target. `cargo wbuild` is `cargo build --no-default-features
-# --features con/bin-con-app`; `wrun`, `wcheck`, `wtest` mirror it.
-cargo wbuild -p con --release          # → target\release\con-app.exe
+# Windows release workflows use the retained `vu-app.exe` alias.
+# `cargo wbuild` is `cargo build --no-default-features
+# --features vu/bin-vu-app`; `wrun`, `wcheck`, `wtest` mirror it.
+cargo wbuild -p vu --release          # → target\release\vu-app.exe
 ```
 
 If you have `just` installed, the root `justfile` wraps the common local
@@ -106,8 +104,8 @@ just install        # build and install to the local platform install path
 ```
 
 On Windows, those default recipes dispatch through the `cargo w*` aliases
-above, so they produce and run `con-app.exe` instead of trying to build a
-reserved `con.exe` name. Platform-specific release helpers are also available,
+above, so they produce and run the Windows release alias `vu-app.exe`.
+Platform-specific release helpers are also available,
 for example `just channel=beta macos-release`,
 `just channel=beta linux-release`, `just arch=x86_64 macos-bundle`, and
 `just windows-build-release`.
@@ -116,32 +114,32 @@ for example `just channel=beta macos-release`,
 
 ```bash
 # macOS / Linux
-cargo run -p con
+cargo run -p vu
 
 # Windows
-cargo wrun -p con
+cargo wrun -p vu
 ```
 
 With optional arguments:
 
 ```bash
-RUST_LOG=con_agent::flow=info,con_agent=warn,con_core=warn,con::suggestions=debug,con_core::suggestions=debug cargo run -p con
+RUST_LOG=vu_agent::flow=info,vu_agent=warn,vu_core=warn,vu::suggestions=debug,vu_core::suggestions=debug cargo run -p vu
 ```
 
 ## Test
 
 ```bash
 cargo test --workspace            # macOS / Linux
-cargo wtest -p con-core -p con-cli -p con-agent -p con-terminal   # Windows (portable crates only)
+cargo wtest -p vu-core -p vu-cli -p vu-agent -p vu-terminal   # Windows (portable crates only)
 ```
 
 ## Release Build
 
 ```bash
-cargo build --release -p con                  # macOS / Linux
-cargo build --release -p con-cli              # control-plane CLI
-cargo wbuild -p con --release                 # Windows → target\release\con-app.exe
-cargo build --release -p con-cli              # Windows → target\release\con-cli.exe
+cargo build --release -p vu                  # macOS / Linux
+cargo build --release -p vu-cli              # control-plane CLI
+cargo wbuild -p vu --release                 # Windows → target\release\vu-app.exe
+cargo build --release -p vu-cli              # Windows → target\release\vu-cli.exe
 ```
 
 For signed macOS release artifacts, use:
@@ -150,10 +148,10 @@ For signed macOS release artifacts, use:
 ./scripts/macos/release.sh
 ```
 
-The macOS app bundle contains both `Contents/MacOS/con` and
-`Contents/MacOS/con-cli`; the release verifier fails if the CLI is
+The macOS app bundle contains both `Contents/MacOS/vu` and
+`Contents/MacOS/vu-cli`; the release verifier fails if the CLI is
 missing. The Homebrew cask and Unix installer expose that bundled
-`con-cli` on PATH so orchestrators such as `pi-interactive-subagents`
+`vu-cli` on PATH so orchestrators such as `pi-interactive-subagents`
 do not need a separate source checkout.
 
 Release CI also has a final promotion gate. Platform jobs verify the
@@ -169,23 +167,23 @@ For a Linux release tarball (un-signed; mirrors the Windows
 preview's distribution shape), use:
 
 ```bash
-CON_RELEASE_VERSION=0.1.0-beta.X CON_RELEASE_CHANNEL=beta \
+VU_RELEASE_VERSION=0.1.0-beta.X VU_RELEASE_CHANNEL=beta \
   ./scripts/linux/release.sh
 ```
 
-Output lands in `dist/con-<version>-linux-<arch>.tar.gz` with a
+Output lands in `dist/vu-<version>-linux-<arch>.tar.gz` with a
 SHA256 sum next to it. The CI workflow at
 `.github/workflows/release-linux.yml` runs the same script on every
 `v*` tag, attaches the tarball to the shared GitHub release, and
 updates the Sparkle-shaped appcast at
-`https://con-releases.nowledge.co/appcast/<channel>-linux-x86_64.xml`
+`https://vu-releases.nowledge.co/appcast/<channel>-linux-x86_64.xml`
 that the in-app notify-only updater polls.
 
 ## Useful Paths
 
-- `crates/con-app/src` — app shell and GPUI surfaces (the crate directory is `con-app` because `con` is a reserved DOS device name on Windows; the Cargo package and binary are still named `con` on macOS, so `cargo run -p con` works as before — see `docs/impl/windows-port.md`)
-- `crates/con-core/src` — shared app logic
-- `crates/con-agent/src` — agent provider, hooks, tools, skills
+- `crates/vu-app/src` — app shell and GPUI surfaces; the Cargo package and default binary are named `vu` (`cargo run -p vu`)
+- `crates/vu-core/src` — shared app logic
+- `crates/vu-agent/src` — agent provider, hooks, tools, skills
 - `docs/design` — design handoff set
 - `docs/impl` — implementation notes
 - `postmortem` — issue writeups and lessons learned

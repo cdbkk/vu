@@ -30,7 +30,7 @@ The drag preview (ghost tab) is locked to the tab bar's y-axis. The preview x po
 ### Key helpers
 
 ```text
-crates/con-app/src/workspace/helpers.rs
+crates/vu-app/src/workspace/helpers.rs
   horizontal_tab_slot_from_bounds(cursor, tab_bounds, tab_count) -> Option<usize>
     Position-based slot from full bounds array. Returns None when bounds is empty
     (first drag frame before prepaint). Slot is clamped to tab_count.
@@ -44,7 +44,7 @@ crates/con-app/src/workspace/helpers.rs
     cursor position for slot computation so the slot tracks the ghost,
     not the raw mouse y.
 
-crates/con-app/src/sidebar.rs
+crates/vu-app/src/sidebar.rs
   vertical_slot_from_bounds(probe_y, bounds, session_count) -> Option<usize>
     Midpoint-based slot from tab row bounds array.
 ```
@@ -64,7 +64,7 @@ The preview is cleared on `on_drop`, on `on_mouse_up` (mouseup outside any drop 
 Both the horizontal tab strip and the vertical sidebar panel rows share a single context menu builder. Orientation-specific items are passed as `Option<WinCb>` fields so the builder stays generic.
 
 ```text
-crates/con-app/src/tab_context_menu.rs
+crates/vu-app/src/tab_context_menu.rs
   TabMenuOptions { rename, duplicate, reset_name, move_up, move_down,
                    close_to_right, close_tab, close_others,
                    set_color, current_color }
@@ -110,14 +110,14 @@ Selected swatch is indicated by an opacity-based background on the wrapper div (
 ### Data model
 
 ```text
-crates/con-core/src/session.rs
+crates/vu-core/src/session.rs
   pub enum TabAccentColor {
       Red, Orange, Yellow, Green, Teal, Blue, Purple, Pink,
       #[serde(other)]
       Unknown,   // forward-compat catch-all for future colors
   }
 
-crates/con-core/src/session.rs
+crates/vu-core/src/session.rs
   TabState.color: Option<TabAccentColor>   // persisted in session.json
 ```
 
@@ -126,7 +126,7 @@ crates/con-core/src/session.rs
 ### Color helpers
 
 ```text
-crates/con-app/src/tab_colors.rs
+crates/vu-app/src/tab_colors.rs
   tab_accent_color_hsla(color, cx) -> Hsla
     Maps TabAccentColor to an Hsla. Light/dark variants are separate
     lightness values (ll / ld) selected from cx.theme().is_dark().
@@ -201,19 +201,19 @@ The new tab is inserted at `index + 1` and immediately activated.
 ## Code map
 
 ```text
-crates/con-core/src/session.rs
+crates/vu-core/src/session.rs
   + TabAccentColor enum with #[serde(other)] Unknown variant
   + TabState.color: Option<TabAccentColor>
 
-crates/con-app/src/tab_colors.rs          (new file)
+crates/vu-app/src/tab_colors.rs          (new file)
   + tab_accent_color_hsla()
   + active_tab_indicator_color()
 
-crates/con-app/src/tab_context_menu.rs    (new file)
+crates/vu-app/src/tab_context_menu.rs    (new file)
   + TabMenuOptions struct
   + build_tab_context_menu()
 
-crates/con-app/src/workspace/tab_actions.rs
+crates/vu-app/src/workspace/tab_actions.rs
   + duplicate_tab()     — full pane tree copy
   + duplicate_tab_by_id(), close_*_by_id(), set_tab_color_by_id()
     stable-id wrappers for menu actions
@@ -221,33 +221,33 @@ crates/con-app/src/workspace/tab_actions.rs
   + close_tabs_to_right()
   + set_tab_color()     — calls sync_sidebar before save
 
-crates/con-app/src/workspace/window_actions.rs
+crates/vu-app/src/workspace/window_actions.rs
   + close_tab_by_id() — stable-id wrapper for menu actions
 
-crates/con-app/src/workspace/sidebar_settings.rs
+crates/vu-app/src/workspace/sidebar_settings.rs
   + begin_tab_rename_by_id() — stable-id wrapper for menu actions
 
-crates/con-app/src/workspace/helpers.rs
+crates/vu-app/src/workspace/helpers.rs
   + horizontal_tab_slot_from_bounds()
   + tab_drag_overlay_origin()
   + tab_drag_overlay_probe_position()
 
-crates/con-app/src/workspace/render.rs
+crates/vu-app/src/workspace/render.rs
   ~ container on_drag_move: position-based slot via horizontal_tab_slot_from_bounds
   ~ clears stale drop target when cursor leaves valid tab bounds
   ~ passes tab_accent_color to pane_tree.render()
 
-crates/con-app/src/workspace/render/top_bar.rs
+crates/vu-app/src/workspace/render/top_bar.rs
   ~ tab bg uses accent color (active 0.35 / inactive 0.12 / hover 0.18)
   ~ active indicator dot: accent or green fallback
   ~ context menu via build_tab_context_menu()
 
-crates/con-app/src/pane_tree.rs
+crates/vu-app/src/pane_tree.rs
   ~ render() / render_node() / render_zoomed_leaf() / render_leaf()
     all accept tab_accent_color: Option<TabAccentColor>
   ~ render_pane_title_bar(): accent bg on focused pane only
 
-crates/con-app/src/sidebar.rs
+crates/vu-app/src/sidebar.rs
   ~ rail pill and panel row: accent bg + indicator dot
   ~ container on_drag_move: point_in_bounds guard for all origins
   ~ panel body on_drag_move: same guard
@@ -255,7 +255,7 @@ crates/con-app/src/sidebar.rs
   + SidebarSetColor event (color picker → workspace)
   ~ force_clear_drag_state: only notifies when state actually changed
 
-crates/con-app/src/workspace/sidebar_settings.rs
+crates/vu-app/src/workspace/sidebar_settings.rs
   ~ on_sidebar_duplicate: delegates to duplicate_tab() so both orientations
     preserve the full pane tree, copy color, and insert next to the source tab
   + on_sidebar_set_color handler

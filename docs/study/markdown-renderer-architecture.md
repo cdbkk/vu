@@ -2,9 +2,9 @@
 
 ## Decision
 
-con should use the `markdown` crate's mdast parser for agent-panel Markdown and continue building a Con-owned renderer/style system on top of it.
+vu should use the `markdown` crate's mdast parser for agent-panel Markdown and continue building a Vu-owned renderer/style system on top of it.
 
-con should not import Zed's markdown crate directly.
+vu should not import Zed's markdown crate directly.
 
 The mdast parser choice is intentional now: GFM tables, display math, and inline math are product requirements, and the renderer benefits from a stable block/inline tree with per-node caches.
 
@@ -12,17 +12,17 @@ The mdast parser choice is intentional now: GFM tables, display math, and inline
 
 ### 1. Parsing and rendering are different problems
 
-The current quality gap in Con's chat panel is not Markdown parsing correctness. It is rendering and typesetting:
+The current quality gap in Vu's chat panel is not Markdown parsing correctness. It is rendering and typesetting:
 
 - inline code chips need dedicated typography and spacing
 - fenced code blocks need their own surface, language label, and mono treatment
 - lists, blockquotes, and headings need a cleaner style ladder
 
-The `markdown` crate gives us a normalized mdast tree with GFM and math constructs, while keeping parsing and rendering separated. That is the right fit for Con's UI renderer because parsed block entities can own cache state without reparsing during ordinary GPUI paints.
+The `markdown` crate gives us a normalized mdast tree with GFM and math constructs, while keeping parsing and rendering separated. That is the right fit for Vu's UI renderer because parsed block entities can own cache state without reparsing during ordinary GPUI paints.
 
 ### 2. Zed is not reusable as-is
 
-Zed's markdown renderer is better, but the crate we studied is GPL-3.0-or-later and is tightly coupled to Zed workspace crates. It is useful as a design reference, not as a dependency we can ship in Con.
+Zed's markdown renderer is better, but the crate we studied is GPL-3.0-or-later and is tightly coupled to Zed workspace crates. It is useful as a design reference, not as a dependency we can ship in Vu.
 
 That makes the long-term answer straightforward:
 
@@ -32,11 +32,11 @@ That makes the long-term answer straightforward:
 
 ### 3. A heavier parser would not solve the UI problem
 
-`comrak` is a reasonable Rust Markdown library when you need HTML rendering or deeper AST mutation, but Con's current problem is not HTML generation. It is "our renderer must turn a known Markdown tree into cached GPUI text/image blocks without stalling the app."
+`comrak` is a reasonable Rust Markdown library when you need HTML rendering or deeper AST mutation, but Vu's current problem is not HTML generation. It is "our renderer must turn a known Markdown tree into cached GPUI text/image blocks without stalling the app."
 
 Switching parsers again would add cost and churn without solving the typography and cache-boundary problem by itself.
 
-## Recommended Con design
+## Recommended Vu design
 
 ### Parser layer
 
@@ -51,7 +51,7 @@ Use it for:
 - fenced code blocks
 - math flow and math text constructs
 
-### Con-owned intermediate representation
+### Vu-owned intermediate representation
 
 Keep or evolve the current custom block/inline model in `chat_markdown.rs` into an explicit renderer IR:
 
@@ -106,7 +106,7 @@ Each slot should own:
 - corner radius
 - spacing above/below
 
-That is the abstraction Zed effectively has and Con currently lacks.
+That is the abstraction Zed effectively has and Vu currently lacks.
 
 ### Layout rules
 
@@ -166,7 +166,7 @@ The mdast layer can be extended with source-position tracking if we need this la
 The long-term elegant path is:
 
 - keep `markdown` mdast parsing
-- keep a Con-owned renderer
+- keep a Vu-owned renderer
 - formalize a real markdown style/render abstraction
 - do not import Zed's GPL markdown crate
 - do not switch parsers just to compensate for missing renderer design

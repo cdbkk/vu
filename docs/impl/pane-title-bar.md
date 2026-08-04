@@ -23,7 +23,7 @@ Add a persistent title bar to every pane when there are 2+ panes in the split tr
 
 ```
 ┌─────────────────────────────────────────────┐
-│      sundy@m1max: ~/work/con      [⛶][✕] │  ← title bar, h=28px
+│      sundy@m1max: ~/work/vu      [⛶][✕] │  ← title bar, h=28px
 ├─────────────────────────────────────────────┤
 │  [surface strip — only when surfaces > 1]   │  ← existing, h=28px
 ├─────────────────────────────────────────────┤
@@ -93,14 +93,14 @@ Pane title controls are direct buttons rather than an overflow menu. This keeps 
 ### Interaction
 
 1. User drags from the pane title bar.
-2. Over pane content, Con previews the nearest split edge and moves the pane there on drop.
-3. Over the horizontal tab strip, Con renders a ghost tab at the live insertion slot.
+2. Over pane content, Vu previews the nearest split edge and moves the pane there on drop.
+3. Over the horizontal tab strip, Vu renders a ghost tab at the live insertion slot.
 4. On drop in the tab strip, the pane is detached and promoted to a new tab at that slot.
 5. On drop outside an actionable target, the drag state is cleared and the pane stays put.
 
 ### State
 
-Pane title drags use `PaneTitleDragState` in `crates/con-app/src/workspace/types.rs` as the authoritative workspace-level state:
+Pane title drags use `PaneTitleDragState` in `crates/vu-app/src/workspace/types.rs` as the authoritative workspace-level state:
 
 ```rust
 struct PaneTitleDragState {
@@ -119,7 +119,7 @@ Rendered in the horizontal tab strip as a primary-tinted ghost tab. Existing tab
 
 ### Promotion Logic
 
-`ConWorkspace::detach_pane_to_new_tab_at_slot(pane_id, slot, window, cx)`:
+`VuWorkspace::detach_pane_to_new_tab_at_slot(pane_id, slot, window, cx)`:
 
 1. Collect all surface terminals for `pane_id` from the active tab's `pane_tree`.
 2. Remove the pane from the split tree without shutting down its terminals.
@@ -158,8 +158,8 @@ pub fn render(
 
 | File | Change |
 |---|---|
-| `crates/con-app/src/pane_tree.rs` | Add `render_pane_title_bar()`, update `render_leaf()`, update `render()` / `render_node()` / `render_zoomed_leaf()` signatures, start pane title drags with `DraggedTabOrigin::Pane` |
-| `crates/con-app/src/workspace/` | Wire `pane_tree.render(...)`, add pane split drag state, render workspace-owned floating pane title preview, insert pane-to-tab ghost tabs in the horizontal tab strip, promote dropped panes to new tabs |
+| `crates/vu-app/src/pane_tree.rs` | Add `render_pane_title_bar()`, update `render_leaf()`, update `render()` / `render_node()` / `render_zoomed_leaf()` signatures, start pane title drags with `DraggedTabOrigin::Pane` |
+| `crates/vu-app/src/workspace/` | Wire `pane_tree.render(...)`, add pane split drag state, render workspace-owned floating pane title preview, insert pane-to-tab ghost tabs in the horizontal tab strip, promote dropped panes to new tabs |
 
 ---
 

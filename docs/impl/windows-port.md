@@ -1,6 +1,6 @@
 # Windows Port — Plan and Status
 
-con ships on macOS and has a working Windows beta. This document captures
+vu ships on macOS and has a working Windows beta. This document captures
 what we learned while preparing the codebase for the Windows port and lays
 out the staged path that got it there. It is the single source of truth
 for Windows-specific work.
@@ -17,18 +17,18 @@ you get per platform:
 
 | Target | UI binary | Terminal pane | Control socket | Agent / settings / CLI |
 |:-------|:---------:|:-------------:|:--------------:|:----------------------:|
-| macOS  | ✅ real   | ✅ libghostty + Metal | `/tmp/con.sock` | ✅ |
-| Windows | ✅ real  | ✅ libghostty-vt + ConPTY + D3D11/DirectWrite | `\\.\pipe\con` | ✅ |
-| Linux  | ✅ real preview | ✅ Unix PTY + libghostty-vt + GPUI styled-cell paint | `/tmp/con.sock` | ✅ |
+| macOS  | ✅ real   | ✅ libghostty + Metal | `/tmp/vu.sock` | ✅ |
+| Windows | ✅ real  | ✅ libghostty-vt + ConPTY + D3D11/DirectWrite | `\\.\pipe\vu` | ✅ |
+| Linux  | ✅ real preview | ✅ Unix PTY + libghostty-vt + GPUI styled-cell paint | `/tmp/vu.sock` | ✅ |
 
 On Windows (from a Developer Command Prompt for VS 2022):
 
 ```powershell
 rustup default stable
-git clone https://github.com/nowledge-co/con-terminal.git
-cd con-terminal
-cargo wbuild -p con --release          # → target\release\con-app.exe
-cargo wtest  -p con-core -p con-cli -p con-agent -p con-terminal
+git clone https://github.com/nowledge-co/con-terminal.git vu-terminal
+cd vu-terminal
+cargo wbuild -p vu --release          # → target\release\vu-app.exe
+cargo wtest  -p vu-core -p vu-cli -p vu-agent -p vu-terminal
 ```
 
 Prerequisites:
@@ -38,32 +38,32 @@ Prerequisites:
 - **Git for Windows**.
 - **Zig 0.15.2 or newer** on PATH (for `libghostty-vt`); download from
   <https://ziglang.org/download/>. If the `zig` executable isn't on
-  PATH, set `CON_ZIG_BIN` to its absolute path.
+  PATH, set `VU_ZIG_BIN` to its absolute path.
 
-Build-time env vars for `con-ghostty`:
+Build-time env vars for `vu-ghostty`:
 
 | Var | Effect |
 |-----|--------|
-| `CON_ZIG_BIN` | Absolute path to the `zig` executable. |
-| `CON_GHOSTTY_SOURCE_DIR` | Reuse a local Ghostty checkout instead of fetching one into `OUT_DIR` (handy on Windows when `MAX_PATH` bites or Defender scans the `target` dir). |
-| `CON_GHOSTTY_VT_STEP` | Exact Zig build step/flag to pass for libghostty-vt. Autodetected; override only if the probe picks wrong. |
-| `CON_GHOSTTY_VT_TARGET` | Override the Zig target passed to the `libghostty-vt` build. Normally derived from Cargo's target triple and set explicitly so release artifacts do not inherit the build machine's native CPU features. |
-| `CON_GHOSTTY_VT_SIMD=1` | Opt in to Ghostty's SIMD UTF-8 paths (`-Dsimd=true`). Default off on Windows because the resulting `ghostty-vt-static.lib` references `simdutf` C++ symbols that Zig doesn't bundle into the archive. Flip this once simdutf link-resolution is sorted (see TODO in `build.rs`). |
-| `CON_STUB_GHOSTTY_VT=1` | Compile `src/windows/ghostty_vt_stub.c` and link it instead of libghostty-vt. The resulting `con-app.exe` launches the full GPUI app and ConPTY shell path, but the terminal grid is empty because the VT parser is stubbed. Useful for iterating the GPUI / renderer path while a real libghostty-vt build is broken. |
-| `CON_GHOSTTY_VT_RENDER_STATE=0` | Skip `ghostty_render_state_new` at startup. Default on (render state is how we read cells back for display). The escape hatch exists because older Ghostty revisions have a broken render-state implementation on Windows; the `GHOSTTY_REV` pin as of 2026-04-17 tip-of-main works, but if you pull a regression from upstream you can ship a runnable app with `=0` while the fix is in flight. |
-| `CON_SKIP_GHOSTTY_VT=1` | Skip both. `cargo build` will fail at link. Only useful for `cargo check`. |
-| `ZIG_GLOBAL_CACHE_DIR` | Optional Zig cache override. On Windows, `con-ghostty` now defaults this to a short path (`C:\zc`, then `%TEMP%\zc` fallback) when unset so Ghostty/uucode helper spawns stay under `MAX_PATH`. |
+| `VU_ZIG_BIN` | Absolute path to the `zig` executable. |
+| `VU_GHOSTTY_SOURCE_DIR` | Reuse a local Ghostty checkout instead of fetching one into `OUT_DIR` (handy on Windows when `MAX_PATH` bites or Defender scans the `target` dir). |
+| `VU_GHOSTTY_VT_STEP` | Exact Zig build step/flag to pass for libghostty-vt. Autodetected; override only if the probe picks wrong. |
+| `VU_GHOSTTY_VT_TARGET` | Override the Zig target passed to the `libghostty-vt` build. Normally derived from Cargo's target triple and set explicitly so release artifacts do not inherit the build machine's native CPU features. |
+| `VU_GHOSTTY_VT_SIMD=1` | Opt in to Ghostty's SIMD UTF-8 paths (`-Dsimd=true`). Default off on Windows because the resulting `ghostty-vt-static.lib` references `simdutf` C++ symbols that Zig doesn't bundle into the archive. Flip this once simdutf link-resolution is sorted (see TODO in `build.rs`). |
+| `VU_STUB_GHOSTTY_VT=1` | Compile `src/windows/ghostty_vt_stub.c` and link it instead of libghostty-vt. The resulting `vu-app.exe` launches the full GPUI app and ConPTY shell path, but the terminal grid is empty because the VT parser is stubbed. Useful for iterating the GPUI / renderer path while a real libghostty-vt build is broken. |
+| `VU_GHOSTTY_VT_RENDER_STATE=0` | Skip `ghostty_render_state_new` at startup. Default on (render state is how we read cells back for display). The escape hatch exists because older Ghostty revisions have a broken render-state implementation on Windows; the `GHOSTTY_REV` pin as of 2026-04-17 tip-of-main works, but if you pull a regression from upstream you can ship a runnable app with `=0` while the fix is in flight. |
+| `VU_SKIP_GHOSTTY_VT=1` | Skip both. `cargo build` will fail at link. Only useful for `cargo check`. |
+| `ZIG_GLOBAL_CACHE_DIR` | Optional Zig cache override. On Windows, `vu-ghostty` now defaults this to a short path (`C:\zc`, then `%TEMP%\zc` fallback) when unset so Ghostty/uucode helper spawns stay under `MAX_PATH`. |
 
 Common Windows pitfalls when the Zig step fails mid-build with
 `FileNotFound` on a just-compiled `uucode_build_tables.exe`:
 
 1. **Windows Defender** is quarantining the newborn executable. Add an
-   exclusion for `C:\path\to\con` + `%USERPROFILE%\.zig-cache` +
+   exclusion for `C:\path\to\vu` + `%USERPROFILE%\.zig-cache` +
    `%LOCALAPPDATA%\zig`.
 2. **MAX_PATH** — the default 260-char limit trips on Zig's deep cache
    layout. Enable long paths (`HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1`)
-   OR point `CON_GHOSTTY_SOURCE_DIR` at a short path like `C:\ghostty`.
-   `con-ghostty` now also defaults `ZIG_GLOBAL_CACHE_DIR` to a short
+   OR point `VU_GHOSTTY_SOURCE_DIR` at a short path like `C:\ghostty`.
+   `vu-ghostty` now also defaults `ZIG_GLOBAL_CACHE_DIR` to a short
    path on Windows; if your machine disallows `C:\zc`, set
    `ZIG_GLOBAL_CACHE_DIR` explicitly to another short writable path.
 3. **Zig version mismatch** — the current pin is validated with Zig
@@ -71,15 +71,14 @@ Common Windows pitfalls when the Zig step fails mid-build with
    Zig version or bump `GHOSTTY_REV` in `build.rs` (requires macOS
    re-validation of the full libghostty build).
 
-The binary ships as `con-app.exe`, not `con.exe`: `CON` is a reserved
-DOS device name and Windows refuses to create `con.exe` via most
-Win32 file APIs. The package name is still `con` (so `cargo run -p
-con` is unambiguous), and the `wbuild` / `wrun` / `wtest` / `wcheck`
-aliases in `.cargo/config.toml` wrap the `--no-default-features
---features con/bin-con-app` incantation that selects the renamed bin.
-macOS and Linux keep the plain `con` binary unchanged.
+The Windows release artifact retains the `vu-app.exe` alias used by the
+existing packaging pipeline. The package and default binary are both `vu`;
+the `wbuild` / `wrun` / `wtest` / `wcheck` aliases in
+`.cargo/config.toml` select `vu-app` with
+`--no-default-features --features vu/bin-vu-app`. macOS and Linux use the
+plain `vu` binary.
 
-The produced `con-app.exe` launches into the full UI with a real,
+The produced `vu-app.exe` launches into the full UI with a real,
 GPU-rendered terminal pane — libghostty-vt parses the VT stream from a
 ConPTY child, the D3D11/DirectWrite atlas renderer rasterizes glyphs
 (including IoskeleyMono's Nerd-Font icon set), and the grid is drawn
@@ -94,9 +93,9 @@ The macOS stack is fully native:
 
 ```
 GPUI window (upstream zed-industries/zed)
-  └── GhosttyView                          crates/con-app/src/ghostty_view.rs
+  └── GhosttyView                          crates/vu-app/src/ghostty_view.rs
         ├── child NSView (host)            cocoa::base::id
-        ├── GhosttyApp     (per window)    crates/con-ghostty
+        ├── GhosttyApp     (per window)    crates/vu-ghostty
         └── GhosttyTerminal (per surface)  ghostty_surface_t
               ├── PTY + child process      libghostty
               ├── VT parser + scrollback   libghostty
@@ -104,14 +103,11 @@ GPUI window (upstream zed-industries/zed)
               └── action callbacks         libghostty
 ```
 
-The UI crate lives at `crates/con-app/` (not `crates/con/`) because `CON`
-is a reserved DOS device name on Windows — `git clone` and `git checkout`
-refuse to create any path component named `con`. The Cargo package name
-and the binary name are both still `con` on macOS; only the filesystem
-directory changed. See "Binary naming on Windows" below for how the
-future Windows build will produce a valid executable filename.
+The UI crate lives at `crates/vu-app/`; its Cargo package and default binary
+are both named `vu`. See "Binary naming on Windows" below for the retained
+Windows release alias.
 
-`con-ghostty` is a thin Rust wrapper over libghostty's C embedding API.
+`vu-ghostty` is a thin Rust wrapper over libghostty's C embedding API.
 libghostty is built from a pinned Ghostty revision via `zig build` and
 linked statically as `libghostty-fat.a`. Surface creation hands a NSView
 pointer to libghostty, which attaches a Metal `IOSurfaceLayer` and renders
@@ -137,7 +133,7 @@ those become the embedder's responsibility.
 A Win32 apprt (`-Dapp-runtime=win32`) is in progress in community forks
 (notably `InsipidPoint/ghostty-windows` and `adilahmeddev/windows-apprt`)
 but is not merged upstream. None of these forks expose the embedded C API
-that `con-ghostty` consumes — they ship a standalone `.exe`.
+that `vu-ghostty` consumes — they ship a standalone `.exe`.
 
 Cross-compiling libghostty for Windows from Linux is currently broken
 (discussion ghostty-org/ghostty#11697); building **on** Windows works
@@ -153,7 +149,7 @@ HiDPI, IME for most input methods, dark/light mode) work; rough edges are
 multi-monitor, 120-144 Hz scheduling, certain IMEs, and some GPU
 variants.
 
-Two GPUI gaps matter for con's Windows port:
+Two GPUI gaps matter for vu's Windows port:
 
 1. **HWND child-window embedding is missing.** PR
    zed-industries/zed#24330 attempted exactly this for Windows 11
@@ -162,7 +158,7 @@ Two GPUI gaps matter for con's Windows port:
    NSView and let it render into your view tree" has no upstream Windows
    equivalent.
 2. **No tray icon, accessibility (UIA), or background-running app
-   support.** Not blockers for con today but worth tracking.
+   support.** Not blockers for vu today but worth tracking.
 
 The workspace currently uses upstream `zed-industries/zed` gpui directly
 (see `Cargo.toml`), not the GPUI-CE community fork. CLAUDE.md previously
@@ -187,19 +183,19 @@ worked in parallel by different contributors.
 
 ### Hurdle 1 — Terminal backend on Windows
 
-`con-ghostty` cannot be reused as-is. The realistic options are, in
+`vu-ghostty` cannot be reused as-is. The realistic options are, in
 order from lowest-risk to most-coupled:
 
 **Option A. `libghostty-vt` + custom renderer + ConPTY (lowest risk).**
 
 - Embed `libghostty-vt` for the VT parser and screen state machine.
 - Implement a Direct3D 11 / DirectWrite renderer in a new
-  `con-ghostty-win` crate (or as a `cfg(windows)` module inside
-  `con-ghostty`).
+  `vu-ghostty-win` crate (or as a `cfg(windows)` module inside
+  `vu-ghostty`).
 - Drive a child shell via `CreatePseudoConsole` (ConPTY) and feed bytes
   into the libghostty-vt parser; pull back grid/scrollback diffs and
   render them.
-- Reuse `con-ghostty`'s public Rust types (`TerminalColors`,
+- Reuse `vu-ghostty`'s public Rust types (`TerminalColors`,
   `GhosttySurfaceEvent`, `GhosttyTerminal::write`, etc.) so
   `terminal_pane.rs` doesn't have to know which backend it is talking to.
 
@@ -211,9 +207,9 @@ Largest engineering investment but cleanest layering.
 - Fork `InsipidPoint/ghostty-windows` and add an `apprt-embedded`
   variant that exposes `ghostty_surface_*` on Windows by accepting an
   HWND in a new `ghostty_platform_windows_s` variant.
-- Update `con-ghostty/src/ffi.rs` to add the `WINDOWS` enum variant and
+- Update `vu-ghostty/src/ffi.rs` to add the `WINDOWS` enum variant and
   the HWND union member.
-- Update `con-ghostty/build.rs` to invoke `zig build` with the win32
+- Update `vu-ghostty/build.rs` to invoke `zig build` with the win32
   toolchain on Windows.
 
 Smaller engineering investment per feature, but you own a Ghostty fork
@@ -252,43 +248,34 @@ text), pursue option 1.
 
 ### Binary naming on Windows
 
-`CON` is a reserved DOS device name on Windows. That reservation covers
-both filesystem paths (`git checkout` refuses to create `crates/con/`
-even read-only, which is why the UI crate now lives at
-`crates/con-app/`) and the produced executable — a `con.exe` file
-cannot be created by most file-creation APIs. The `CON` reservation
-applies regardless of extension.
-
-This is implemented with feature-gated twin `[[bin]]` entries: macOS and
-Linux keep the plain `con` binary, while Windows builds `con-app.exe`.
-Cargo does not support per-target `[[bin]] name` in the manifest, so the
-practical mechanisms were:
+The fork retains feature-gated twin `[[bin]]` entries so existing Windows
+release scripts continue to emit `vu-app.exe`, while the default target is
+the plain `vu` binary. The available mechanisms are:
 
 1. **Feature-gated twin `[[bin]]` entries pointing at the same
    `main.rs`** —
 
    ```toml
    [features]
-   default = ["bin-con"]
-   bin-con = []      # enabled on macOS/Linux via a .cargo/config.toml
-   bin-con-app = []  # enabled on Windows
+   default = ["bin-vu"]
+   bin-vu = []      # default target
+   bin-vu-app = []  # Windows release alias
 
    [[bin]]
-   name = "con"
+   name = "vu"
    path = "src/main.rs"
-   required-features = ["bin-con"]
+   required-features = ["bin-vu"]
 
    [[bin]]
-   name = "con-app"
+   name = "vu-app"
    path = "src/main.rs"
-   required-features = ["bin-con-app"]
+   required-features = ["bin-vu-app"]
    ```
 
-   Combined with a `.cargo/config.toml` that sets the right feature
-   per `[target.cfg(...)]`, `cargo run -p con` works everywhere and
-   produces `con` on Unix / `con-app.exe` on Windows.
-2. **Rename the single `[[bin]]` to `con-app` and install a shell
-   wrapper named `con`** in the macOS cask / Homebrew formula so the
+   The `.cargo/config.toml` `w*` aliases select `bin-vu-app` for Windows
+   release workflows.
+2. **Rename the single `[[bin]]` to `vu-app` and install a shell
+   wrapper named `vu`** in the macOS cask / Homebrew formula so the
    command-line experience is unchanged. Simpler manifest, more work
    in the packaging scripts.
 
@@ -302,11 +289,11 @@ if untouched. The Windows-prep PR series should land these incrementally:
 
 - **Sockets.** Replace `tokio::net::UnixListener`/`UnixStream` with a
   small transport abstraction backed by Unix sockets on `cfg(unix)` and
-  Windows Named Pipes (`\\.\pipe\con-<user>`) on `cfg(windows)`.
+  Windows Named Pipes (`\\.\pipe\vu-<user>`) on `cfg(windows)`.
 - **Path conventions.** Replace hard-coded `/tmp` fallbacks with
-  `std::env::temp_dir()`. Use `con-paths` for config, data, auth,
-  theme, and skills storage so Windows gets `con-terminal` instead of
-  the reserved `con` path segment.
+  `std::env::temp_dir()`. Use `vu-paths` for config, data, auth,
+  theme, and skills storage so Windows consistently uses its
+  `vu-terminal` app-directory name.
 - **Permissions.** Gate `set_permissions(0o600)` and any
   `std::os::unix::*` imports behind `cfg(unix)`.
 - **Bundle metadata.** `bundle_info_value`, `set_dock_icon`,
@@ -334,14 +321,14 @@ phase keeps the macOS build green.
 |------:|-------|--------------|----------------------|
 | 0 | prep | Cfg-gates, transport abstraction, docs, cleaner non-macOS error message | macOS unchanged; non-UI crates compile on Windows. ✅ landed |
 | 1 | Windows + Linux CI smoke test | `.github/workflows/ci-portable.yml` runs `cargo check` + `cargo test` for the portable crates and the UI binary on `windows-latest` and `ubuntu-latest` | CI green on both targets. ✅ landed |
-| 2 | Stub terminal backend | `con-ghostty` exposes stub types on non-macOS; `stub_view.rs` is a GPUI placeholder view selected via `#[path]`; the `compile_error!` is gone | `cargo build -p con` worked on Windows and Linux with a placeholder pane during the bootstrap phase. ✅ landed |
-| 3a | Windows backend scaffold | `con-ghostty/src/windows/` modules: ConPTY wrapper, libghostty-vt FFI, D3D11 + DirectWrite renderer skeleton, offscreen render session, and `WindowsGhosttyApp` / `WindowsGhosttyTerminal` facade. `con-app/src/windows_view.rs` instantiates a `RenderSession` lazily once GPUI pane bounds are known. `build.rs` builds `libghostty-vt` via `zig build` on Windows host targets (probes available step names; `CON_GHOSTTY_VT_STEP` override). Binary renamed to `con-app.exe` on Windows via feature-gated twin `[[bin]]` (CON is reserved DOS device name). | `cargo wbuild -p con --release` on Windows produces a `con-app.exe` that launches; terminal pane spawns a real ConPTY shell, drives libghostty-vt, and paints through the offscreen D3D11 -> GPUI image bridge. Compiles clean on Linux + Windows CI. ✅ landed |
-| 3b | Glyph atlas + grid render | HLSL shaders embedded and runtime-compiled via `D3DCompile`. Skyline-packed (`etagere`) BGRA8 glyph atlas (`con-ghostty/src/windows/render/atlas.rs`), glyphs rasterized via Direct2D `DrawText` with grayscale AA. Three-case PUA rasterization (fits-cell / width-overflow with lsb shift / height-overflow with scale-around-centre) for Nerd-Font icons, plus per-slot `PushAxisAlignedClip` + black pre-fill to prevent antialias fringe bleeding between atlas neighbours. The shader collapses sampled atlas RGB to scalar glyph coverage, so driver or remote-display subpixel fallback cannot leak colored ClearType fringe into screenshots or transparent windows. CJK/wide fallback glyphs reserve two-cell atlas slots using `unicode-width`, so DirectWrite fallback faces match the width libghostty-vt reserved in the terminal grid instead of looking clipped followed by a blank spacer cell. D3D11 pipeline (`pipeline.rs`): per-instance IA layout, dynamic instance buffer with `Map(WRITE_DISCARD)`, single `DrawIndexedInstanced(6, cell_count)` per frame — matches Windows Terminal AtlasEngine's architecture. Wide PUA instances are stable-sorted after narrow ones so DX11's in-order per-pixel writes let them win overlap with neighbour backgrounds; the cursor inverse-colour instance is captured pre-sort and pushed post-sort so it always draws last. `vt.rs` uses the `ghostty_render_state` API (row iterator + `row_cells_get_multi` + DIRTY row skip) — not the `grid_ref` path that the upstream header explicitly warns against for render loops. | Real glyph rendering on Windows, runtime-validated on real hardware against oh-my-posh prompt stacks, CJK fallback text, and dense hyphen rules. Postmortems: `postmortem/2026-04-21-windows-atlas-pua-rasterization.md`, `postmortem/2026-04-30-windows-font-rgb-fringing.md`. ✅ landed |
+| 2 | Stub terminal backend | `vu-ghostty` exposes stub types on non-macOS; `stub_view.rs` is a GPUI placeholder view selected via `#[path]`; the `compile_error!` is gone | `cargo build -p vu` worked on Windows and Linux with a placeholder pane during the bootstrap phase. ✅ landed |
+| 3a | Windows backend scaffold | `vu-ghostty/src/windows/` modules: ConPTY wrapper, libghostty-vt FFI, D3D11 + DirectWrite renderer skeleton, offscreen render session, and `WindowsGhosttyApp` / `WindowsGhosttyTerminal` facade. `vu-app/src/windows_view.rs` instantiates a `RenderSession` lazily once GPUI pane bounds are known. `build.rs` builds `libghostty-vt` via `zig build` on Windows host targets (probes available step names; `VU_GHOSTTY_VT_STEP` override). Windows release workflows select the feature-gated `vu-app.exe` alias. | `cargo wbuild -p vu --release` on Windows produces a `vu-app.exe` that launches; terminal pane spawns a real ConPTY shell, drives libghostty-vt, and paints through the offscreen D3D11 -> GPUI image bridge. Compiles clean on Linux + Windows CI. ✅ landed |
+| 3b | Glyph atlas + grid render | HLSL shaders embedded and runtime-compiled via `D3DCompile`. Skyline-packed (`etagere`) BGRA8 glyph atlas (`vu-ghostty/src/windows/render/atlas.rs`), glyphs rasterized via Direct2D `DrawText` with grayscale AA. Three-case PUA rasterization (fits-cell / width-overflow with lsb shift / height-overflow with scale-around-centre) for Nerd-Font icons, plus per-slot `PushAxisAlignedClip` + black pre-fill to prevent antialias fringe bleeding between atlas neighbours. The shader collapses sampled atlas RGB to scalar glyph coverage, so driver or remote-display subpixel fallback cannot leak colored ClearType fringe into screenshots or transparent windows. CJK/wide fallback glyphs reserve two-cell atlas slots using `unicode-width`, so DirectWrite fallback faces match the width libghostty-vt reserved in the terminal grid instead of looking clipped followed by a blank spacer cell. D3D11 pipeline (`pipeline.rs`): per-instance IA layout, dynamic instance buffer with `Map(WRITE_DISCARD)`, single `DrawIndexedInstanced(6, cell_count)` per frame — matches Windows Terminal AtlasEngine's architecture. Wide PUA instances are stable-sorted after narrow ones so DX11's in-order per-pixel writes let them win overlap with neighbour backgrounds; the cursor inverse-colour instance is captured pre-sort and pushed post-sort so it always draws last. `vt.rs` uses the `ghostty_render_state` API (row iterator + `row_cells_get_multi` + DIRTY row skip) — not the `grid_ref` path that the upstream header explicitly warns against for render loops. | Real glyph rendering on Windows, runtime-validated on real hardware against oh-my-posh prompt stacks, CJK fallback text, and dense hyphen rules. Postmortems: `postmortem/2026-04-21-windows-atlas-pua-rasterization.md`, `postmortem/2026-04-30-windows-font-rgb-fringing.md`. ✅ landed |
 | 3c | Input + selection | Beta-baseline input, selection, scrollback, clipboard, and ConPTY launch behavior are landed; details below. | Beta-baseline terminal interactivity is landed. Remaining polish belongs in Phase 4 hardening. ✅ largely landed |
-| 3d | (Parallel, upstream) | `WindowsWindow::attach_external_swap_chain_handle(bounds, HANDLE)` PR to `zed-industries/zed`. When merged, swap the current offscreen readback/image bridge to a composition swap chain that GPUI can place directly in its DComp tree. | No con-side merge blocker; still upstream-facing work. This is the remaining structural performance cleanup. — |
-| 3e | renderer perf tuning | The current pipeline draws into an offscreen D3D11 texture, reads back BGRA bytes (`RenderSession::render_frame`), wraps them as `ImageSource::Render(Arc<RenderImage>)`, and lets GPUI re-upload them into its DComp tree. The GPU→CPU readback per dirty frame plus the CPU→GPU re-upload adds structural overhead versus Windows Terminal's direct-DComp present path. Landed mitigations: (1) ✅ wake GPUI from the ConPTY reader thread so freshly arrived shell output paints on the next prepaint instead of waiting for user input; (2) ✅ move steady-state terminal image generation into the main render path so freshly rendered images can appear in the current frame rather than always one frame later; (3) ✅ skip default-background blank-cell instances that are already covered by the render-target clear; (4) ✅ avoid a full-frame zero-fill before D3D readback; (5) ✅ only stable-sort the instance stream when a frame actually contains overflowing wide glyphs; (6) ✅ keep low-latency presents armed until the triggering input actually advances the VT generation, so shell echo/prompt redraws do not miss the fresh-frame path; (7) ✅ treat the staging ring as a mailbox so maximize/fullscreen backlog never blocks GPUI's thread trying to rescue stale readbacks; (8) ✅ snapshot Ghostty's actual render-state rows/cols during asynchronous resize catch-up and include snapshot geometry in the renderer invalidation key so resize catch-up frames are not skipped as "unchanged"; (9) ✅ keep the fresh-frame preference armed across a short interactive typing/paste burst so repeated echoed generations do not periodically fall back to stale-frame presents mid-burst; (10) ✅ stop forcing speculative GPUI repaints on handled key input before ConPTY echo has advanced the VT, so steady typing rides the real output wake path instead of paying for an extra unchanged prepaint; (11) ✅ preserve successive output wakes from the ConPTY reader instead of draining them into one repaint request, so bursty commands like `ls` can advance across multiple prepaints rather than visibly batching intermediate output; (12) ✅ when a fresher VT snapshot has already been submitted, stop presenting an older completed readback ahead of it, so PTY-driven redraws use true mailbox semantics instead of sliding through stale intermediate frames; (13) ✅ compute exact changed VT rows even when libghostty-vt reports full dirty, and use D3D `CopySubresourceRegion` to read back only those pixel rows for small updates while keeping full-readback fallbacks for resize/selection/theme changes; (14) ✅ replace dirty rows inside a CPU-side BGRA backing frame before publishing one GPUI image, so partial D3D readbacks keep replacement semantics even with translucent terminal backgrounds; (15) ✅ keep command-start output latency-critical for long enough to cover delayed shell output; (16) ✅ control shell/profile as a benchmark variable by honoring Windows Terminal's `defaultProfile` where possible. Runtime instrumentation behind `CON_GHOSTTY_PROFILE` now logs the full chain: `conpty_read` for chunk cadence, `vt_snapshot` for shared render-state + clone cost, `win_renderer` for drain/draw/submit/readback timing, partial-readback row counts, and ring state, `win_render_frame` for session-level timing, and `win_sync_render` for GPUI image-wrap/upload timing. Use `CON_LOG_FILE=con-profile.log` to capture these logs without shell redirection; idle unchanged frames are filtered by default to keep the app usable during profiling, and `CON_GHOSTTY_PROFILE_VERBOSE=1` enables every-frame traces. Postmortem: `postmortem/2026-04-26-windows-command-render-latency.md`. Long-term plan: once Phase 3d lands, present the swap chain directly via `attach_external_swap_chain_handle` and drop the readback entirely; profile with PIX / GPUView / ETW to verify Enter→glyph latency parity with WT. | Wins in `crates/con-app/src/windows_view.rs` (output wake handling + same-frame image swap + CPU-backed row replacement + image-wrap timing), `crates/con-ghostty/src/windows/conpty.rs` (chunk cadence timing + spawn-handle marker + Windows Terminal default-profile shell resolution), `crates/con-ghostty/src/windows/host_view.rs` (VT-generation-aware low-latency presents + frame instrumentation), `crates/con-ghostty/src/vt.rs` (render-state geometry snapshot + exact dirty-row derivation + shared snapshot instrumentation), and `crates/con-ghostty/src/windows/render/mod.rs` (instance/readback hot path + partial-row staging copies + per-stage timing + true mailbox presentation policy). ✅ substantially improved; direct swap-chain composition remains the long-term cleanup |
+| 3d | (Parallel, upstream) | `WindowsWindow::attach_external_swap_chain_handle(bounds, HANDLE)` PR to `zed-industries/zed`. When merged, swap the current offscreen readback/image bridge to a composition swap chain that GPUI can place directly in its DComp tree. | No vu-side merge blocker; still upstream-facing work. This is the remaining structural performance cleanup. — |
+| 3e | renderer perf tuning | The current pipeline draws into an offscreen D3D11 texture, reads back BGRA bytes (`RenderSession::render_frame`), wraps them as `ImageSource::Render(Arc<RenderImage>)`, and lets GPUI re-upload them into its DComp tree. The GPU→CPU readback per dirty frame plus the CPU→GPU re-upload adds structural overhead versus Windows Terminal's direct-DComp present path. Landed mitigations: (1) ✅ wake GPUI from the ConPTY reader thread so freshly arrived shell output paints on the next prepaint instead of waiting for user input; (2) ✅ move steady-state terminal image generation into the main render path so freshly rendered images can appear in the current frame rather than always one frame later; (3) ✅ skip default-background blank-cell instances that are already covered by the render-target clear; (4) ✅ avoid a full-frame zero-fill before D3D readback; (5) ✅ only stable-sort the instance stream when a frame actually contains overflowing wide glyphs; (6) ✅ keep low-latency presents armed until the triggering input actually advances the VT generation, so shell echo/prompt redraws do not miss the fresh-frame path; (7) ✅ treat the staging ring as a mailbox so maximize/fullscreen backlog never blocks GPUI's thread trying to rescue stale readbacks; (8) ✅ snapshot Ghostty's actual render-state rows/cols during asynchronous resize catch-up and include snapshot geometry in the renderer invalidation key so resize catch-up frames are not skipped as "unchanged"; (9) ✅ keep the fresh-frame preference armed across a short interactive typing/paste burst so repeated echoed generations do not periodically fall back to stale-frame presents mid-burst; (10) ✅ stop forcing speculative GPUI repaints on handled key input before ConPTY echo has advanced the VT, so steady typing rides the real output wake path instead of paying for an extra unchanged prepaint; (11) ✅ preserve successive output wakes from the ConPTY reader instead of draining them into one repaint request, so bursty commands like `ls` can advance across multiple prepaints rather than visibly batching intermediate output; (12) ✅ when a fresher VT snapshot has already been submitted, stop presenting an older completed readback ahead of it, so PTY-driven redraws use true mailbox semantics instead of sliding through stale intermediate frames; (13) ✅ compute exact changed VT rows even when libghostty-vt reports full dirty, and use D3D `CopySubresourceRegion` to read back only those pixel rows for small updates while keeping full-readback fallbacks for resize/selection/theme changes; (14) ✅ replace dirty rows inside a CPU-side BGRA backing frame before publishing one GPUI image, so partial D3D readbacks keep replacement semantics even with translucent terminal backgrounds; (15) ✅ keep command-start output latency-critical for long enough to cover delayed shell output; (16) ✅ control shell/profile as a benchmark variable by honoring Windows Terminal's `defaultProfile` where possible. Runtime instrumentation behind `VU_GHOSTTY_PROFILE` now logs the full chain: `conpty_read` for chunk cadence, `vt_snapshot` for shared render-state + clone cost, `win_renderer` for drain/draw/submit/readback timing, partial-readback row counts, and ring state, `win_render_frame` for session-level timing, and `win_sync_render` for GPUI image-wrap/upload timing. Use `VU_LOG_FILE=vu-profile.log` to capture these logs without shell redirection; idle unchanged frames are filtered by default to keep the app usable during profiling, and `VU_GHOSTTY_PROFILE_VERBOSE=1` enables every-frame traces. Postmortem: `postmortem/2026-04-26-windows-command-render-latency.md`. Long-term plan: once Phase 3d lands, present the swap chain directly via `attach_external_swap_chain_handle` and drop the readback entirely; profile with PIX / GPUView / ETW to verify Enter→glyph latency parity with WT. | Wins in `crates/vu-app/src/windows_view.rs` (output wake handling + same-frame image swap + CPU-backed row replacement + image-wrap timing), `crates/vu-ghostty/src/windows/conpty.rs` (chunk cadence timing + spawn-handle marker + Windows Terminal default-profile shell resolution), `crates/vu-ghostty/src/windows/host_view.rs` (VT-generation-aware low-latency presents + frame instrumentation), `crates/vu-ghostty/src/vt.rs` (render-state geometry snapshot + exact dirty-row derivation + shared snapshot instrumentation), and `crates/vu-ghostty/src/windows/render/mod.rs` (instance/readback hot path + partial-row staging copies + per-stage timing + true mailbox presentation policy). ✅ substantially improved; direct swap-chain composition remains the long-term cleanup |
 | 4 | Hardening | Multi-pane, splits, IME edge-case validation, focus, resize, copy/paste, drag/drop, OSC 133 shell integration, ligatures | Beta-quality polish and correctness backlog. — |
-| 5 | Distribution | Installer/signing strategy (MSI/MSIX/winget/`cargo dist`), code signing, update verification / hardening, `con-app.exe` rename via feature-gated twin `[[bin]]` | ZIP + PowerShell installer + in-place beta update flow exist; release-trust hardening remains. — |
+| 5 | Distribution | Installer/signing strategy (MSI/MSIX/winget/`cargo dist`), code signing, update verification / hardening, `vu-app.exe` rename via feature-gated twin `[[bin]]` | ZIP + PowerShell installer + in-place beta update flow exist; release-trust hardening remains. — |
 
 Phase 3c details now covered by the beta baseline:
 
@@ -361,7 +348,7 @@ Phase 3c details now covered by the beta baseline:
   painted with the same terminal clear color and opacity as the renderer image
   rather than falling through to transparent window content.
 - Alternate-screen TUIs keep a higher default-background opacity floor than the
-  ordinary shell. That preserves Con's glass effect for prompts while keeping
+  ordinary shell. That preserves Vu's glass effect for prompts while keeping
   htop/vim-style application canvases readable on Windows.
 - CJK fallback glyphs are baseline-aligned inside the glyph atlas instead of
   being top-aligned as one-character `DrawText` lines. This keeps fallback
@@ -377,15 +364,15 @@ Phase 3c details now covered by the beta baseline:
   PTY as text. Composition ranges report cursor-relative bounds so
   candidate windows anchor to the terminal cursor.
 - ConPTY child launch passes the pseudo-console with
-  `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE`, avoids inheriting con's unrelated
+  `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE`, avoids inheriting vu's unrelated
   stdout/stderr handles, starts from a valid absolute cwd when provided, then
   falls back to the user's home directory and finally `%TEMP%`.
   PowerShell/pwsh shells are launched with a lightweight prompt hook that emits
-  OSC 7 cwd updates, and Con's Rust VT wrapper captures OSC 7 directly because
+  OSC 7 cwd updates, and Vu's Rust VT wrapper captures OSC 7 directly because
   libghostty-vt's terminal-only handler does not mutate pwd for that report.
   Restored sessions and new panes can therefore follow `cd` changes instead of
   only remembering the process launch directory.
-- Profiling uses `CON_LOG_FILE` instead of shell redirection so the child shell never sees redirected log handles.
+- Profiling uses `VU_LOG_FILE` instead of shell redirection so the child shell never sees redirected log handles.
 
 Phases 0-3e are **substantially complete** for the current Windows beta
 baseline. Phase 3b shipped the full glyph atlas, the three-case PUA
@@ -424,7 +411,7 @@ Compared to Windows Terminal's AtlasEngine, two costs are structural:
    the next user input event or animation tick (up to ~16ms slack).
    Phase 3e step (1) closes this — `RenderSession::new` now takes a
    `wake: Fn() + Send + Sync` callback that the view uses to push a
-   coalesced `cx.notify()` per PTY chunk (`crates/con-app/src/windows_view.rs`).
+   coalesced `cx.notify()` per PTY chunk (`crates/vu-app/src/windows_view.rs`).
 
 The remaining structural cost (readback plus GPUI image upload) goes away
 once Phase 3d (`attach_external_swap_chain_handle`) lands and we can
@@ -439,17 +426,17 @@ one image produced from a CPU BGRA backing frame patched with those row
 readbacks, and the wide-glyph sort is skipped on ordinary text frames.
 After the 2026-04-26 profiling pass,
 command output should also be compared with the same shell/profile that
-Windows Terminal uses; con now reads Windows Terminal's `defaultProfile`
+Windows Terminal uses; vu now reads Windows Terminal's `defaultProfile`
 when possible so PowerShell profile hooks or WSL startup do not masquerade
 as renderer latency.
 
 ### What you can do *today* on Windows
 
 ```powershell
-git clone https://github.com/nowledge-co/con-terminal.git
-cd con-terminal
-cargo wbuild -p con --release
-target\release\con-app.exe
+git clone https://github.com/nowledge-co/con-terminal.git vu-terminal
+cd vu-terminal
+cargo wbuild -p vu --release
+target\release\vu-app.exe
 ```
 
 The window comes up with the full chrome and a live terminal pane.
@@ -472,15 +459,15 @@ Caveats:
 - You must have **Zig 0.15.2 exactly** on `PATH` for `cargo build` to
   compile `libghostty-vt`. Do not use Zig 0.16.0 for this pinned
   Ghostty revision; install 0.15.2 from
-  <https://ziglang.org/download/0.15.2/> or point `CON_ZIG_BIN` at an
+  <https://ziglang.org/download/0.15.2/> or point `VU_ZIG_BIN` at an
   explicit 0.15.2 binary. `cargo check` works without Zig
-  (compile-only, no link); set `CON_SKIP_GHOSTTY_VT=1` to skip the
+  (compile-only, no link); set `VU_SKIP_GHOSTTY_VT=1` to skip the
   build entirely.
-- The shell is `CON_SHELL` if set, else the configured Windows Terminal
+- The shell is `VU_SHELL` if set, else the configured Windows Terminal
   default profile command when `%LOCALAPPDATA%` settings are readable,
   else `pwsh.exe`/`powershell.exe` if on `PATH`, else `$env:COMSPEC`,
   else `cmd.exe`. PowerShell/pwsh profiles without an explicit
-  `-Command`/`-File` get Con's OSC 7 cwd hook automatically; custom
+  `-Command`/`-File` get Vu's OSC 7 cwd hook automatically; custom
   command/file profiles are left untouched. A first-class config field is
   still Phase 4 work.
 - The terminal still pays a GPU→CPU readback and GPUI image upload on
@@ -496,7 +483,7 @@ ConPTY + libghostty-vt + D3D11/DirectWrite architecture works. The
 remaining decisions are narrower:
 
 1. **Direct composition boundary.** Land or otherwise obtain a GPUI API
-   that lets con present a Windows composition swap chain directly in the
+   that lets vu present a Windows composition swap chain directly in the
    GPUI tree, then remove the D3D readback + `RenderImage` re-upload
    bridge.
 2. **Shell integration scope.** Decide whether OSC 133 and non-PowerShell

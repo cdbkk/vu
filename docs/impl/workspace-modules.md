@@ -1,6 +1,6 @@
 # Workspace Module Map
 
-`crates/con-app/src/workspace/` owns the live GPUI window: tabs, pane trees,
+`crates/vu-app/src/workspace/` owns the live GPUI window: tabs, pane trees,
 agent/input chrome, settings, session persistence, terminal event wiring, and
 control-plane dispatch.
 
@@ -8,7 +8,7 @@ The module split keeps those responsibilities explicit:
 
 | Module | Responsibility |
 |---|---|
-| `mod.rs` | `ConWorkspace` field definitions and shared imports. Keep this file structural. |
+| `mod.rs` | `VuWorkspace` field definitions and shared imports. Keep this file structural. |
 | `types.rs` | Workspace-local data shapes such as tabs, pane drag state, pending control requests, and suggestion results. |
 | `lifecycle.rs` | Workspace construction, terminal creation, native view visibility, and deferred window-aware work. |
 | `control_surfaces.rs`, `control_requests.rs`, `control_agent_tools.rs` | Socket/control-plane routing, pane/surface targeting, and agent-visible terminal operations. |

@@ -81,7 +81,7 @@ derive_marketing_version() {
 }
 
 derive_build_number() {
-  local build_number="${CON_BUILD_NUMBER:-}"
+  local build_number="${VU_BUILD_NUMBER:-}"
 
   if [[ -n "$build_number" ]]; then
     printf '%s\n' "$build_number"
@@ -105,54 +105,54 @@ derive_build_number() {
 }
 
 setup_release_env() {
-  export CON_CHANNEL="${CON_CHANNEL:-stable}"
-  case "$CON_CHANNEL" in
+  export VU_CHANNEL="${VU_CHANNEL:-stable}"
+  case "$VU_CHANNEL" in
     stable|beta|dev)
       ;;
     *)
-      fail "CON_CHANNEL must be 'stable', 'beta', or 'dev', got: $CON_CHANNEL"
+      fail "VU_CHANNEL must be 'stable', 'beta', or 'dev', got: $VU_CHANNEL"
       ;;
   esac
 
-  export CON_ARCH="$(normalize_arch "${CON_ARCH:-}")"
-  export CON_RUST_TARGET="${CON_RUST_TARGET:-$(default_rust_target "$CON_ARCH")}"
-  export CON_APP_VERSION="${CON_APP_VERSION:-$(read_workspace_version)}"
-  export CON_MARKETING_VERSION="${CON_MARKETING_VERSION:-$(derive_marketing_version "$CON_APP_VERSION")}"
-  export CON_BUILD_NUMBER="$(derive_build_number)"
-  export CON_BUNDLE_ID_BASE="${CON_BUNDLE_ID_BASE:-co.cdbkk.vu}"
-  export CON_MINIMUM_SYSTEM_VERSION="${CON_MINIMUM_SYSTEM_VERSION:-10.15.7}"
-  export CON_ICON_SOURCE="${CON_ICON_SOURCE:-$REPO_ROOT/assets/Con-macOS-Dark-1024x1024@1x.png}"
-  export CON_DIST_ROOT="${CON_DIST_ROOT:-$REPO_ROOT/dist/macos/$CON_CHANNEL/$CON_ARCH}"
+  export VU_ARCH="$(normalize_arch "${VU_ARCH:-}")"
+  export VU_RUST_TARGET="${VU_RUST_TARGET:-$(default_rust_target "$VU_ARCH")}"
+  export VU_APP_VERSION="${VU_APP_VERSION:-$(read_workspace_version)}"
+  export VU_MARKETING_VERSION="${VU_MARKETING_VERSION:-$(derive_marketing_version "$VU_APP_VERSION")}"
+  export VU_BUILD_NUMBER="$(derive_build_number)"
+  export VU_BUNDLE_ID_BASE="${VU_BUNDLE_ID_BASE:-co.cdbkk.vu}"
+  export VU_MINIMUM_SYSTEM_VERSION="${VU_MINIMUM_SYSTEM_VERSION:-10.15.7}"
+  export VU_ICON_SOURCE="${VU_ICON_SOURCE:-$REPO_ROOT/assets/Vu-macOS-Dark-1024x1024@1x.png}"
+  export VU_DIST_ROOT="${VU_DIST_ROOT:-$REPO_ROOT/dist/macos/$VU_CHANNEL/$VU_ARCH}"
 
-  local default_bundle_id="$CON_BUNDLE_ID_BASE"
+  local default_bundle_id="$VU_BUNDLE_ID_BASE"
   local default_app_name="vu"
-  if [[ "$CON_CHANNEL" == "beta" ]]; then
-    default_bundle_id="${CON_BUNDLE_ID_BASE}.beta"
+  if [[ "$VU_CHANNEL" == "beta" ]]; then
+    default_bundle_id="${VU_BUNDLE_ID_BASE}.beta"
     default_app_name="vu Beta"
-  elif [[ "$CON_CHANNEL" == "dev" ]]; then
-    default_bundle_id="${CON_BUNDLE_ID_BASE}.dev"
+  elif [[ "$VU_CHANNEL" == "dev" ]]; then
+    default_bundle_id="${VU_BUNDLE_ID_BASE}.dev"
     default_app_name="vu Dev"
   fi
-  export CON_BUNDLE_ID="${CON_BUNDLE_ID:-$default_bundle_id}"
-  export CON_APP_NAME="${CON_APP_NAME:-$default_app_name}"
+  export VU_BUNDLE_ID="${VU_BUNDLE_ID:-$default_bundle_id}"
+  export VU_APP_NAME="${VU_APP_NAME:-$default_app_name}"
 
   # Derive Sparkle feed URL from channel + arch if not explicitly set.
   # Dev builds never poll and must not inherit a public feed URL from
   # the caller's environment.
-  # Pattern: https://con-releases.nowledge.co/appcast/{channel}-macos-{arch}.xml
-  if [[ "$CON_CHANNEL" == "dev" ]]; then
-    unset CON_SPARKLE_FEED_URL
-  elif [[ -z "${CON_SPARKLE_FEED_URL:-}" ]]; then
-    # No default feed: con-releases.nowledge.co is upstream's, and pointing our
+  # Pattern: https://vu-releases.nowledge.co/appcast/{channel}-macos-{arch}.xml
+  if [[ "$VU_CHANNEL" == "dev" ]]; then
+    unset VU_SPARKLE_FEED_URL
+  elif [[ -z "${VU_SPARKLE_FEED_URL:-}" ]]; then
+    # No default feed: vu-releases.nowledge.co is upstream's, and pointing our
     # builds at it would hand our users upstream's binaries. Set
-    # CON_SPARKLE_FEED_URL explicitly once this fork hosts its own appcast.
-    unset CON_SPARKLE_FEED_URL
+    # VU_SPARKLE_FEED_URL explicitly once this fork hosts its own appcast.
+    unset VU_SPARKLE_FEED_URL
   fi
 
-  export CON_APP_BUNDLE_PATH="$CON_DIST_ROOT/$CON_APP_NAME.app"
-  export CON_APP_ZIP_PATH="$CON_DIST_ROOT/${CON_APP_NAME// /-}-${CON_APP_VERSION}-macos-${CON_ARCH}.zip"
-  export CON_DMG_PATH="$CON_DIST_ROOT/${CON_APP_NAME// /-}-${CON_APP_VERSION}-macos-${CON_ARCH}.dmg"
-  export CON_CHECKSUM_PATH="$CON_DIST_ROOT/SHA256SUMS-macos-$CON_ARCH.txt"
+  export VU_APP_BUNDLE_PATH="$VU_DIST_ROOT/$VU_APP_NAME.app"
+  export VU_APP_ZIP_PATH="$VU_DIST_ROOT/${VU_APP_NAME// /-}-${VU_APP_VERSION}-macos-${VU_ARCH}.zip"
+  export VU_DMG_PATH="$VU_DIST_ROOT/${VU_APP_NAME// /-}-${VU_APP_VERSION}-macos-${VU_ARCH}.dmg"
+  export VU_CHECKSUM_PATH="$VU_DIST_ROOT/SHA256SUMS-macos-$VU_ARCH.txt"
 }
 
 signing_identity() {
@@ -161,12 +161,12 @@ signing_identity() {
     return
   fi
 
-  if [[ "${CON_ALLOW_ADHOC_SIGNING:-0}" == "1" ]]; then
+  if [[ "${VU_ALLOW_ADHOC_SIGNING:-0}" == "1" ]]; then
     printf '%s\n' '-'
     return
   fi
 
-  fail "APPLE_SIGNING_IDENTITY is required unless CON_ALLOW_ADHOC_SIGNING=1"
+  fail "APPLE_SIGNING_IDENTITY is required unless VU_ALLOW_ADHOC_SIGNING=1"
 }
 
 have_notary_credentials() {
@@ -198,8 +198,8 @@ prepare_notary_key_if_needed() {
     return
   fi
 
-  local key_path="$CON_DIST_ROOT/AuthKey_${APPLE_NOTARY_KEY_ID}.p8"
-  mkdir -p "$CON_DIST_ROOT"
+  local key_path="$VU_DIST_ROOT/AuthKey_${APPLE_NOTARY_KEY_ID}.p8"
+  mkdir -p "$VU_DIST_ROOT"
   printf '%s' "$APPLE_NOTARY_API_KEY_BASE64" | decode_base64_to_file "$key_path"
   if ! grep -q "BEGIN PRIVATE KEY" "$key_path" 2>/dev/null; then
     rm -f "$key_path"
@@ -214,13 +214,13 @@ notarytool_submit() {
   local artifact="$1"
   require_cmd xcrun
 
-  if [[ "${CON_SKIP_NOTARIZATION:-0}" == "1" ]]; then
-    log "Skipping notarization for $artifact because CON_SKIP_NOTARIZATION=1"
+  if [[ "${VU_SKIP_NOTARIZATION:-0}" == "1" ]]; then
+    log "Skipping notarization for $artifact because VU_SKIP_NOTARIZATION=1"
     return
   fi
 
   if ! have_notary_credentials; then
-    if [[ "${CON_REQUIRE_NOTARIZATION:-0}" == "1" ]]; then
+    if [[ "${VU_REQUIRE_NOTARIZATION:-0}" == "1" ]]; then
       fail "notarization credentials are missing"
     fi
     log "Skipping notarization for $artifact because no credentials are configured"
@@ -251,12 +251,12 @@ generate_info_plist() {
   local plist_path="$1"
   local sparkle_keys=""
 
-  if [[ -n "${CON_SPARKLE_FEED_URL:-}" ]]; then
-    sparkle_keys+="  <key>SUFeedURL</key>\n  <string>${CON_SPARKLE_FEED_URL}</string>\n"
+  if [[ -n "${VU_SPARKLE_FEED_URL:-}" ]]; then
+    sparkle_keys+="  <key>SUFeedURL</key>\n  <string>${VU_SPARKLE_FEED_URL}</string>\n"
   fi
 
-  if [[ -n "${CON_SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
-    sparkle_keys+="  <key>SUPublicEDKey</key>\n  <string>${CON_SPARKLE_PUBLIC_ED_KEY}</string>\n"
+  if [[ -n "${VU_SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
+    sparkle_keys+="  <key>SUPublicEDKey</key>\n  <string>${VU_SPARKLE_PUBLIC_ED_KEY}</string>\n"
   fi
 
   if [[ -n "$sparkle_keys" ]]; then
@@ -271,31 +271,31 @@ generate_info_plist() {
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleDisplayName</key>
-  <string>${CON_APP_NAME}</string>
+  <string>${VU_APP_NAME}</string>
   <key>CFBundleExecutable</key>
-  <string>con</string>
+  <string>vu</string>
   <key>CFBundleIconFile</key>
-  <string>con.icns</string>
+  <string>vu.icns</string>
   <key>CFBundleIdentifier</key>
-  <string>${CON_BUNDLE_ID}</string>
+  <string>${VU_BUNDLE_ID}</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>${CON_APP_NAME}</string>
+  <string>${VU_APP_NAME}</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>${CON_MARKETING_VERSION}</string>
+  <string>${VU_MARKETING_VERSION}</string>
   <key>CFBundleVersion</key>
-  <string>${CON_BUILD_NUMBER}</string>
+  <string>${VU_BUILD_NUMBER}</string>
   <key>LSMinimumSystemVersion</key>
-  <string>${CON_MINIMUM_SYSTEM_VERSION}</string>
+  <string>${VU_MINIMUM_SYSTEM_VERSION}</string>
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
-  <key>ConReleaseChannel</key>
-  <string>${CON_CHANNEL}</string>
+  <key>VuReleaseChannel</key>
+  <string>${VU_CHANNEL}</string>
 $(printf '%b' "$sparkle_keys")
 </dict>
 </plist>

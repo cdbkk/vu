@@ -1,9 +1,9 @@
 # Study: Linux port feasibility
 
-This note answers the question behind con's Linux port more precisely
+This note answers the question behind vu's Linux port more precisely
 than the top-level tracker:
 
-> Is Linux closer to macOS or closer to Windows for con?
+> Is Linux closer to macOS or closer to Windows for vu?
 
 Answer:
 
@@ -34,7 +34,7 @@ Relevant local sources:
 
 Important consequence:
 
-- con already has a credible Linux host app shell via GPUI
+- vu already has a credible Linux host app shell via GPUI
 - the host shell is not the blocker
 
 ### 2. Ghostty already has a real Linux runtime
@@ -52,10 +52,10 @@ Relevant local sources:
 
 Important consequence:
 
-- Linux should not be treated like Windows, where con had to assume the
+- Linux should not be treated like Windows, where vu had to assume the
   upstream terminal runtime was unusable for embedding
 
-### 3. con cannot consume Ghostty Linux the same way it consumes macOS Ghostty
+### 3. vu cannot consume Ghostty Linux the same way it consumes macOS Ghostty
 
 This is the main blocker.
 
@@ -74,7 +74,7 @@ Relevant local sources:
 
 Important consequence:
 
-- con cannot just "point Linux at libghostty" today
+- vu cannot just "point Linux at libghostty" today
 - there is no Linux host-surface contract in the embeddable API
 
 ## Stronger finding: Ghostty's embedded OpenGL path is explicitly broken today
@@ -96,7 +96,7 @@ That means a Linux embed path needs more than:
 
 It also needs actual embedded-renderer work upstream in Ghostty.
 
-## What GPUI Linux gives con today
+## What GPUI Linux gives vu today
 
 GPUI Linux exposes:
 
@@ -112,7 +112,7 @@ What it does **not** currently expose as a ready-made public contract:
 - zero-copy external-texture composition API for arbitrary downstream
   renderers
 
-The nearest existing downstream technique in con is the Windows path:
+The nearest existing downstream technique in vu is the Windows path:
 
 - render elsewhere
 - CPU-read back BGRA
@@ -152,12 +152,12 @@ Costs:
 - likely also some GPUI interop work
 - Wayland/X11 host contracts are more fragmented than AppKit
 
-### Option B — local Linux backend inside con
+### Option B — local Linux backend inside vu
 
 Goal:
 
 - keep GPUI Linux as the host shell
-- build terminal integration locally in `con-ghostty/src/linux/`
+- build terminal integration locally in `vu-ghostty/src/linux/`
 
 Likely shape:
 
@@ -168,8 +168,8 @@ Likely shape:
 
 Benefits:
 
-- con can start independently of Ghostty embed upstream work
-- architecture is fully under con's control
+- vu can start independently of Ghostty embed upstream work
+- architecture is fully under vu's control
 - shares some engineering shape with the Windows backend
 
 Costs:
@@ -197,7 +197,7 @@ This study narrows the effort bands:
 - **best case**: Ghostty embed delta is moderate and GPUI only needs a
   small interop addition
   - Linux effort is meaningfully smaller than Windows
-- **worst case**: Ghostty embed delta is large or blocked, and con must
+- **worst case**: Ghostty embed delta is large or blocked, and vu must
   build a local Linux backend
   - Linux effort approaches Windows territory, though still with better
     upstream platform context
@@ -218,7 +218,7 @@ questions explicitly:
    project?
 2. If yes, can GPUI host that result without invasive compositor work?
 
-If either answer is "no" or "not soon," con should proceed with a local
+If either answer is "no" or "not soon," vu should proceed with a local
 Linux backend and stop pretending the macOS embed model is available.
 
 ## References

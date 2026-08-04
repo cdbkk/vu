@@ -2,7 +2,7 @@
 
 Status: Implemented
 
-`crates/con-app/src/main.rs` defines keybindings through a small structured
+`crates/vu-app/src/main.rs` defines keybindings through a small structured
 table instead of scattered `KeyBinding::new(...)` calls.
 
 ## Model

@@ -5,7 +5,7 @@ Zed worktree can draft the PR.
 
 ## Why
 
-con renders the Windows terminal via a dedicated D3D11 renderer
+vu renders the Windows terminal via a dedicated D3D11 renderer
 (libghostty-vt → ConPTY → DirectWrite glyph atlas). Phase 3a hosts the
 renderer in a `WS_CHILD` HWND parented to GPUI's main HWND. That
 works — GPUI already binds the topmost DComposition target on the HWND,
@@ -14,7 +14,7 @@ drawbacks vs. a first-class DComposition sibling visual:
 
 1. **No blending with GPUI effects.** HWND children are opaque rects;
    rounded corners, drop shadows, and blur don't apply. We live with
-   this today because con's design language is flat/borderless, but it
+   this today because vu's design language is flat/borderless, but it
    precludes future effects on the terminal pane.
 2. **Flickering DPI transitions** when dragging across monitors.
 3. **Focus/IME/resize coordination** between two windowing layers.
@@ -97,8 +97,8 @@ same fate:
   description and stub the method on macOS with a `// TODO` pointing
   at the CAMetalLayer approach.
 - Linux: `wgpu::Texture` or dmabuf. Same stub + TODO.
-- Show a concrete downstream consumer (con) that's blocked on this.
-  Link to the con repo's `docs/impl/windows-port.md` Phase 3d row.
+- Show a concrete downstream consumer (vu) that's blocked on this.
+  Link to the vu repo's `docs/impl/windows-port.md` Phase 3d row.
 
 ## Implementation steps
 
@@ -114,16 +114,16 @@ same fate:
    `IDXGIFactoryMedia::CreateSwapChainForCompositionSurfaceHandle`
    (see `microsoft/terminal` PR #10023 for the exact invocation).
 5. Add the example + a smoke test.
-6. Write the PR description citing: con's Phase 3d (this doc), the
+6. Write the PR description citing: vu's Phase 3d (this doc), the
    WebView2 composition-hosting precedent, Windows Terminal #10023,
    the closed PR #24330 and why this is scoped differently.
 
 ## Once merged
 
-In con, Phase 3d swap:
+In vu, Phase 3d swap:
 
 ```rust
-// crates/con-ghostty/src/windows/render.rs
+// crates/vu-ghostty/src/windows/render.rs
 // Before (Phase 3a/3b):
 let swapchain = dxgi_factory.CreateSwapChainForHwnd(&device, hwnd, &desc, ...)?;
 
@@ -152,4 +152,4 @@ normal event stream. This is the Phase 3d endgame.
   <https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/windowed-vs-visual-hosting>
 - PR that was closed (lessons on what to avoid):
   <https://github.com/zed-industries/zed/pull/24330>
-- con Phase 3 plan: `docs/impl/windows-port.md`
+- vu Phase 3 plan: `docs/impl/windows-port.md`

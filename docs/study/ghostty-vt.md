@@ -20,7 +20,7 @@ We initially planned to use **libghostty-vt** — the standalone VT parser libra
 ### Architecture
 
 ```
-con process
+vu process
 ├── GhosttyApp (singleton)
 │   └── ghostty_app_t — runtime config, font discovery
 │
@@ -107,18 +107,18 @@ What the embedded API does **not** currently give us as a stable product contrac
 - a nested scope stack such as `ssh -> tmux -> agent CLI`
 - a direct export of Ghostty's richer semantic prompt model for host applications
 
-This matters for con:
+This matters for vu:
 
 - Ghostty should be treated as a strong source of terminal facts
-- con still needs its own pane runtime observer
-- if con needs process-group identity, the durable move is to upstream a libghostty API for it
+- vu still needs its own pane runtime observer
+- if vu needs process-group identity, the durable move is to upstream a libghostty API for it
 - we should not design external-agent or tmux awareness around assumptions that Ghostty will directly tell us the whole runtime state
 
 One more important limit: Ghostty's OSC 7 handling validates host information against the local system when reporting `PWD`. That means `PWD` is not a durable embedded signal for remote host identity in the way a naive reader might expect.
 
 ## Ghostty Is Not A Full Terminal Control Plane
 
-For con's product goal, the important conclusion is:
+For vu's product goal, the important conclusion is:
 
 Ghostty is one layer in the stack, not the whole stack.
 
@@ -126,7 +126,7 @@ The current embedded C API is a strong host-embedding API.
 The VT API is a strong emulator-state API.
 Neither is a universal runtime-control protocol analogous to browser CDP.
 
-The durable model for con is therefore:
+The durable model for vu is therefore:
 
 - Ghostty for emulator truth
 - shell integration for shell truth

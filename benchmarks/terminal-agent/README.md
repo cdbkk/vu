@@ -1,23 +1,23 @@
 # Terminal Agent Benchmark
 
-This benchmark is how Con measures progress toward a real terminal-native agent.
+This benchmark is how Vu measures progress toward a real terminal-native agent.
 
 It is intentionally split into three layers:
 
-- **Strict suites**: machine-checkable control-plane verification against a live running Con session
+- **Strict suites**: machine-checkable control-plane verification against a live running Vu session
 - **Operator suites**: replayable multi-turn prompt sequences that execute real SSH, tmux, and coding workflows and record the transcript
 - **Playbooks**: scenario guides and scoring rubrics for judging the operator runs honestly
 
-That split is deliberate. Con should have hard invariants where the product is deterministic, and honest rubrics where the product is agentic.
+That split is deliberate. Vu should have hard invariants where the product is deterministic, and honest rubrics where the product is agentic.
 
 ## What this benchmark is for
 
 Use it to:
 
-- catch regressions in `con-cli` and the local socket bridge
+- catch regressions in `vu-cli` and the local socket bridge
 - validate that visible shell execution remains safe and reusable
 - track session understanding across SSH, tmux, and agent workflows
-- maintain release-quality evidence as Con moves toward open source
+- maintain release-quality evidence as Vu moves toward open source
 
 ## Run the strict suite
 
@@ -30,14 +30,14 @@ python3 benchmarks/terminal-agent/run.py --suite strict
 Optional live in-tab agent verification:
 
 ```bash
-CON_BENCH_ENABLE_AGENT=1 python3 benchmarks/terminal-agent/run.py --suite all
+VU_BENCH_ENABLE_AGENT=1 python3 benchmarks/terminal-agent/run.py --suite all
 ```
 
 Run benchmark suites sequentially against a given live app session. For live-socket operator runs without `--tab`, the runner now creates a fresh temporary tab automatically so one operator run does not collide with the active conversation or another benchmark tab.
 
 Defaults:
 
-- socket path: `/tmp/con.sock`
+- socket path: `/tmp/vu.sock`
 - tab target: active tab
 - record path: `.context/benchmarks/terminal-agent-<timestamp>.json`
 
@@ -45,7 +45,7 @@ You can override them:
 
 ```bash
 python3 benchmarks/terminal-agent/run.py \
-  --socket /tmp/con.sock \
+  --socket /tmp/vu.sock \
   --tab 2 \
   --record .context/benchmarks/latest.json
 ```
@@ -60,7 +60,7 @@ Run a concrete profile:
 
 ```bash
 python3 benchmarks/terminal-agent/run.py --profile basic-local-shell
-CON_BENCH_ENABLE_AGENT=1 python3 benchmarks/terminal-agent/run.py --profile basic-local-codex --suite all
+VU_BENCH_ENABLE_AGENT=1 python3 benchmarks/terminal-agent/run.py --profile basic-local-codex --suite all
 ```
 
 Run a complex operator benchmark:
@@ -89,11 +89,11 @@ python3 benchmarks/terminal-agent/iterate.py \
   --profile operator-ssh-tmux-devloop
 ```
 
-`iterate.py` launches a fresh Con app instance for each iteration with its own socket, XDG data home, and XDG config home. Use it when you want a real trend line instead of one hand-run benchmark.
+`iterate.py` launches a fresh Vu app instance for each iteration with its own socket, XDG data home, and XDG config home. Use it when you want a real trend line instead of one hand-run benchmark.
 
-On macOS, `iterate.py` also forces isolated session and conversation storage with `CON_SESSION_PATH` and `CON_CONVERSATIONS_DIR`, so fresh benchmark apps do not inherit your real restored tabs or saved conversations.
+On macOS, `iterate.py` also forces isolated session and conversation storage with `VU_SESSION_PATH` and `VU_CONVERSATIONS_DIR`, so fresh benchmark apps do not inherit your real restored tabs or saved conversations.
 
-If the batch runner reports `blocked` with `ghostty_surface_bootstrap_unavailable`, that is not a scored product regression. It means the benchmark environment could not produce a live Ghostty surface for the launched app process. In that case, prefer running operator suites against an already-live Con session with `--socket`.
+If the batch runner reports `blocked` with `ghostty_surface_bootstrap_unavailable`, that is not a scored product regression. It means the benchmark environment could not produce a live Ghostty surface for the launched app process. In that case, prefer running operator suites against an already-live Vu session with `--socket`.
 
 Use a tab that is not already serving another in-progress agent request. Operator suites serialize turns on one tab by design, and the runner will fail fast if the tab stays busy too long.
 
@@ -107,7 +107,7 @@ Today the strict runner verifies:
 - visible shell execution and reuse of a proven shell pane
 - optional live built-in agent response
 
-This is the hard floor. If these break, Con is not ready for higher-level SSH/tmux evaluation.
+This is the hard floor. If these break, Vu is not ready for higher-level SSH/tmux evaluation.
 
 ## Operator suites
 
@@ -118,7 +118,7 @@ They do not pretend to be fully machine-scored intelligence benchmarks. Instead,
 - execute the full prompt sequence automatically
 - start from a fresh in-tab conversation when the profile asks for it
 - optionally run visible-shell setup commands before the first operator turn
-- optionally run local shell setup commands before the first operator turn when benchmark hygiene needs work outside the live Con tab
+- optionally run local shell setup commands before the first operator turn when benchmark hygiene needs work outside the live Vu tab
 - record the assistant transcript for each turn
 - give you one JSON record you can review after the run
 
@@ -148,13 +148,13 @@ python3 benchmarks/terminal-agent/score.py \
 
 This writes a scored record under `.context/benchmarks/scored/`.
 
-For an LLM-assisted judgment pass, ask Con's built-in agent to judge the rubric against the raw benchmark record and saved conversation transcript:
+For an LLM-assisted judgment pass, ask Vu's built-in agent to judge the rubric against the raw benchmark record and saved conversation transcript:
 
 ```bash
 python3 benchmarks/terminal-agent/judge_llm.py \
   --profile operator-ssh-tmux-devloop \
   --record .context/benchmarks/terminal-agent-<run>.json \
-  --socket /tmp/con.sock
+  --socket /tmp/vu.sock
 ```
 
 That writes a judge artifact under `.context/benchmarks/judged/`.
@@ -284,7 +284,7 @@ That matters for credibility. A benchmark that only passes on hand-held, over-pe
 
 ## Benchmark philosophy
 
-Con is not trying to benchmark generic coding-agent intelligence.
+Vu is not trying to benchmark generic coding-agent intelligence.
 
 It is benchmarking whether an agent:
 

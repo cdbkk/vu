@@ -4,7 +4,7 @@
   "recommended_suite": "all",
   "fresh_conversation": true,
   "setup_visible_shell_commands": [
-    "rm -rf ~/dev/temp/con-bench-twosum && mkdir -p ~/dev/temp"
+    "rm -rf ~/dev/temp/vu-bench-twosum && mkdir -p ~/dev/temp"
   ],
   "env_checks": [
     {
@@ -36,12 +36,12 @@
       "steps": [
         {
           "label": "prepare_codex_workspace",
-          "prompt": "Please prepare a Codex workspace in ~/dev/temp/con-bench-twosum by launching Codex there and preparing a paired local shell target for file and test work.",
+          "prompt": "Please prepare a Codex workspace in ~/dev/temp/vu-bench-twosum by launching Codex there and preparing a paired local shell target for file and test work.",
           "timeout_secs": 90
         },
         {
           "label": "create_code_and_tests",
-          "prompt": "Keep the Codex target prepared, but use its paired local shell target for the deterministic coding work: create a small Python two_sum implementation and a unittest-based test file in ~/dev/temp/con-bench-twosum, then run `python3 -m unittest -q`. Only touch the Codex pane if a blocking trust or continue prompt must be cleared first.",
+          "prompt": "Keep the Codex target prepared, but use its paired local shell target for the deterministic coding work: create a small Python two_sum implementation and a unittest-based test file in ~/dev/temp/vu-bench-twosum, then run `python3 -m unittest -q`. Only touch the Codex pane if a blocking trust or continue prompt must be cleared first.",
           "timeout_secs": 120
         },
         {

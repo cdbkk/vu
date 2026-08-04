@@ -1,16 +1,12 @@
-# con - Windows terminal emulator installer
-# Usage:  irm https://con-releases.nowledge.co/install.ps1 | iex
+# vu - Windows terminal emulator installer
+# Usage:  irm https://vu-releases.nowledge.co/install.ps1 | iex
 
 #Requires -Version 5.1
 $ErrorActionPreference = 'Stop'
 
-$Repo        = 'nowledge-co/con-terminal'
-# Install under Programs\con-terminal, not Programs\con. CON is a
-# reserved DOS device name: New-Item reports success on such a path,
-# but the Win32 namespace redirects CON to the console device so
-# Test-Path and Expand-Archive can never see the directory. Using
-# con-terminal as the folder segment sidesteps the entire trap.
-$InstallRoot = Join-Path $env:LOCALAPPDATA 'Programs\con-terminal'
+$Repo        = 'nowledge-co/vu-terminal'
+# Keep the installer path aligned with the Windows app-directory name.
+$InstallRoot = Join-Path $env:LOCALAPPDATA 'Programs\vu-terminal'
 
 # --- Terminal setup ---------------------------------------------------------
 # UTF-8 output is required for the block-drawing glyphs in the banner
@@ -85,7 +81,7 @@ function Pass($msg) { Write-Host "   $OK$CHK$RESET  $msg" }
 function Fail($msg) { Write-Host "   $ERR$CROSS$RESET  $msg" -ForegroundColor Red; exit 1 }
 
 # --- Banner -----------------------------------------------------------------
-# Exact output from: npx oh-my-logo "con" --palette-colors
+# Exact output from: npx oh-my-logo "vu" --palette-colors
 # "#4ea8ff,#a855f7,#ec4899" --filled --block-font tiny --color
 # Re-rendered through 8 truecolor stops for a smooth gradient.
 
@@ -101,7 +97,7 @@ Write-Host ''
 
 # --- Preflight --------------------------------------------------------------
 
-if ($env:OS -ne 'Windows_NT') { Fail 'con requires Windows' }
+if ($env:OS -ne 'Windows_NT') { Fail 'vu requires Windows' }
 
 $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
     'AMD64' { 'x86_64' }
@@ -114,7 +110,7 @@ $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
 try {
     $release = Invoke-RestMethod `
         -Uri "https://api.github.com/repos/$Repo/releases/latest" `
-        -Headers @{ 'User-Agent' = 'con-installer' } `
+        -Headers @{ 'User-Agent' = 'vu-installer' } `
         -UseBasicParsing
 } catch {
     Fail 'could not reach GitHub'
@@ -140,15 +136,15 @@ $sumAsset = $release.assets |
     Select-Object -First 1
 
 if ($channel) {
-    Pass "$BOLD`con $channel$RESET  $DIM$version $MID $arch$RESET"
+    Pass "$BOLD`vu $channel$RESET  $DIM$version $MID $arch$RESET"
 } else {
-    Pass "$BOLD`con$RESET  $DIM$version $MID $arch$RESET"
+    Pass "$BOLD`vu$RESET  $DIM$version $MID $arch$RESET"
 }
 
 # --- Download ---------------------------------------------------------------
 
 $tmp = New-Item -ItemType Directory -Force `
-    -Path (Join-Path $env:TEMP "con-install-$([System.IO.Path]::GetRandomFileName())")
+    -Path (Join-Path $env:TEMP "vu-install-$([System.IO.Path]::GetRandomFileName())")
 $zipPath = Join-Path $tmp $zipAsset.name
 
 Write-Host -NoNewline "   $DIM$MID$RESET  downloading"
@@ -192,7 +188,7 @@ Write-Host -NoNewline "   $DIM$MID$RESET  installing"
 
 # Kill any running instance so we can overwrite the exe. `Stop-Process`
 # is idempotent when the process isn't running.
-Get-Process -Name 'con-app' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process -Name 'vu-app' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
 if (Test-Path $InstallRoot) {
     Remove-Item -Path $InstallRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -203,19 +199,19 @@ New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
 # our packager stages files flat so extract directly into $InstallRoot.
 Expand-Archive -Path $zipPath -DestinationPath $InstallRoot -Force
 
-$exePath = Join-Path $InstallRoot 'con-app.exe'
+$exePath = Join-Path $InstallRoot 'vu-app.exe'
 if (-not (Test-Path $exePath)) {
-    Fail 'con-app.exe missing from archive'
+    Fail 'vu-app.exe missing from archive'
 }
 
 Write-Host "`r$(' ' * 40)`r" -NoNewline
 Pass "installed  $DIM$InstallRoot$RESET"
 
-$cliPath = Join-Path $InstallRoot 'con-cli.exe'
+$cliPath = Join-Path $InstallRoot 'vu-cli.exe'
 if (Test-Path $cliPath) {
     Pass "installed  $DIM$cliPath$RESET"
 } else {
-    Write-Host "   $DIM$MID$RESET  con-cli.exe is not bundled in this release artifact"
+    Write-Host "   $DIM$MID$RESET  vu-cli.exe is not bundled in this release artifact"
 }
 
 # --- PATH (HKCU) ------------------------------------------------------------
@@ -235,10 +231,8 @@ if ($pathSegments -notcontains $InstallRoot) {
 # --- Start Menu shortcut ----------------------------------------------------
 
 $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-# con.lnk would trip the reserved-name rule the same way. The Start
-# Menu shows the filename without the .lnk suffix, so "Con Terminal"
-# is what the user sees.
-$lnk       = Join-Path $startMenu 'Con Terminal.lnk'
+# The Start Menu shows the filename without the .lnk suffix.
+$lnk       = Join-Path $startMenu 'Vu Terminal.lnk'
 try {
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($lnk)
@@ -260,7 +254,7 @@ try {
     Start-Process -FilePath $exePath
     Pass 'launched. enjoy!'
 } catch {
-    # Non-fatal: user can launch from Start Menu or by typing `con-app`.
+    # Non-fatal: user can launch from Start Menu or by typing `vu-app`.
 }
 
 Write-Host ''

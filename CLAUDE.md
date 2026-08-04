@@ -1,8 +1,8 @@
-# con — Development Guide
+# vu — Development Guide
 
-## What is con?
+## What is vu?
 
-con is an open-source, GPU-accelerated terminal emulator with a built-in AI agent harness. Built in Rust.
+vu is an open-source, GPU-accelerated terminal emulator with a built-in AI agent harness. Built in Rust.
 
 - **macOS** — primary target, shipped. Metal-backed libghostty, signed DMG, Sparkle auto-update.
 - **Windows** — first beta shipped as `v0.1.0-beta.25`. D3D11/DirectWrite renderer over ConPTY + libghostty-vt, unsigned ZIP distribution, notify-only update checker. Plan + open work: `docs/impl/windows-port.md`; status tracker: issue #34.
@@ -12,10 +12,10 @@ con is an open-source, GPU-accelerated terminal emulator with a built-in AI agen
 
 - **UI**: upstream Zed GPUI (git dependency on `zed-industries/zed`, Apache 2.0). Windows backend is D3D11/DirectComposition; HWND child-embedding is the known gap for the Windows port.
 - **Terminal runtime**: libghostty — full Ghostty terminal via C API, Metal GPU rendering, embedded as native NSView. macOS uses the full embedded libghostty; Windows and Linux consume the carved-out `libghostty-vt` parser instead and pair it with their own renderers (D3D11/DirectWrite on Windows, GPUI per-row `StyledText` on the Linux preview today / GPUI-owned glyph-atlas grid renderer in the long term).
-- **Terminal FFI**: con-ghostty crate — thin Rust wrapper over libghostty C API on macOS (surface lifecycle, action callbacks, clipboard, key/mouse input). On Windows + Linux it wraps `libghostty-vt` plus per-platform PTY (`ConPTY` / Unix PTY) and renderer plumbing. Per-platform code lives in `con-ghostty/src/{terminal,windows,linux}/`; the workspace consumes the same `GhosttyApp` / `GhosttyTerminal` / `TerminalColors` type names from each.
-- **Terminal support crate**: con-terminal — theme and palette helpers only
+- **Terminal FFI**: vu-ghostty crate — thin Rust wrapper over libghostty C API on macOS (surface lifecycle, action callbacks, clipboard, key/mouse input). On Windows + Linux it wraps `libghostty-vt` plus per-platform PTY (`ConPTY` / Unix PTY) and renderer plumbing. Per-platform code lives in `vu-ghostty/src/{terminal,windows,linux}/`; the workspace consumes the same `GhosttyApp` / `GhosttyTerminal` / `TerminalColors` type names from each.
+- **Terminal support crate**: vu-terminal — theme and palette helpers only
 - **AI agent**: Rig v0.40.0 (from crates.io, multi-provider clients, Tool and AgentHook traits)
-- **Socket API**: JSON-RPC 2.0 with a platform-specific transport — Unix domain sockets on Unix, Windows Named Pipes (`\\.\pipe\con`) on Windows. Served by the app and consumed first by `con-cli`.
+- **Socket API**: JSON-RPC 2.0 with a platform-specific transport — Unix domain sockets on Unix, Windows Named Pipes (`\\.\pipe\vu`) on Windows. Served by the app and consumed first by `vu-cli`.
 
 ## Repository Layout
 
@@ -28,12 +28,12 @@ kingston/
 │   └── study/         # Research notes on 3pp dependencies
 ├── postmortem/        # Issue postmortems (YYYY-MM-DD-title.md)
 ├── crates/
-│   ├── con/           # Main binary (GPUI app shell)
-│   ├── con-core/      # Shared logic (harness, config, session)
-│   ├── con-terminal/  # Terminal themes and palette helpers
-│   ├── con-ghostty/   # Ghostty FFI wrapper — primary macOS backend (libghostty C API)
-│   ├── con-agent/     # AI harness (Rig 0.40, tools, conversation)
-│   └── con-cli/       # CLI + socket client for the live local control plane
+│   ├── vu/           # Main binary (GPUI app shell)
+│   ├── vu-core/      # Shared logic (harness, config, session)
+│   ├── vu-terminal/  # Terminal themes and palette helpers
+│   ├── vu-ghostty/   # Ghostty FFI wrapper — primary macOS backend (libghostty C API)
+│   ├── vu-agent/     # AI harness (Rig 0.40, tools, conversation)
+│   └── vu-cli/       # CLI + socket client for the live local control plane
 ├── assets/            # Themes, fonts, icons
 └── 3pp/               # Third-party source (READ-ONLY reference, .gitignored)
 ```
@@ -52,16 +52,16 @@ The `3pp/` directory contains third-party source checkouts for **read-only refer
 # Prerequisites: rust (stable, edition 2024), cmake, Zig 0.15.2 exactly (for libghostty / libghostty-vt)
 cargo build            # debug (macOS)
 cargo build --release  # release (macOS)
-cargo run -p con       # run the terminal (macOS)
+cargo run -p vu       # run the terminal (macOS)
 cargo test --workspace # test
 ```
 
-The `con` UI binary builds on macOS, Linux, and Windows. macOS uses
+The `vu` UI binary builds on macOS, Linux, and Windows. macOS uses
 the embedded full libghostty + Metal renderer; Windows ships a
 ConPTY + libghostty-vt + D3D11/DirectWrite renderer; Linux ships a
 Unix PTY + libghostty-vt + GPUI-owned `StyledText` paint path. The
 agent panel, settings, command palette, and control socket
-(`\\.\pipe\con` on Windows, `/tmp/con.sock` on Unix) are fully
+(`\\.\pipe\vu` on Windows, `/tmp/vu.sock` on Unix) are fully
 wired on every platform. See `docs/impl/windows-port.md` and
 `docs/impl/linux-port.md` for the per-platform porting plans and
 the path to the long-term GPU-accelerated grid renderer on each
@@ -69,32 +69,31 @@ non-macOS target.
 
 ```bash
 # Windows (from a Developer Command Prompt for VS 2022; needs Zig 0.15.2 exactly on PATH
-# for libghostty-vt; the binary ships as `con-app.exe` because `CON` is a
-# reserved DOS device name):
-cargo wbuild -p con --release          # produces target\release\con-app.exe
-cargo wrun   -p con
-cargo wtest  -p con-core -p con-cli -p con-agent -p con-terminal
+# for libghostty-vt; release scripts retain the `vu-app.exe` Windows alias):
+cargo wbuild -p vu --release          # produces target\release\vu-app.exe
+cargo wrun   -p vu
+cargo wtest  -p vu-core -p vu-cli -p vu-agent -p vu-terminal
 
 # Linux (needs the GPUI linux runtime deps — see .github/workflows/ci-portable.yml):
-cargo build -p con --release
+cargo build -p vu --release
 ```
 
 The `w*` aliases (declared in `.cargo/config.toml`) wrap the
-`--no-default-features --features con/bin-con-app` incantation the
-Windows-named binary requires.
+`--no-default-features --features vu/bin-vu-app` incantation the
+Windows release alias uses.
 
 ## Control Plane
 
-- `con-cli` is a real client for Con's local control socket, not a stub.
+- `vu-cli` is a real client for Vu's local control socket, not a stub.
 - Implementation details live in `docs/impl/socket-api.md`.
-- The current live E2E workflow lives in `docs/impl/con-cli-e2e.md` and `docs/impl/con-test.md`.
+- The current live E2E workflow lives in `docs/impl/vu-cli-e2e.md` and `docs/impl/vu-test.md`.
 
 ## Local Skills
 
-- `skills/con-cli-e2e/SKILL.md` — use when validating the control plane from
-  an external agent, writing eval automation against a real running Con session,
-  or writing/fixing integration tests in `crates/con-test/testdata/`. Covers
-  both manual `con-cli` E2E and the `con-test` runner (test file format,
+- `skills/vu-cli-e2e/SKILL.md` — use when validating the control plane from
+  an external agent, writing eval automation against a real running Vu session,
+  or writing/fixing integration tests in `crates/vu-test/testdata/`. Covers
+  both manual `vu-cli` E2E and the `vu-test` runner (test file format,
   assertion types, common failure patterns).
 - `skills/gpui-cache-aware/SKILL.md` — use when reviewing or changing UI
   performance, especially markdown/chat rendering, terminal-adjacent UI, or
@@ -114,7 +113,7 @@ Windows-named binary requires.
 - **Color by meaning only**: Monochrome surfaces by default. Accent color for semantic states (focus, active, warning, error).
 - **Typography as hierarchy**: Size, weight, and opacity create structure — not boxes and borders.
 
-See `docs/design/con-design-language.md` for full design system.
+See `docs/design/vu-design-language.md` for full design system.
 
 ## UI/UX Principles
 
@@ -157,14 +156,14 @@ Read the component's source in `3pp/gpui-component/crates/ui/src/` to understand
 
 ## Key Conventions
 
-- **Crate boundaries matter.** con-terminal has zero UI deps. con-agent has zero terminal deps. con-core glues them.
+- **Crate boundaries matter.** vu-terminal has zero UI deps. vu-agent has zero terminal deps. vu-core glues them.
 - **Real Rig integration.** Tools implement `rig::tool::Tool` trait. Agent built via `client.agent(model).tool(T).build()`. Chat via `Chat::chat()` trait.
 - **Agent transparency.** When the built-in agent runs a command, it executes visibly. No hidden subprocesses.
 - **Shared tokio runtime.** The harness owns a single multi-thread tokio runtime — no thread-per-message.
-- **Config is TOML.** User config resolved at runtime via `con-paths::config_file()` → `dirs::config_dir()`:
-  - **macOS**: `~/Library/Application Support/con/config.toml` (fallback: `~/.config/con/config.toml` if `dirs::config_dir()` returns None — effectively never on macOS)
-  - **Linux**: `$XDG_CONFIG_HOME/con/config.toml` (defaults to `~/.config/con/config.toml` when `XDG_CONFIG_HOME` is unset)
-  - **Windows**: `%APPDATA%\con-terminal\config.toml` (fallback: `~/.config/con-terminal/config.toml`)
+- **Config is TOML.** User config resolved at runtime via `vu-paths::config_file()` → `dirs::config_dir()`:
+  - **macOS**: `~/Library/Application Support/vu/config.toml` (fallback: `~/.config/vu/config.toml` if `dirs::config_dir()` returns None — effectively never on macOS)
+  - **Linux**: `$XDG_CONFIG_HOME/vu/config.toml` (defaults to `~/.config/vu/config.toml` when `XDG_CONFIG_HOME` is unset)
+  - **Windows**: `%APPDATA%\vu-terminal\config.toml` (fallback: `~/.config/vu-terminal/config.toml`)
 - **GPUI patterns.** Use `cx.spawn(async move |this, cx| { ... })` for async work. Use if/else for conditional UI (FluentBuilder::when() is not re-exported).
 
 ## Branching
@@ -177,7 +176,7 @@ Read the component's source in `3pp/gpui-component/crates/ui/src/` to understand
 After implementing a PR, write tests following this priority order:
 
 - **Unit tests first** — test functions and logic directly in the same crate using `#[cfg(test)]` modules. Cover non-trivial logic, edge cases, and error paths.
-- **con-test for integration** — use `con-test` only for integration and interactive behavior that requires a running session (e.g., pane lifecycle, socket API, agent interactions).
+- **vu-test for integration** — use `vu-test` only for integration and interactive behavior that requires a running session (e.g., pane lifecycle, socket API, agent interactions).
 - **No low-value tests** — don't write tests just to hit coverage. Skip tests for trivial getters, one-liner wrappers, or behavior already covered by the type system. Every test should catch a real bug or document a real contract.
 
 ## Postmortems

@@ -2,7 +2,7 @@
 
 ## Background
 
-Con embeds Ghostty terminal surfaces as native `NSScrollView` subtrees inside the
+Vu embeds Ghostty terminal surfaces as native `NSScrollView` subtrees inside the
 GPUI Metal window. GPUI renders its own UI (workspace chrome, editor panes, agent
 panel) via a `GPUIView` (Metal-backed `NSView`) that is the window's initial first
 responder. Ghostty surfaces are added as siblings below `GPUIView` in the view
@@ -37,12 +37,12 @@ Editor panes had no GPUI entity and no `FocusHandle`, so clicking them left
 `window.focused()` as `None`. All keyboard actions were silently dropped.
 
 ### Fix (commit `c1db4a2`)
-Add `workspace_focus: FocusHandle` to `ConWorkspace`. When an editor pane is
+Add `workspace_focus: FocusHandle` to `VuWorkspace`. When an editor pane is
 clicked, call `workspace_focus.focus(window, cx)`. Add `track_focus(&workspace_focus)`
 to the root workspace div so GPUI tracks it in the element tree.
 
 ```rust
-// In ConWorkspace::new / from_session:
+// In VuWorkspace::new / from_session:
 workspace_focus: cx.focus_handle(),
 
 // In focus_pane_in_active_tab (when pane is an editor):

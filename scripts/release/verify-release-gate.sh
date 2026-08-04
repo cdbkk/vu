@@ -46,11 +46,11 @@ case "$version" in
   *-dev.*) channel="dev" ;;
 esac
 
-mac_prefix="con"
+mac_prefix="vu"
 if [[ "$channel" == "beta" ]]; then
-  mac_prefix="con-Beta"
+  mac_prefix="vu-Beta"
 elif [[ "$channel" == "dev" ]]; then
-  mac_prefix="con-Dev"
+  mac_prefix="vu-Dev"
 fi
 
 required_assets=(
@@ -60,9 +60,9 @@ required_assets=(
   "${mac_prefix}-${version}-macos-x86_64.dmg"
   "${mac_prefix}-${version}-macos-x86_64.zip"
   "SHA256SUMS-macos-x86_64.txt"
-  "con-${version}-linux-x86_64.tar.gz"
+  "vu-${version}-linux-x86_64.tar.gz"
   "SHA256SUMS-linux.txt"
-  "con-${version}-windows-x86_64.zip"
+  "vu-${version}-windows-x86_64.zip"
   "SHA256SUMS-windows.txt"
 )
 
@@ -93,25 +93,25 @@ grep -F "${mac_prefix}-${version}-macos-arm64" "$tmp/SHA256SUMS-macos-arm64.txt"
   || fail "SHA256SUMS-macos-arm64.txt does not reference arm64 macOS artifacts"
 grep -F "${mac_prefix}-${version}-macos-x86_64" "$tmp/SHA256SUMS-macos-x86_64.txt" >/dev/null \
   || fail "SHA256SUMS-macos-x86_64.txt does not reference x86_64 macOS artifacts"
-grep -F "con-${version}-linux-x86_64.tar.gz" "$tmp/SHA256SUMS-linux.txt" >/dev/null \
+grep -F "vu-${version}-linux-x86_64.tar.gz" "$tmp/SHA256SUMS-linux.txt" >/dev/null \
   || fail "SHA256SUMS-linux.txt does not reference the Linux tarball"
-grep -F "con-${version}-windows-x86_64.zip" "$tmp/SHA256SUMS-windows.txt" >/dev/null \
+grep -F "vu-${version}-windows-x86_64.zip" "$tmp/SHA256SUMS-windows.txt" >/dev/null \
   || fail "SHA256SUMS-windows.txt does not reference the Windows ZIP"
 
 [[ -f "$pages_dir/install.sh" ]] || fail "gh-pages install.sh missing"
 [[ -f "$pages_dir/install.ps1" ]] || fail "gh-pages install.ps1 missing"
-require_line "$pages_dir/install.sh" 'cli_src="${target}/Contents/MacOS/con-cli"' \
-  "macOS bundled con-cli source"
-require_line "$pages_dir/install.sh" 'ln -sf "$cli_src" "${bin_dir}/con-cli"' \
+require_line "$pages_dir/install.sh" 'cli_src="${target}/Contents/MacOS/vu-cli"' \
+  "macOS bundled vu-cli source"
+require_line "$pages_dir/install.sh" 'ln -sf "$cli_src" "${bin_dir}/vu-cli"' \
   "macOS PATH symlink"
-require_line "$pages_dir/install.sh" 'target_cli="${bin_dir}/con-cli"' \
-  "Linux con-cli install target"
+require_line "$pages_dir/install.sh" 'target_cli="${bin_dir}/vu-cli"' \
+  "Linux vu-cli install target"
 require_line "$pages_dir/install.sh" 'mv -f "$tmp_cli" "$target_cli"' \
-  "Linux atomic con-cli install"
-require_line "$pages_dir/install.ps1" "\$cliPath = Join-Path \$InstallRoot 'con-cli.exe'" \
-  "Windows con-cli install path"
+  "Linux atomic vu-cli install"
+require_line "$pages_dir/install.ps1" "\$cliPath = Join-Path \$InstallRoot 'vu-cli.exe'" \
+  "Windows vu-cli install path"
 require_line "$pages_dir/install.ps1" 'if (Test-Path $cliPath)' \
-  "Windows con-cli archive verification"
+  "Windows vu-cli archive verification"
 
 if [[ "$channel" == "dev" ]]; then
   log "dev tag: appcast promotion checks skipped"
@@ -174,11 +174,11 @@ require_appcast \
   "$marketing_version"
 require_appcast \
   "$pages_dir/appcast/${channel}-linux-x86_64.xml" \
-  "con-${version}-linux-x86_64.tar.gz" \
+  "vu-${version}-linux-x86_64.tar.gz" \
   "$version"
 require_appcast \
   "$pages_dir/appcast/${channel}-windows-x86_64.xml" \
-  "con-${version}-windows-x86_64.zip" \
+  "vu-${version}-windows-x86_64.zip" \
   "$version"
 
 log "release gate passed for $tag"

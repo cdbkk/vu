@@ -1,0 +1,20 @@
+# tabs/basic.test
+# Basic tab lifecycle: list, new, close.
+
+vu-cli --json tabs list  # at least one tab exists
+---- json-subset
+{"tabs":[{"index":1}]}
+
+vu-cli tabs new  # create a new tab succeeds
+---- ok
+
+vu-cli --json tabs list  # now have at least 2 tabs
+---- contains
+"index":2
+
+vu-cli --json tabs close --tab 2  # close the tab we just created
+---- ok
+
+vu-cli --json tabs list  # back to 1 tab
+---- json-subset
+{"tabs":[{"index":1}]}

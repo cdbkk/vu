@@ -14,32 +14,32 @@ require_cmd sips
 require_cmd rsync
 require_cmd mkdir
 
-mkdir -p "$CON_DIST_ROOT"
+mkdir -p "$VU_DIST_ROOT"
 
-log "Building con and con-cli for $CON_RUST_TARGET"
+log "Building vu and vu-cli for $VU_RUST_TARGET"
 (
   cd "$REPO_ROOT"
-  CON_REQUIRE_GHOSTTY_INITIAL_OUTPUT="${CON_REQUIRE_GHOSTTY_INITIAL_OUTPUT:-1}" \
-    cargo build --locked --release --target "$CON_RUST_TARGET" -p con -p con-cli
+  VU_REQUIRE_GHOSTTY_INITIAL_OUTPUT="${VU_REQUIRE_GHOSTTY_INITIAL_OUTPUT:-1}" \
+    cargo build --locked --release --target "$VU_RUST_TARGET" -p vu -p vu-cli
 )
 
-app_root="$CON_APP_BUNDLE_PATH"
+app_root="$VU_APP_BUNDLE_PATH"
 contents_dir="$app_root/Contents"
 macos_dir="$contents_dir/MacOS"
 resources_dir="$contents_dir/Resources"
-binary_path="$REPO_ROOT/target/$CON_RUST_TARGET/release/con"
-cli_binary_path="$REPO_ROOT/target/$CON_RUST_TARGET/release/con-cli"
+binary_path="$REPO_ROOT/target/$VU_RUST_TARGET/release/vu"
+cli_binary_path="$REPO_ROOT/target/$VU_RUST_TARGET/release/vu-cli"
 
 rm -rf "$app_root"
 mkdir -p "$macos_dir" "$resources_dir"
 
 log "Creating app bundle at $app_root"
-rsync -a "$binary_path" "$macos_dir/con"
-chmod 755 "$macos_dir/con"
-rsync -a "$cli_binary_path" "$macos_dir/con-cli"
-chmod 755 "$macos_dir/con-cli"
+rsync -a "$binary_path" "$macos_dir/vu"
+chmod 755 "$macos_dir/vu"
+rsync -a "$cli_binary_path" "$macos_dir/vu-cli"
+chmod 755 "$macos_dir/vu-cli"
 
-ghostty_resources_dir="$(find "$REPO_ROOT/target/$CON_RUST_TARGET/release/build" -path '*/out/ghostty-src/zig-out/share/ghostty' | head -n 1)"
+ghostty_resources_dir="$(find "$REPO_ROOT/target/$VU_RUST_TARGET/release/build" -path '*/out/ghostty-src/zig-out/share/ghostty' | head -n 1)"
 if [[ -z "$ghostty_resources_dir" || ! -d "$ghostty_resources_dir" ]]; then
   log "Ghostty resources not found in cargo build output"
   exit 1
@@ -59,22 +59,22 @@ fi
 rsync -a "$ghostty_terminfo_dir/" "$resources_dir/terminfo/"
 log "Embedded Ghostty terminfo from $ghostty_terminfo_dir"
 
-iconset_parent="$(mktemp -d "$CON_DIST_ROOT/iconset.XXXXXX")"
-iconset_dir="$iconset_parent/con.iconset"
+iconset_parent="$(mktemp -d "$VU_DIST_ROOT/iconset.XXXXXX")"
+iconset_dir="$iconset_parent/vu.iconset"
 mkdir -p "$iconset_dir"
 trap 'rm -rf "$iconset_parent"' EXIT
 
 for size in 16 32 128 256 512; do
-  sips -z "$size" "$size" "$CON_ICON_SOURCE" --out "$iconset_dir/icon_${size}x${size}.png" >/dev/null
+  sips -z "$size" "$size" "$VU_ICON_SOURCE" --out "$iconset_dir/icon_${size}x${size}.png" >/dev/null
 done
 
-sips -z 32 32 "$CON_ICON_SOURCE" --out "$iconset_dir/icon_16x16@2x.png" >/dev/null
-sips -z 64 64 "$CON_ICON_SOURCE" --out "$iconset_dir/icon_32x32@2x.png" >/dev/null
-sips -z 256 256 "$CON_ICON_SOURCE" --out "$iconset_dir/icon_128x128@2x.png" >/dev/null
-sips -z 512 512 "$CON_ICON_SOURCE" --out "$iconset_dir/icon_256x256@2x.png" >/dev/null
-cp "$CON_ICON_SOURCE" "$iconset_dir/icon_512x512@2x.png"
+sips -z 32 32 "$VU_ICON_SOURCE" --out "$iconset_dir/icon_16x16@2x.png" >/dev/null
+sips -z 64 64 "$VU_ICON_SOURCE" --out "$iconset_dir/icon_32x32@2x.png" >/dev/null
+sips -z 256 256 "$VU_ICON_SOURCE" --out "$iconset_dir/icon_128x128@2x.png" >/dev/null
+sips -z 512 512 "$VU_ICON_SOURCE" --out "$iconset_dir/icon_256x256@2x.png" >/dev/null
+cp "$VU_ICON_SOURCE" "$iconset_dir/icon_512x512@2x.png"
 
-iconutil -c icns "$iconset_dir" -o "$resources_dir/con.icns"
+iconutil -c icns "$iconset_dir" -o "$resources_dir/vu.icns"
 generate_info_plist "$contents_dir/Info.plist"
 
 printf 'APPL????' >"$contents_dir/PkgInfo"
@@ -90,4 +90,4 @@ else
   log "Sparkle.framework not found — auto-update will be disabled at runtime"
 fi
 
-log "App bundle ready: $CON_APP_BUNDLE_PATH"
+log "App bundle ready: $VU_APP_BUNDLE_PATH"

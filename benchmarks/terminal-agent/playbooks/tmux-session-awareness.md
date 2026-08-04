@@ -2,7 +2,7 @@
 
 ## Goal
 
-Verify that Con can orient itself around a visible `ssh -> tmux` workflow without overstating what is proven.
+Verify that Vu can orient itself around a visible `ssh -> tmux` workflow without overstating what is proven.
 
 ## Setup
 

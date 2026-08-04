@@ -2,7 +2,7 @@
 
 This note narrows Linux Phase 2b from:
 
-> "figure out how con could display a Linux terminal surface inside a
+> "figure out how vu could display a Linux terminal surface inside a
 > GPUI window"
 
 to:
@@ -12,7 +12,7 @@ to:
 
 ## Conclusion
 
-GPUI Linux already gives con a real native host shell, but it does
+GPUI Linux already gives vu a real native host shell, but it does
 **not** currently expose a public child-composition contract for a
 foreign Linux-rendered terminal surface.
 
@@ -29,13 +29,13 @@ It does **not** yet provide a downstream public API for:
 3. **zero-copy Linux texture import for arbitrary downstream renderers**
 
 That means a Ghostty-first Linux embed path is blocked on more than
-Ghostty alone. Even if Ghostty grew a Linux embedded API tomorrow, con
+Ghostty alone. Even if Ghostty grew a Linux embedded API tomorrow, vu
 would still need either:
 
 - new GPUI interop support, or
 - a GPUI-owned rendering path instead of a foreign-surface embed
 
-## What GPUI Linux already gives con
+## What GPUI Linux already gives vu
 
 ### 1. Real Linux windows and compositor integration
 
@@ -58,7 +58,7 @@ Relevant local sources:
 
 Important consequence:
 
-- con already has a real Linux app shell
+- vu already has a real Linux app shell
 - window creation, input dispatch, clipboard, menus, and top-level GPU
   presentation are not the core blocker
 
@@ -100,7 +100,7 @@ handle access, but no child-surface API.
 
 Important consequence:
 
-- con cannot currently hand GPUI a Wayland child surface, X11 child
+- vu cannot currently hand GPUI a Wayland child surface, X11 child
   window, GL drawable, or dmabuf-backed surface and ask GPUI to compose
   it inside a pane
 
@@ -157,12 +157,12 @@ But that code is:
 - used for compositor GPU hinting
 - not exposed as a downstream texture-import API
 
-So "GPUI mentions dmabuf internally" does **not** mean con can already
+So "GPUI mentions dmabuf internally" does **not** mean vu can already
 use dmabuf as a supported pane-composition interface.
 
-## Architecture consequences for con
+## Architecture consequences for vu
 
-This leaves con with three realistic Linux integration lanes.
+This leaves vu with three realistic Linux integration lanes.
 
 ### Option A: GPUI gains a public Linux external-surface API
 
@@ -170,7 +170,7 @@ This is the Linux analog of the upstream Windows external-swapchain
 study:
 
 - GPUI would accept some Linux-native child composition object
-- con would hand it a Ghostty-rendered surface or texture export
+- vu would hand it a Ghostty-rendered surface or texture export
 - GPUI would position and clip it inside the pane tree
 
 Plausible shapes:
@@ -191,7 +191,7 @@ Costs:
 
 ### Option B: GPUI-owned render path
 
-con keeps GPUI as the sole Linux renderer and only reuses Ghostty for
+vu keeps GPUI as the sole Linux renderer and only reuses Ghostty for
 terminal semantics if possible.
 
 This means:
@@ -229,7 +229,7 @@ Costs:
 
 ## Recommended GPUI-side ask
 
-If con pursues the Ghostty-first Linux path, the GPUI-side upstream ask
+If vu pursues the Ghostty-first Linux path, the GPUI-side upstream ask
 should be framed narrowly:
 
 1. define one public external-surface or external-texture composition
@@ -247,7 +247,7 @@ Phase 2b now has a bounded output:
 
 - **Ghostty-first Linux embed remains plausible only if both Ghostty and
   GPUI accept upstream interop work**
-- if either upstream delta is too large or too slow, con should choose a
+- if either upstream delta is too large or too slow, vu should choose a
   local Linux backend and stop modeling Linux as "macOS with different
   headers"
 

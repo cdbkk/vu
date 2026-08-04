@@ -3,28 +3,28 @@
 This note exists for one specific class of bugs:
 
 - a heavy TUI such as Claude Code resizes instantly in Ghostty or iTerm2
-- the same TUI in Con appears to repaint from upper rows down to the bottom
-- Con feels hung or many seconds behind during live resize
+- the same TUI in Vu appears to repaint from upper rows down to the bottom
+- Vu feels hung or many seconds behind during live resize
 - the same lag can reproduce even with a minimal TUI such as an otherwise empty `tmux`, which means the issue is not Claude-specific
 
 At that point, guessing is lower value than measuring.
 
 ## What we already know
 
-- Con **does** use GPU rendering on macOS.
+- Vu **does** use GPU rendering on macOS.
 - The terminal runtime is embedded Ghostty.
 - Ghostty renders into a native `NSView` with its Metal renderer.
 
 Before drawing architectural conclusions, verify two invariants first:
 
-1. the trace must target the real `con` process, not `cargo`
+1. the trace must target the real `vu` process, not `cargo`
 2. the embedded Ghostty runtime must be built as a release-class Zig library
 
 Without those checks, performance comparisons against standalone Ghostty are not trustworthy.
 
 ## Lightweight app logs
 
-Con now exposes an opt-in trace mode.
+Vu now exposes an opt-in trace mode.
 
 Fast path:
 
@@ -38,32 +38,32 @@ Time Profiler capture:
 ./scripts/macos/profile-terminal-resize-xctrace.sh
 ```
 
-The helper now builds `con` first and then launches the actual built binary under `xctrace`. This is important: profiling `cargo run -p con` captures the Cargo wrapper process, not the app you are resizing.
+The helper now builds `vu` first and then launches the actual built binary under `xctrace`. This is important: profiling `cargo run -p vu` captures the Cargo wrapper process, not the app you are resizing.
 
 If your toolchain or output path is non-standard, set them explicitly:
 
 ```bash
 CARGO_BIN="$(command -v cargo)" \
-CON_APP_BIN="$PWD/target/debug/con" \
+VU_APP_BIN="$PWD/target/debug/vu" \
 ./scripts/macos/profile-terminal-resize-xctrace.sh
 ```
 
 Equivalent manual form:
 
 ```bash
-CON_GHOSTTY_PROFILE=1 \
-RUST_LOG=con::perf=info,con_ghostty::perf=info,con=warn,con_core=warn,con_agent=warn \
-cargo run -p con
+VU_GHOSTTY_PROFILE=1 \
+RUST_LOG=vu::perf=info,vu_ghostty::perf=info,vu=warn,vu_core=warn,vu_agent=warn \
+cargo run -p vu
 ```
 
 This emits two high-signal log streams:
 
-- `con::perf`
+- `vu::perf`
   - every real `ghostty_surface_set_size` request from the host view
   - includes old pixel size, old grid size, new pixel size, logical pane size, and host call time
   - host-side `update_frame` timing for the embedded terminal view
   - workspace-level Ghostty wake drain timing
-- `con_ghostty::perf`
+- `vu_ghostty::perf`
   - every Ghostty wakeup-driven app tick
   - includes queue delay before the main-thread tick and tick execution time
 
@@ -86,7 +86,7 @@ Interpretation:
 
 ## Instruments pass
 
-When logs are not enough, capture one trace from Con and one from Ghostty with the same TUI and the same resize gesture.
+When logs are not enough, capture one trace from Vu and one from Ghostty with the same TUI and the same resize gesture.
 
 Use Instruments:
 
@@ -96,25 +96,25 @@ Use Instruments:
 
 Suggested workflow:
 
-1. Launch Con from Xcode Instruments or attach Instruments to the running process.
+1. Launch Vu from Xcode Instruments or attach Instruments to the running process.
 2. Start a heavy TUI, for example `claude --resume`.
 3. Also capture the simpler control case: launch `tmux`, then resize for 3-5 seconds.
 4. Repeat the same capture with Ghostty.
 
-The helper script above automates the `Time Profiler` launch for Con by building and then wrapping:
+The helper script above automates the `Time Profiler` launch for Vu by building and then wrapping:
 
 ```bash
-/absolute/path/to/cargo build -p con
-xcrun xctrace record --template 'Time Profiler' --launch -- /absolute/path/to/target/debug/con
+/absolute/path/to/cargo build -p vu
+xcrun xctrace record --template 'Time Profiler' --launch -- /absolute/path/to/target/debug/vu
 ```
 
 Look for:
 
-- main-thread time in AppKit / Core Animation during Con resize
+- main-thread time in AppKit / Core Animation during Vu resize
 - time under GPUI window or layer composition
 - time spent in `ghostty_app_tick`
 - time spent in `ghostty_surface_set_size`
-- whether Metal work itself is slow, or whether Con is late getting frames onto screen
+- whether Metal work itself is slow, or whether Vu is late getting frames onto screen
 
 Also inspect the target process and hot symbols before deeper interpretation:
 
@@ -123,7 +123,7 @@ Also inspect the target process and hot symbols before deeper interpretation:
 
 ## Current thesis
 
-After validating the target process and Ghostty build mode, if Con still remains much slower than Ghostty even when:
+After validating the target process and Ghostty build mode, if Vu still remains much slower than Ghostty even when:
 
 - Ghostty wake tick delay is low
 - Ghostty tick time is low

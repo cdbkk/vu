@@ -5,7 +5,7 @@ Issue: [#111](https://github.com/nowledge-co/con-terminal/issues/111)
 ## Product Position
 
 Restorable workspaces are a continuity feature, not a process snapshot feature.
-Con should bring the user back to the same working shape: windows, tabs, panes,
+Vu should bring the user back to the same working shape: windows, tabs, panes,
 pane-local surfaces, cwd, history, focus, and agent context. It must not pretend
 that a shell process, a TUI process, or arbitrary terminal scrollback can be
 faithfully resumed.
@@ -16,7 +16,7 @@ The production design has one priority order:
    from private app data.
 2. **Project memory second.** Opening a repo should feel like returning to a
    familiar workspace without writing anything to the repo.
-3. **Exported layout DSL third.** A versioned schema is useful as Con's own
+3. **Exported layout DSL third.** A versioned schema is useful as Vu's own
    export/import format. It should be generated from a user-tuned workspace
    first, not treated as a hand-written boot script.
 
@@ -38,7 +38,7 @@ Implemented in the first issue #111 PR:
 - each pane stores its active surface id
 - old session files that only stored a leaf cwd still load correctly
 - cwd restore is grounded in terminal protocol state (OSC 7/PWD), not restored
-  prompt text. On macOS, Con's embedded Ghostty patch trusts the app-captured
+  prompt text. On macOS, Vu's embedded Ghostty patch trusts the app-captured
   cwd for privacy-protected folders such as Documents/Downloads instead of
   rejecting it during directory open/stat preflight.
 - New Window uses a fresh session seeded with global history, not a clone of
@@ -47,7 +47,7 @@ Implemented in the first issue #111 PR:
   history-backed session instead of restoring the same saved layout again
 - the layout-only schema now has a closed import/export loop: users can export
   the current window, add a profile's tabs to an existing window, open a profile
-  in a new window, or launch `con <project-folder>` / `con <workspace.toml>`
+  in a new window, or launch `vu <project-folder>` / `vu <workspace.toml>`
   explicitly
 
 This slice is production-safe because it improves private restore fidelity and
@@ -65,8 +65,8 @@ Required qualities:
   restore private state without asking users to understand a file.
 - **Explicit when shared.** A repo file appears only after the user exports or
   opens a project/profile intentionally.
-- **Generated, not hand-authored.** Users design the workspace in Con first;
-  `.con/workspace.toml` is the reviewable artifact Con writes from that design.
+- **Generated, not hand-authored.** Users design the workspace in Vu first;
+  `.vu/workspace.toml` is the reviewable artifact Vu writes from that design.
 - **Stable in git.** Exported paths are repo-relative and slash-separated on
   every OS, so Windows/macOS/Linux do not churn diffs.
 - **No trust surprise.** Layout profiles never run commands, replay history,
@@ -75,8 +75,8 @@ Required qualities:
   is default-on for new installs and existing beta users because workspace
   continuity is the default product promise. Settings exposes an opt-out and
   Command Palette exposes a clear-and-disable action.
-- **One mental model.** The same path resolver powers `con <project-folder>`,
-  `con <workspace.toml>`, Add Tabs from Layout Profile, and Open Layout Profile in
+- **One mental model.** The same path resolver powers `vu <project-folder>`,
+  `vu <workspace.toml>`, Add Tabs from Layout Profile, and Open Layout Profile in
   New Window.
 - **Scratch remains scratch.** New Tab and New Window do not silently explode
   into project layouts; profile import is a named action until project memory
@@ -85,7 +85,7 @@ Required qualities:
 ## First Principles
 
 1. **A terminal session is not a document.**
-   Con can restore placement and intent. It cannot honestly restore arbitrary
+   Vu can restore placement and intent. It cannot honestly restore arbitrary
    process state. True process continuity belongs to tools such as tmux,
    zellij, shells, or the underlying application.
 
@@ -100,12 +100,12 @@ Required qualities:
    chooses to restore.
 
 4. **Open Project can remember.**
-   If the user opens the same folder again, Con may restore local project
+   If the user opens the same folder again, Vu may restore local project
    memory keyed by the canonical project root. This is the IDE-shaped behavior
    users already understand.
 
 5. **No hidden replay.**
-   Con must never run commands from a restored workspace without explicit user
+   Vu must never run commands from a restored workspace without explicit user
    action. Future task files are picker inputs, not boot scripts. The layout
    schema deliberately has no `run` field.
 
@@ -128,13 +128,13 @@ Required qualities:
 
 ### Flow 1: Quit Tonight, Continue Tomorrow
 
-The user has one Con window with three tabs:
+The user has one Vu window with three tabs:
 
 - `Dev`: editor shell, server pane, tests pane
 - `Agents`: two pane-local surfaces, `Planner` and `Worker`
 - `Release`: one shell in `~/release`
 
-When Con launches cold tomorrow:
+When Vu launches cold tomorrow:
 
 - the same windows/tabs/panes/surfaces return
 - each terminal opens at its remembered cwd
@@ -168,7 +168,7 @@ This is already the behavior direction of `fresh_window_session_with_history()`.
 
 ### Flow 3: Second Process Invocation
 
-The user runs `con` while Con is already open.
+The user runs `vu` while Vu is already open.
 
 Production target:
 
@@ -181,8 +181,8 @@ Current mitigation:
 
 - the second process detects the live endpoint for its build identity and opens
   a fresh-history session instead of cloning the last restored session
-- debug builds use a separate default endpoint (`/tmp/con-debug.sock` on Unix,
-  `\\.\pipe\con-debug` on Windows), so a development build can run next to an
+- debug builds use a separate default endpoint (`/tmp/vu-debug.sock` on Unix,
+  `\\.\pipe\vu-debug` on Windows), so a development build can run next to an
   installed release/beta without suppressing the dev build's private restore
 
 The mitigation is safe, but not final. Single-instance forwarding is the
@@ -193,20 +193,20 @@ production target.
 The user explicitly runs:
 
 ```sh
-con ~/dev/con
+vu ~/dev/vu
 ```
 
 Current behavior:
 
-- if `~/dev/con/.con/workspace.toml` exists, Con opens that layout profile
-- otherwise, Con opens one fresh shell rooted at `~/dev/con`
+- if `~/dev/vu/.vu/workspace.toml` exists, Vu opens that layout profile
+- otherwise, Vu opens one fresh shell rooted at `~/dev/vu`
 - profile import includes layout intent only; private history is shared from
   app data, and no commands run automatically
 
 Production target after AppState/project memory:
 
-- Con canonicalizes the project root
-- if local project memory exists, it restores that folder's last private Con
+- Vu canonicalizes the project root
+- if local project memory exists, it restores that folder's last private Vu
   shape
 - otherwise, it opens the shared layout profile if present
 - if neither exists, it opens one fresh shell rooted at the project
@@ -241,16 +241,16 @@ This is the most important shipped value of the current PR.
 
 ### Flow 6: tmux / SSH Continuity
 
-If the user wants true process continuity, Con should make tmux or an explicit
+If the user wants true process continuity, Vu should make tmux or an explicit
 SSH attach command easy, not fake process restore.
 
 Recommended user pattern:
 
 ```sh
-tmux attach -t con || tmux new -s con
+tmux attach -t vu || tmux new -s vu
 ```
 
-Con's job is to restore the terminal shape around that command. Running the
+Vu's job is to restore the terminal shape around that command. Running the
 command remains a user action unless a future trusted task system explicitly
 supports it.
 
@@ -277,7 +277,7 @@ Sketch:
 {
   "version": 1,
   "id": "win_01j...",
-  "project_root": "/Users/me/dev/con",
+  "project_root": "/Users/me/dev/vu",
   "active_tab": 0,
   "tabs": [],
   "chrome": {
@@ -319,7 +319,7 @@ Sketch:
 ```json
 {
   "version": 1,
-  "root": "/Users/me/dev/con",
+  "root": "/Users/me/dev/vu",
   "last_window_id": "win_01j...",
   "tabs": [],
   "history": {
@@ -331,7 +331,7 @@ Sketch:
 
 ### 4. Exported Layout DSL
 
-Implemented as `con-core::workspace_layout` for validation and future
+Implemented as `vu-core::workspace_layout` for validation and future
 import/export wiring.
 
 Purpose:
@@ -339,7 +339,7 @@ Purpose:
 - deterministic output from "Save Layout Profile"
 - stable schema for import/export tests
 - reviewable layout intent if a user chooses to commit it
-- future bridge for orchestrators that want to generate Con layouts
+- future bridge for orchestrators that want to generate Vu layouts
 
 Non-purpose:
 
@@ -351,12 +351,12 @@ Non-purpose:
 Default path for future export:
 
 ```text
-.con/workspace.toml
+.vu/workspace.toml
 ```
 
 Current schema constraints:
 
-- `format = "con.workspace.layout"`
+- `format = "vu.workspace.layout"`
 - `version = 1`
 - tabs, panes, surfaces, split geometry, cwd, and optional agent defaults
 - no `run`
@@ -368,14 +368,14 @@ Current schema constraints:
 
 Future task files should be separate:
 
-- `.con/tasks.toml`: explicit named commands users pick from a menu
+- `.vu/tasks.toml`: explicit named commands users pick from a menu
 
 Do not combine layout and command replay. It creates a trust model before the
 product needs one.
 
 ### 5. Screen Text History
 
-Terminal scrollback in Con is currently runtime-only. That is a meaningful gap:
+Terminal scrollback in Vu is currently runtime-only. That is a meaningful gap:
 screen text history is a practical continuity feature, and iTerm2 users expect
 it.
 
@@ -389,7 +389,7 @@ Production direction:
 - avoid recording alternate-screen TUIs by default unless the user explicitly
   enables it
 
-This should be implemented separately from layout restore. Layout tells Con
+This should be implemented separately from layout restore. Layout tells Vu
 where terminals belong. Transcript history tells the user what happened there.
 
 ## Startup Semantics
@@ -398,7 +398,7 @@ where terminals belong. Transcript history tells the user what happened there.
 | --- | --- |
 | Cold app launch | Restore windows from `launch.json` if enabled. |
 | Cmd+N | Fresh scratch window with shared history only. |
-| Open Folder / `con <path>` | Restore private project memory if present; otherwise fresh root shell. |
+| Open Folder / `vu <path>` | Restore private project memory if present; otherwise fresh root shell. |
 | Dock click after all windows closed | Reopen one clean/default window, or last window if the user chose that setting. |
 | Second process invocation | Forward to running app through the control socket, then exit. |
 | Crash recovery | Restore last private shape, but never pretend processes resumed. |
@@ -472,23 +472,23 @@ Status: after AppState.
 
 Status: layout import/export is implemented; task files remain deferred.
 
-- Save Layout Profile writes a generated `.con/workspace.toml` from the live
+- Save Layout Profile writes a generated `.vu/workspace.toml` from the live
   window.
 - Add Tabs from Layout Profile imports a profile into the current window.
 - Open Layout Profile in New Window imports a profile into a separate window.
-- `con <project-folder>` opens the project profile when present; plain `con`
+- `vu <project-folder>` opens the project profile when present; plain `vu`
   remains private restore.
-- Start with `.con/tasks.toml` for named commands.
-- Keep `.con/workspace.toml` layout-only.
+- Start with `.vu/tasks.toml` for named commands.
+- Keep `.vu/workspace.toml` layout-only.
 - Never store secrets, conversations, command history, scrollback, active focus,
   or trust decisions in repo files.
 
 ### Phase 6: Screen Text History
 
-Status: first visual continuity slice implemented in this PR. On macOS, Con
+Status: first visual continuity slice implemented in this PR. On macOS, Vu
 adds a narrow embedded-Ghostty `initial_output` hook at build time and feeds the
 snapshot through Ghostty's own terminal parser before the shell IO thread starts.
-On Windows and Linux, Con feeds the same sanitized snapshot into the
+On Windows and Linux, Vu feeds the same sanitized snapshot into the
 `libghostty-vt` parser before starting ConPTY / the Unix PTY. This keeps
 restored text selectable, scrollable, and clipped by the terminal renderer
 instead of rendering a separate UI layer. Deeper native scrollback integration
@@ -498,7 +498,7 @@ If Ghostty's upstream source shape drifts and the macOS embedding patch cannot
 be applied, the build disables the hook and emits a Cargo warning instead of
 failing the whole app build. That keeps terminal text restore optional for
 casual local builds. macOS release packaging
-sets `CON_REQUIRE_GHOSTTY_INITIAL_OUTPUT=1`, so the same drift blocks release
+sets `VU_REQUIRE_GHOSTTY_INITIAL_OUTPUT=1`, so the same drift blocks release
 artifacts and forces the patch to be rebased before shipping.
 
 - Add bounded transcript capture per pane/surface.
@@ -523,7 +523,7 @@ artifacts and forces the patch to be rebased before shipping.
 Before a restorable-workspace PR is merge-ready, verify:
 
 - Cmd+N opens a fresh scratch window.
-- Reopening Con after quit restores the previous private shape.
+- Reopening Vu after quit restores the previous private shape.
 - Pane-local surfaces survive restore with correct title/cwd/owner.
 - No project file is written unless the user explicitly requests export.
 - No command runs because of restore.

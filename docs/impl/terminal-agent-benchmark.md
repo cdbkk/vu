@@ -1,8 +1,8 @@
 # Implementation: Terminal Agent Benchmark
 
-## Why Con needs its own benchmark
+## Why Vu needs its own benchmark
 
-Con is not trying to win a generic coding benchmark.
+Vu is not trying to win a generic coding benchmark.
 
 The product claim is narrower and harder:
 
@@ -43,7 +43,7 @@ such as interactive subagent panes.
 
 ### 2. Operator suites
 
-This layer executes real multi-turn benchmark prompts through `con-cli agent ask`.
+This layer executes real multi-turn benchmark prompts through `vu-cli agent ask`.
 
 It is not pretending to be a fully machine-scored intelligence benchmark yet. The current purpose is:
 
@@ -51,7 +51,7 @@ It is not pretending to be a fully machine-scored intelligence benchmark yet. Th
 - keep the prompt sequence stable and replayable
 - reset the in-tab conversation when a profile needs a clean slate
 - allow explicit visible-shell setup commands when a profile needs deterministic prep
-- allow explicit local shell setup commands when a profile needs deterministic preflight outside Con itself, such as clearing a remote tmux session before a run
+- allow explicit local shell setup commands when a profile needs deterministic preflight outside Vu itself, such as clearing a remote tmux session before a run
 - record the full transcript as benchmark evidence
 
 Current operator flows live in the operator profiles under `benchmarks/terminal-agent/profiles/`.
@@ -97,7 +97,7 @@ These are scored against product criteria such as:
 
 Operator runs become comparable when they are judged against a stable rubric.
 
-Con now commits those rubrics under:
+Vu now commits those rubrics under:
 
 - `benchmarks/terminal-agent/rubrics/`
 
@@ -124,9 +124,9 @@ The LLM judge is intentionally a second layer, not the primary source of truth:
 
 That keeps the loop auditable. The judge does not replace the rubric; it helps inspect the detailed transcript without collapsing everything into a hand-written summary.
 
-For broader evaluation, `iterate.py` now launches a fresh Con app instance per iteration with an isolated socket, isolated XDG data/config homes, an isolated session file, and an isolated conversation directory. That keeps one operator run from polluting the next with restored session state on macOS too.
+For broader evaluation, `iterate.py` now launches a fresh Vu app instance per iteration with an isolated socket, isolated XDG data/config homes, an isolated session file, and an isolated conversation directory. That keeps one operator run from polluting the next with restored session state on macOS too.
 
-One honest environment boundary remains: a subprocess-launched Con app can still fail to acquire a live Ghostty surface under some macOS launch contexts. When every retry fails with `ghostty_surface_new returned null`, the batch runner now classifies that iteration as `blocked` with reason `ghostty_surface_bootstrap_unavailable` instead of pretending it is a scored product regression.
+One honest environment boundary remains: a subprocess-launched Vu app can still fail to acquire a live Ghostty surface under some macOS launch contexts. When every retry fails with `ghostty_surface_new returned null`, the batch runner now classifies that iteration as `blocked` with reason `ghostty_surface_bootstrap_unavailable` instead of pretending it is a scored product regression.
 
 That is how the benchmark becomes a product-improvement system instead of only a demo script.
 
@@ -179,9 +179,9 @@ That makes the benchmark usable across real environments instead of only on one 
 
 ## Why this split is intentional
 
-If Con tries to make every tmux or SSH behavior a strict exact-output benchmark too early, the benchmark will become fragile and dishonest.
+If Vu tries to make every tmux or SSH behavior a strict exact-output benchmark too early, the benchmark will become fragile and dishonest.
 
-If Con only does human demos, regressions will slip constantly.
+If Vu only does human demos, regressions will slip constantly.
 
 So the benchmark stays hybrid:
 
@@ -215,7 +215,7 @@ When adding a new benchmark:
 The strict suite works against:
 
 - local macOS shell
-- a real running Con app session
+- a real running Vu app session
 - the live Unix socket surface
 
 The playbooks currently assume operator-provided remote hosts such as `haswell`.

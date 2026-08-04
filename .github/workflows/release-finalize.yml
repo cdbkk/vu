@@ -16,7 +16,7 @@ name: Finalize release
 # `/releases/latest` — even though the other two platforms still
 # hadn't uploaded their assets. Fresh installs hit the symptom
 #
-#   irm https://nowled.ge/con-ps1 | iex
+#   irm https://nowled.ge/vu-ps1 | iex
 #   ✗ no ZIP found for windows-x86_64
 #
 # (the tag was "latest" but only the Linux tarball was attached).

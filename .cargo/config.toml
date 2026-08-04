@@ -1,7 +1,7 @@
-# Build/run shortcuts for targets that can't use the default `[[bin]] con`.
+# Build/run shortcuts for targets that can't use the default `[[bin]] vu`.
 #
-# `CON` is a reserved DOS device name on Windows, so the Windows build
-# ships as `vu-app.exe` via the `bin-con-app` feature. These aliases
+# Windows release workflows retain the `vu-app.exe` alias via the
+# `bin-vu-app` feature. These aliases
 # wrap the longer `--no-default-features --features` incantation so day-
 # to-day commands stay ergonomic:
 #

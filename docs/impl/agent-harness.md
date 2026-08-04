@@ -4,16 +4,16 @@
 
 The agent harness orchestrates the AI agent lifecycle: user input → model call → tool execution → response delivery. It bridges three crates:
 
-- **con-agent** — Rig integration, tools, hooks, conversation state
-- **con-core** — Harness orchestration, event routing, config
-- **con** — GPUI workspace, agent panel rendering, approval UI
+- **vu-agent** — Rig integration, tools, hooks, conversation state
+- **vu-core** — Harness orchestration, event routing, config
+- **vu** — GPUI workspace, agent panel rendering, approval UI
 
 ## Architecture
 
 The harness is split into two concerns: **shared infrastructure** (one per window) and **per-tab sessions** (one per tab).
 
 ```
-Window (ConWorkspace)
+Window (VuWorkspace)
   │
   ├─ AgentHarness (shared)
   │   ├── config: AgentConfig       ← provider, model, auth
@@ -49,7 +49,7 @@ Window (ConWorkspace)
 User Input (Tab N)
     │
     ▼
-ConWorkspace::send_to_agent()
+VuWorkspace::send_to_agent()
     │
     ├── Adds user message to AgentPanel
     ├── Snapshots Ghostty pane state → TerminalContext
@@ -69,9 +69,9 @@ ConWorkspace::send_to_agent()
                     └── Calls provider.send(conv, ctx, event_tx, approval_rx)
                             │
                             ▼
-                        AgentProvider (con-agent)
+                        AgentProvider (vu-agent)
                             │
-                            ├── Builds Rig Agent with tools + ConHook
+                            ├── Builds Rig Agent with tools + VuHook
                             ├── Creates streaming request with conversation history
                             └── agent.stream_prompt(msg).history(history)
                                     │
@@ -79,10 +79,10 @@ ConWorkspace::send_to_agent()
                                 Rig Agent Loop
                                     │
                                     ├── Calls model API
-                                    ├── on_tool_call → ConHook emits ToolCallStart
+                                    ├── on_tool_call → VuHook emits ToolCallStart
                                     │                  (blocks for approval if dangerous)
                                     ├── Executes tool
-                                    ├── on_tool_result → ConHook emits ToolCallComplete
+                                    ├── on_tool_result → VuHook emits ToolCallComplete
                                     └── Returns response text
                             │
                             ▼
@@ -151,7 +151,7 @@ This avoids cloning — `mem::replace` moves ownership. The AgentPanel always di
 ### Per-request approval channel (UI → Hook)
 - Fresh `crossbeam::unbounded::<ToolApprovalDecision>()` per `send_message()` call
 - Sender delivered to UI inside `HarnessEvent::ToolApprovalNeeded`
-- Receiver owned by `ConHook` for that request
+- Receiver owned by `VuHook` for that request
 - Hook blocks with 5-minute timeout on `recv_timeout()`
 
 ### Bridge thread (AgentEvent → HarnessEvent)
@@ -185,7 +185,7 @@ This avoids cloning — `mem::replace` moves ownership. The AgentPanel always di
 | `tmux_ensure_agent_target` | Dangerous | Requires approval (or auto_approve) |
 
 Classification happens in two places:
-1. `ConHook::on_tool_call` — blocks on approval for dangerous tools
+1. `VuHook::on_tool_call` — blocks on approval for dangerous tools
 2. Bridge thread in harness — emits `ToolApprovalNeeded` event for dangerous tools
 
 ## Conversation State
@@ -196,7 +196,7 @@ The mutex is held briefly for two operations:
 1. **Snapshot** — clone conversation before agent call
 2. **Add message** — insert assistant response after agent completes
 
-Each streaming request receives history from `to_rig_history()` as User/Assistant text pairs. Rig appends tool call/result messages during its turn loop and returns the final response to Con for persistence.
+Each streaming request receives history from `to_rig_history()` as User/Assistant text pairs. Rig appends tool call/result messages during its turn loop and returns the final response to Vu for persistence.
 
 ## Focused Pane Fact Preflight
 
@@ -235,11 +235,11 @@ auto_approve_tools = false  # skip approval for dangerous tools
 max_turns = 10              # max tool-use turns per request
 ```
 
-`auto_approve_tools = true` makes `ConHook` continue all tool calls without consulting the approval channel. Rig 0.40 uses an exact total model-call budget; Con preserves the ceiling shipped by its earlier Rig integration when converting `max_turns`.
+`auto_approve_tools = true` makes `VuHook` continue all tool calls without consulting the approval channel. Rig 0.40 uses an exact total model-call budget; Vu preserves the ceiling shipped by its earlier Rig integration when converting `max_turns`.
 
 ## Input Classification
 
-`classify_input(input, is_remote)` determines whether user input is a skill invocation, a shell command, or a natural language query. The `is_remote` flag is only enabled when the focused pane's runtime state contains a proven remote host. con no longer guesses remote identity from pane titles or status-line text.
+`classify_input(input, is_remote)` determines whether user input is a skill invocation, a shell command, or a natural language query. The `is_remote` flag is only enabled when the focused pane's runtime state contains a proven remote host. vu no longer guesses remote identity from pane titles or status-line text.
 
 1. **Skill** — starts with `/` and matches a registered skill name
 2. **Shell command** — structural analysis (see below)
@@ -268,28 +268,28 @@ When the focused pane is an SSH session, remote executables aren't on the local 
 
 The system prompt is built from a live pane snapshot, not process-wide environment variables. For the focused pane we derive host, title, pane mode (`shell`, `multiplexer`, `tui`, `unknown`), and whether shell metadata is fresh enough to trust for the visible app.
 
-When multiple panes are open, the system prompt includes a `<panes>` block listing every pane with both its current `pane_index` and its stable `pane_id`, plus hostname, cwd, mode, shell-metadata freshness, backend-support flags, and typed control state. That control state includes the pane's address space, front-most visible target, nested target stack, control channels, capabilities, and notes. This lets the agent target the right pane immediately without confusing a con pane with a tmux pane or editor target, and without assuming pane position stays fixed after the layout changes.
+When multiple panes are open, the system prompt includes a `<panes>` block listing every pane with both its current `pane_index` and its stable `pane_id`, plus hostname, cwd, mode, shell-metadata freshness, backend-support flags, and typed control state. That control state includes the pane's address space, front-most visible target, nested target stack, control channels, capabilities, and notes. This lets the agent target the right pane immediately without confusing a vu pane with a tmux pane or editor target, and without assuming pane position stays fixed after the layout changes.
 
 This matters for SSH, tmux, and full-screen TUIs:
 
-- `ssh_host` is only populated when a remote host is proven. If con cannot prove it, the prompt says `unknown`.
+- `ssh_host` is only populated when a remote host is proven. If vu cannot prove it, the prompt says `unknown`.
 - `tmux_session` only comes from authoritative command-line evidence, not from inherited process environment, pane titles, or status-line patterns.
-- Shell freshness now comes from Ghostty command-boundary tracking. After any unconfirmed PTY input, con stops trusting cwd and last-command metadata until shell integration proves a fresh prompt again.
+- Shell freshness now comes from Ghostty command-boundary tracking. After any unconfirmed PTY input, vu stops trusting cwd and last-command metadata until shell integration proves a fresh prompt again.
 - Current embedded Ghostty panes explicitly report what the backend cannot prove yet. Today that includes authoritative foreground command text, alternate-screen state, and remote-host identity, so manual tmux/editor/SSH flows may remain `unknown` until Ghostty exports stronger facts.
 - When the pane mode is not `shell`, or shell metadata is stale, the prompt explicitly tells the model to inspect the live pane with `list_panes`, `read_pane`, and `send_keys` before making claims about cwd, hostname, or the running app.
 
-con now keeps a per-pane runtime tracker for each tab. The tracker is reducer-based: it merges Ghostty observations, typed shell-probe results, and con-originated actions such as pane creation, visible shell exec, raw input, and process exit. It invalidates active tmux/app state when a fresh shell prompt returns without a fresh typed probe, and it exposes both current runtime truth and recent causal history to the prompt, `list_panes`, the sidebar, and smart-input classification.
+vu now keeps a per-pane runtime tracker for each tab. The tracker is reducer-based: it merges Ghostty observations, typed shell-probe results, and vu-originated actions such as pane creation, visible shell exec, raw input, and process exit. It invalidates active tmux/app state when a fresh shell prompt returns without a fresh typed probe, and it exposes both current runtime truth and recent causal history to the prompt, `list_panes`, the sidebar, and smart-input classification.
 
-On top of that tracker, con now derives a typed `PaneControlState` for each pane. This is the shared contract for prompt writing, `list_panes`, and visible-exec guards:
+On top of that tracker, vu now derives a typed `PaneControlState` for each pane. This is the shared contract for prompt writing, `list_panes`, and visible-exec guards:
 
 - `address_space` says what `pane_index` actually refers to
-- `pane_id` is the stable identity for that con pane while it exists
+- `pane_id` is the stable identity for that vu pane while it exists
 - `visible_target` says what app or runtime is currently in front
-- `target_stack` preserves nested layers when con can actually prove them
+- `target_stack` preserves nested layers when vu can actually prove them
 - `control_attachments` say what protocol/session surfaces are actually attached right now
-- `control_channels` say how con may act
+- `control_channels` say how vu may act
 - `control_capabilities` say what is allowed right now
-- `control_notes` explain important limits such as "this is tmux inside a con pane"
+- `control_notes` explain important limits such as "this is tmux inside a vu pane"
 
 When `probe_shell_context` is present in `control_capabilities`, the agent has a read-only shell-scoped introspection path on that pane. It can ask the live shell for hostname, SSH env, tmux env, tmux session/window/pane ids, and Neovim socket hints without pretending those facts came from Ghostty itself. The result is also fed back into the pane tracker, so future turns can reuse that shell context until newer input makes it stale.
 
@@ -298,12 +298,12 @@ Before each agent turn, the harness now runs a deterministic read-only fact pass
 - if a fresh shell prompt is proven and shell probing is available, it auto-runs `probe_shell_context`
 - if that refreshed pane now exposes tmux-native query, it auto-fetches tmux pane inventory too
 
-This is intentional. The preflight is driven by typed control capabilities, not by the wording of the user's message. con gathers the strongest safe facts first, then lets the model reason over them.
+This is intentional. The preflight is driven by typed control capabilities, not by the wording of the user's message. vu gathers the strongest safe facts first, then lets the model reason over them.
 
 For whole-tab situation questions, the harness and prompt now also carry a typed tab-workspace view. This lets the model describe things like "remote shell ready", "tmux workspace", or "SSH connection appears closed" at the pane level before it decides where to act.
 
-con also now exposes a tmux-specific inspect surface. `tmux_inspect` returns tmux adapter state when tmux has been authoritatively detected, including the explicit reason native tmux pane/window control is not yet available.
+vu also now exposes a tmux-specific inspect surface. `tmux_inspect` returns tmux adapter state when tmux has been authoritatively detected, including the explicit reason native tmux pane/window control is not yet available.
 
 What is still missing is stronger backend truth for foreground runtime identity. The next layer is not more local heuristics; it is an upstream Ghostty observability contract for explicit foreground process and semantic prompt state. See `docs/impl/pane-runtime-observer.md`.
 
-Separately, con also needs a control-plane split between visible shell execution, local hidden execution, tmux-native control, and raw TUI input. That design lives in `docs/impl/agent-runtime-control-plane.md`.
+Separately, vu also needs a control-plane split between visible shell execution, local hidden execution, tmux-native control, and raw TUI input. That design lives in `docs/impl/agent-runtime-control-plane.md`.

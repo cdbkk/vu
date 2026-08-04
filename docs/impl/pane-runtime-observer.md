@@ -1,6 +1,6 @@
 # Pane Runtime Observer
 
-This document keeps the original name, but the current implementation direction in con is a reducer-backed pane runtime tracker.
+This document keeps the original name, but the current implementation direction in vu is a reducer-backed pane runtime tracker.
 
 ## Why this exists
 
@@ -115,7 +115,7 @@ Consumers must receive structured runtime state, not re-run their own heuristics
 
 An immutable observation snapshot emitted by a backend adapter.
 
-Current implementation in con:
+Current implementation in vu:
 
 - `title`
 - `cwd`
@@ -175,7 +175,7 @@ Suggested sources:
 
 The durable observer output for one pane.
 
-Current implementation in con:
+Current implementation in vu:
 
 - `front_state`
 - `mode`
@@ -200,7 +200,7 @@ A pane should expose nested scopes instead of a single label.
 In the shipped reducer, there are now two scope stacks with different meaning:
 
 - `scope_stack`: current verified foreground stack only
-- `last_verified_scope_stack`: last shell frame con verified through a typed shell probe
+- `last_verified_scope_stack`: last shell frame vu verified through a typed shell probe
 
 This is intentional.
 
@@ -208,7 +208,7 @@ This is intentional.
 
 ## Shipped tmux attachment
 
-con now uses that distinction to unlock the first native tmux control path safely.
+vu now uses that distinction to unlock the first native tmux control path safely.
 
 When all of these are true:
 
@@ -216,7 +216,7 @@ When all of these are true:
 - the shell context is fresh
 - the shell probe confirms tmux in that shell frame
 
-con can treat tmux as a native protocol attachment instead of a raw visible TUI.
+vu can treat tmux as a native protocol attachment instead of a raw visible TUI.
 
 That allows:
 
@@ -290,7 +290,7 @@ They are not direct foreground-process identity.
 #### Upstreamable runtime facts
 
 Ghostty clearly owns the PTY and process group internally.
-If con needs high-confidence local foreground-app identity, the durable path is to expose that through libghostty instead of rebuilding a parallel PTY stack in this repo.
+If vu needs high-confidence local foreground-app identity, the durable path is to expose that through libghostty instead of rebuilding a parallel PTY stack in this repo.
 
 That should be treated as an upstream API contract project, not a local shortcut.
 
@@ -315,11 +315,11 @@ It should invalidate shell-metadata freshness for visible-app claims.
 
 Current embedded Ghostty note:
 
-the runtime model is ready for this signal, but the public embedded surface API does not export it yet. con therefore treats alternate-screen support as an explicit backend capability, and it is currently false on Ghostty panes.
+the runtime model is ready for this signal, but the public embedded surface API does not export it yet. vu therefore treats alternate-screen support as an explicit backend capability, and it is currently false on Ghostty panes.
 
 ### Raw observations
 
-These remain valuable to the model, but con does not promote them into typed runtime state.
+These remain valuable to the model, but vu does not promote them into typed runtime state.
 
 #### Screen text and structure
 
@@ -374,7 +374,7 @@ Important consequence:
 
 we should not design the pane-runtime system around assumptions that Ghostty will tell us the exact foreground app or nested scope stack today.
 
-Ghostty should feed Layer 1 facts. Layer 2 should remain a con-owned observer that merges those facts into a defensible runtime model.
+Ghostty should feed Layer 1 facts. Layer 2 should remain a vu-owned observer that merges those facts into a defensible runtime model.
 
 ## Ghostty-specific observations
 
@@ -391,9 +391,9 @@ Also, Ghostty's OSC 7 handling validates the reported hostname against the local
 
 This matters because a product design that depends on remote hostname coming from Ghostty `PWD` is structurally unsound.
 
-Current con behavior reflects that limit:
+Current vu behavior reflects that limit:
 
-- remote host identity is left `unknown` unless con has a stronger backend fact
+- remote host identity is left `unknown` unless vu has a stronger backend fact
 - tmux and agent-CLI identity only enter typed runtime state through authoritative command-line or surface-state evidence
 - pane titles and screen structure remain raw observations for the model, not runtime facts
 - prompt and `list_panes` expose backend-support flags so the model can see when Ghostty cannot prove command text, alternate-screen state, or remote-host identity
@@ -465,7 +465,7 @@ Manual labels should never overwrite facts. They should layer on top of them.
 
 Purpose:
 
-- define the next upstream libghostty exports con actually needs
+- define the next upstream libghostty exports vu actually needs
 - avoid rebuilding a parallel PTY/process introspection stack beside Ghostty
 
 High-value future exports:
@@ -524,7 +524,7 @@ It also enables better product surfaces:
 
 ### Phase 1
 
-Shipped in con:
+Shipped in vu:
 
 - `PaneObservationFrame`, `PaneEvidence`, `PaneRuntimeState`, and `PaneRuntimeObserver`
 - per-tab observer maps keyed by `PaneId`
@@ -582,6 +582,6 @@ This design avoids three long-term failures:
 2. over-trusting shell metadata when a TUI has taken over the screen
 3. scattering app-specific heuristics across prompts, tools, and UI labels
 
-That is the standard required if con wants real credibility in SSH, tmux, and external-agent workflows.
+That is the standard required if vu wants real credibility in SSH, tmux, and external-agent workflows.
 
-The next paired layer is the control plane: how con safely acts on those observed runtimes without confusing con panes, tmux panes, shell execution, and TUI input. con now ships the first typed `PaneControlState` layer on top of the observer, and the longer-term design remains in `docs/impl/agent-runtime-control-plane.md`.
+The next paired layer is the control plane: how vu safely acts on those observed runtimes without confusing vu panes, tmux panes, shell execution, and TUI input. vu now ships the first typed `PaneControlState` layer on top of the observer, and the longer-term design remains in `docs/impl/agent-runtime-control-plane.md`.

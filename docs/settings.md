@@ -1,6 +1,6 @@
 # Settings
 
-con should feel good before you change anything. Use Settings when you want to
+vu should feel good before you change anything. Use Settings when you want to
 make the terminal fit your hands: choose a theme, connect an AI provider, tune
 suggestions, add skills, or change shortcuts.
 
@@ -17,7 +17,7 @@ General contains app-level behavior:
 - saved terminal text privacy
 - skill source folders
 
-If you prefer con not to save terminal text between launches, turn off
+If you prefer vu not to save terminal text between launches, turn off
 **Restore Terminal Text** in General. Layout profiles never include terminal
 text. To wipe terminal text already saved on disk, run **Clear Restored Terminal
 History** from Command Palette.
@@ -30,14 +30,14 @@ Press <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>P</kbd> on macOS, or
 The Command Palette is the fastest way to find actions you do not use every
 minute. Search for Settings, workspace profiles, pane actions, surface actions,
 updates, privacy actions, and other commands. When an action has a shortcut,
-con shows it beside the action.
+vu shows it beside the action.
 
 ## Appearance
 
-Appearance controls the parts of con you look at all day:
+Appearance controls the parts of vu you look at all day:
 
 <p align="center">
-  <img width="1080" alt="Con Appearance settings with theme and transparency controls" src="https://github.com/user-attachments/assets/c730d158-139b-46d5-adbb-0cd48d38b603" />
+  <img width="1080" alt="Vu Appearance settings with theme and transparency controls" src="https://github.com/user-attachments/assets/c730d158-139b-46d5-adbb-0cd48d38b603" />
 </p>
 
 - terminal theme
@@ -55,7 +55,7 @@ want direct close/fullscreen controls and drag-to-rearrange. Turn them off if
 you prefer a sparse terminal surface and use shortcuts or the terminal context
 menu for pane actions.
 
-con can import Ghostty themes. Copy a theme, choose **Load from Clipboard**,
+vu can import Ghostty themes. Copy a theme, choose **Load from Clipboard**,
 preview it, then save it when it feels right.
 
 ## AI providers
@@ -64,7 +64,7 @@ The Providers section stores the connection details for the model hosts you use.
 The AI section chooses the active provider and model for the agent panel,
 Command Palette AI actions, and AI fallback suggestions.
 
-con supports Anthropic, OpenAI, ChatGPT, GitHub Copilot, OpenAI-compatible
+vu supports Anthropic, OpenAI, ChatGPT, GitHub Copilot, OpenAI-compatible
 hosts, MiniMax, Moonshot, Z.AI, DeepSeek, Groq, Gemini, Ollama, OpenRouter,
 Mistral, Together, Cohere, Perplexity, and xAI.
 
@@ -95,7 +95,7 @@ path.
 
 Suggestions are terminal help, not a second prompt.
 
-con checks local command history first. If history has no strong match, AI
+vu checks local command history first. If history has no strong match, AI
 Command Suggestions can ask the configured suggestion provider for a fallback.
 You can turn this off, or route suggestions to a different provider and model
 from the main agent.
@@ -115,14 +115,14 @@ Project skills live with the current workspace:
 
 - `skills/`
 - `.agents/skills/`
-- `.con/skills/`
+- `.vu/skills/`
 
 Global skills follow you across projects:
 
-- `~/.config/con/skills`
+- `~/.config/vu/skills`
 - `~/.agents/skills`
 
-On Windows, the config skills folder is `~/.config/con-terminal/skills`.
+On Windows, the config skills folder is `~/.config/vu-terminal/skills`.
 
 Keep project skills for shared project habits. Keep global skills for personal
 habits. If names collide, the project skill wins so a repository can define its
@@ -133,17 +133,17 @@ For the workflow loop, see [Skills and workflows](skills-and-workflows.md).
 ## Shortcuts
 
 The Keys section shows editable shortcuts for app, pane, and surface actions.
-It also includes the optional global Summon / Hide Con shortcut. That shortcut
+It also includes the optional global Summon / Hide Vu shortcut. That shortcut
 is off by default because global hotkeys can conflict with launchers and window
 managers.
 
 On macOS, Keys also includes Quick Terminal. It is off by default. When enabled,
-it opens a dedicated floating Con window from anywhere, separate from the main
+it opens a dedicated floating Vu window from anywhere, separate from the main
 window. The default shortcut is <kbd>⌘</kbd> <kbd>Backslash</kbd>, and you can
 record a different one if it conflicts with your setup.
 
 For the full behavior, including hide/show state and how it differs from Summon
-/ Hide Con, see [Quick Terminal](quick-terminal.md).
+/ Hide Vu, see [Quick Terminal](quick-terminal.md).
 
 Change shortcuts when the default conflicts with muscle memory. Leave them alone
 when the built-in flow already works. A good setup should reduce decisions, not

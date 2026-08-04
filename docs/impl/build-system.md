@@ -2,7 +2,7 @@
 
 ## Overview
 
-con is a Cargo workspace with platform terminal backends:
+vu is a Cargo workspace with platform terminal backends:
 
 - macOS embeds full Ghostty with Metal rendering.
 - Windows uses ConPTY plus `libghostty-vt` and a D3D11/DirectWrite renderer.
@@ -15,7 +15,7 @@ The build no longer includes the old `vte` and `portable-pty` pipeline.
 ```bash
 cargo build
 cargo build --release
-cargo run -p con
+cargo run -p vu
 cargo test --workspace
 ```
 
@@ -24,13 +24,13 @@ cargo test --workspace
 ```toml
 [workspace]
 members = [
-    "crates/con-app",
-    "crates/con-core",
-    "crates/con-paths",
-    "crates/con-terminal",
-    "crates/con-ghostty",
-    "crates/con-agent",
-    "crates/con-cli",
+    "crates/vu-app",
+    "crates/vu-core",
+    "crates/vu-paths",
+    "crates/vu-terminal",
+    "crates/vu-ghostty",
+    "crates/vu-agent",
+    "crates/vu-cli",
 ]
 ```
 
@@ -38,12 +38,12 @@ members = [
 
 | Crate | Purpose |
 |-------|---------|
-| `con` | GPUI app shell, tabs, splits, settings, agent panel |
-| `con-core` | harness, config, session persistence |
-| `con-paths` | shared platform-safe per-user app directories |
-| `con-ghostty` | Rust wrapper around libghostty C API |
-| `con-terminal` | terminal theme data and Ghostty palette translation helpers |
-| `con-agent` | built-in AI harness and tools |
+| `vu` | GPUI app shell, tabs, splits, settings, agent panel |
+| `vu-core` | harness, config, session persistence |
+| `vu-paths` | shared platform-safe per-user app directories |
+| `vu-ghostty` | Rust wrapper around libghostty C API |
+| `vu-terminal` | terminal theme data and Ghostty palette translation helpers |
+| `vu-agent` | built-in AI harness and tools |
 
 ## Key dependencies
 
@@ -58,31 +58,30 @@ members = [
 
 ## Dependency sourcing
 
-`con` does not build against live sources in `3pp/`.
+`vu` does not build against live sources in `3pp/`.
 
 - `3pp/` is read-only reference material only.
 - Cargo dependencies resolve from crates.io or explicit git sources in the workspace manifest.
-- Ghostty source is fetched by `con-ghostty/build.rs` when needed, unless an override source directory is provided for local development.
+- Ghostty source is fetched by `vu-ghostty/build.rs` when needed, unless an override source directory is provided for local development.
 
 ## Platform boundary
 
-The `con` UI binary builds on macOS, Windows, and Linux. Platform-specific
+The `vu` UI binary builds on macOS, Windows, and Linux. Platform-specific
 runtime code is `cfg`-gated:
 
 - macOS uses the embedded libghostty surface.
-- Windows uses the `con-app.exe` binary name because `CON` is a reserved DOS
-  device name.
-- Linux keeps the normal `con` binary name.
+- Windows release workflows retain the `vu-app.exe` binary alias.
+- Linux keeps the normal `vu` binary name.
 
 ## Per-user app paths
 
-Use `con-paths` for all user config, data, auth, theme, and skill storage paths.
-Windows cannot safely use a bare `con` path segment, so `con-paths` maps the app
-directory to `con-terminal` on Windows while preserving `con` on macOS and Linux.
+Use `vu-paths` for all user config, data, auth, theme, and skill storage paths.
+Windows uses the `vu-terminal` app-directory name, so `vu-paths` maps the app
+directory to `vu-terminal` on Windows while preserving `vu` on macOS and Linux.
 
 ## Ghostty build boundary
 
-`con-ghostty` is intentionally thin:
+`vu-ghostty` is intentionally thin:
 
 - FFI bindings live in `ffi.rs`
 - surface/app lifecycle lives in `terminal.rs`
@@ -96,9 +95,9 @@ Ghostty's runtime is not just the static library. The child shell environment al
 - shell integration scripts
 - supporting share files under `Resources/ghostty`
 
-Con now handles this in two places:
+Vu now handles this in two places:
 
-- `cargo run -p con` debug runs: `con-ghostty` seeds `GHOSTTY_RESOURCES_DIR` from the built Ghostty `zig-out/share/ghostty` directory when that directory exists locally.
+- `cargo run -p vu` debug runs: `vu-ghostty` seeds `GHOSTTY_RESOURCES_DIR` from the built Ghostty `zig-out/share/ghostty` directory when that directory exists locally.
 - macOS app bundles: `scripts/macos/build-app.sh` copies Ghostty's built `share/ghostty` tree into `Contents/Resources/ghostty`.
 
 Without that payload, Ghostty falls back to `TERM=xterm-256color` and disables parts of shell integration. That changes the behavior child processes see and can invalidate product comparisons against standalone Ghostty.

@@ -23,22 +23,22 @@ What changed:
   `update_colors`. Theme switches in the settings panel now actually
   take effect on the Linux pane.
 - Added `linux_view::tests` covering the row renderer (with and
-  without cursor) and the color-alpha decoder. All 12 `con` tests +
-  5 `con-ghostty` tests pass under `RUSTFLAGS="-D warnings"`.
+  without cursor) and the color-alpha decoder. All 12 `vu` tests +
+  5 `vu-ghostty` tests pass under `RUSTFLAGS="-D warnings"`.
 
 Cross-platform safety:
 
-- Only two shared files touched: `con-ghostty/src/lib.rs` (six new
+- Only two shared files touched: `vu-ghostty/src/lib.rs` (six new
   lines, all `#[cfg(target_os = "linux")]`-gated re-exports) and
-  `con-ghostty/src/vt.rs` (a single `PartialEq, Eq` derive added on
+  `vu-ghostty/src/vt.rs` (a single `PartialEq, Eq` derive added on
   `vt::Cell`, a `#[repr(C)]` POD struct that's only compiled on
   Windows + Linux).
 - macOS modules (`terminal.rs`, `ffi.rs`, `objc/`, `ghostty_view.rs`)
   are byte-for-byte unchanged. `pub mod vt` itself is
   `#[cfg(any(target_os = "windows", target_os = "linux"))]` — macOS
   never sees the `Cell` struct or the new derive.
-- `con-ghostty` cross-checks clean for `--target x86_64-pc-windows-msvc`
-  with `CON_SKIP_GHOSTTY_VT=1`.
+- `vu-ghostty` cross-checks clean for `--target x86_64-pc-windows-msvc`
+  with `VU_SKIP_GHOSTTY_VT=1`.
 
 Verification on a native-ish Linux desktop:
 
@@ -46,11 +46,11 @@ Verification on a native-ish Linux desktop:
   needs edition 2024 / Cargo 1.85+), Zig 0.15.2 to `~/.local/`, the
   GPUI Linux apt deps the CI job already installs, plus
   `mesa-vulkan-drivers` for a software ICD.
-- `cargo build -p con` produces a 314 MB debug binary in
-  `target/debug/con`. Launches against the headless X11 display,
+- `cargo build -p vu` produces a 314 MB debug binary in
+  `target/debug/vu`. Launches against the headless X11 display,
   brings up its WGPU/Vulkan surface on llvmpipe, and binds the
-  control socket at `/tmp/con.sock`.
-- End-to-end check via `con-cli`: `panes list` reports the bash pane,
+  control socket at `/tmp/vu.sock`.
+- End-to-end check via `vu-cli`: `panes list` reports the bash pane,
   `panes send-keys` + `panes read` confirm `pwd`, `ls --color=always`,
   `printf "\033[31m..."` etc. all execute and the styled output is
   consumed by the parser; the GPUI view repaints the styled cells
@@ -78,16 +78,16 @@ What's still not complete after this PR (carry-over for phase 5/6):
 ## Visual verification on a Linux desktop session
 
 Verified on the cloud-agent VM's actual XFCE desktop session (not
-just the headless `con-cli` round-trip). The XFCE compositor,
+just the headless `vu-cli` round-trip). The XFCE compositor,
 `xfwm4` window manager, and real `xfdesktop` panel are running on
-`:1`; con joins as a regular client window with **client-side
+`:1`; vu joins as a regular client window with **client-side
 decorations** (the GPUI top bar replaces xfwm's frame). Captures
 taken via `xwd` → `convert`:
 
 `screenshots/2026-04-23-fresh-launch.png` — fresh launch, empty
 shell. The Flexoki Dark terminal pane shows the live `~ $` bash
 prompt and a solid dark **block cursor** sitting after the `$`,
-rendered in **IoskeleyMono** (proper monospace cell grid). The con
+rendered in **IoskeleyMono** (proper monospace cell grid). The vu
 top bar paints across the full window width, with the right-side
 caption cluster (sidebar / AI / settings + minimize / maximize /
 close) matching the Windows beta layout. No xfwm4 titlebar above
@@ -131,7 +131,7 @@ against a Linux desktop screenshot (not the cloud-VM capture):
    does an exact `face.families.iter().any(|family| *name ==
    family.0)` match — `"Ioskeley Mono"` misses, the lookup falls
    through to a proportional sans, and the terminal cells stop
-   aligning. Fix lives in `crates/con-app/src/theme.rs` as
+   aligning. Fix lives in `crates/vu-app/src/theme.rs` as
    `canonical_terminal_font_family()`: a Linux-only normalization
    that maps `"Ioskeley Mono"` → `"IoskeleyMono"` before storing
    into `Theme::mono_font_family`. macOS / Windows behavior is
@@ -143,7 +143,7 @@ against a Linux desktop screenshot (not the cloud-VM capture):
    `WindowDecorations::Client` in `default_window_decorations`,
    added a `TitlebarOptions` (matching what Windows already
    passes), and extended the existing `caption_buttons` cluster
-   in `crates/con-app/src/workspace/` to also build on Linux. The X11 backend's
+   in `crates/vu-app/src/workspace/` to also build on Linux. The X11 backend's
    `on_hit_test_window_control` is a no-op, so each Linux button
    gets an explicit `on_mouse_down` handler that calls
    `window.minimize_window()` / `zoom_window()` / `remove_window()`
@@ -173,11 +173,11 @@ Audit + implementation:
 - **Per-pane terminal opacity**: `LinuxBackendConfig` grew a
   `background_opacity` field that's plumbed through
   `LinuxGhosttyApp::new` / `update_appearance`. The Linux view in
-  `con-app/src/linux_view.rs` reads it via
+  `vu-app/src/linux_view.rs` reads it via
   `app.background_opacity()` and paints the terminal pane bg as
   `theme.background.opacity(pane_opacity)`. The existing
   `effective_terminal_opacity` remap in
-  `ConWorkspace::update_terminal_appearance` already runs on Linux
+  `VuWorkspace::update_terminal_appearance` already runs on Linux
   (gated only by `supports_terminal_glass`, which returns true off-
   macOS), so user-side opacity scrubbing in settings now actually
   changes how see-through the pane is.
@@ -222,7 +222,7 @@ Audit + implementation:
 
 Verified visually on the cloud-agent VM's XFCE :1 session
 (`screenshots/2026-04-23-rounded-transparent.png` is the new
-capture). The con window is clearly translucent over the wallpaper
+capture). The vu window is clearly translucent over the wallpaper
 and an `xterm` window behind it, the top corners chamfer against
 the desktop, the styled-cell paint path keeps working through the
 opacity multiplier, and the caption cluster + IoskeleyMono prompt
@@ -235,7 +235,7 @@ look correct. As expected on X11 there is no actual backdrop blur
 _GTK_FRAME_EXTENTS    = 12, 12, 12, 12        # gpui-component shadow padding
 _NET_FRAME_EXTENTS    = 0, 0, 0, 0            # xfwm draws no server frame
 _MOTIF_WM_HINTS       = 0x2, 0, 0, 0, 0       # decorations bit cleared (CSD)
-_NET_WM_NAME          = "con"
+_NET_WM_NAME          = "vu"
 ```
 
 ## Follow-on fixes 5 & 6: Windows CI lint + Linux pump latency
@@ -278,7 +278,7 @@ testing:
      `prev.generation == snapshot.generation` check; libghostty-vt
      bumps the screen generation on every parser feed that changed
      grid state.
-   - The shared workspace poll loop in `crates/con-app/src/workspace/` slept 16 ms
+   - The shared workspace poll loop in `crates/vu-app/src/workspace/` slept 16 ms
      between iterations whenever no event fired in the previous
      pass. PTY data arriving 1 ms after the loop entered the sleep
      had to wait the full 15 ms before any render was even
@@ -307,7 +307,7 @@ frame for fast bursts and grows on idle-then-burst patterns
 Visual confirmation: `screenshots/2026-04-23-htop.png` shows htop
 running cleanly in the styled-cell pane — colored CPU bars, the
 selected-row inverse highlight, the F-key footer, all column
-alignment, and a process list including the con binary itself.
+alignment, and a process list including the vu binary itself.
 
 ## Follow-on fix 7: alt-screen TUIs no longer flash "Waiting for shell prompt…"
 

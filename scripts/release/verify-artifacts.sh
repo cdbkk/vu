@@ -4,7 +4,7 @@
 #
 # These checks run inside the platform release workflows before artifacts are
 # uploaded. They are intentionally boring and strict: a release artifact that
-# cannot expose `con-cli` must fail before it can reach GitHub Releases or an
+# cannot expose `vu-cli` must fail before it can reach GitHub Releases or an
 # updater appcast.
 
 set -euo pipefail
@@ -49,12 +49,12 @@ verify_linux() {
   )
 
   log "checking Linux tarball layout"
-  tar -tzf "$tarball" | grep -E "/con$" >/dev/null \
-    || fail "$tarball_name does not contain con"
-  tar -tzf "$tarball" | grep -E "/con-cli$" >/dev/null \
-    || fail "$tarball_name does not contain con-cli"
-  tar -tzf "$tarball" | grep -E "/co\\.nowledge\\.con\\.desktop$" >/dev/null \
-    || fail "$tarball_name does not contain co.nowledge.con.desktop"
+  tar -tzf "$tarball" | grep -E "/vu$" >/dev/null \
+    || fail "$tarball_name does not contain vu"
+  tar -tzf "$tarball" | grep -E "/vu-cli$" >/dev/null \
+    || fail "$tarball_name does not contain vu-cli"
+  tar -tzf "$tarball" | grep -E "/co\\.nowledge\\.vu\\.desktop$" >/dev/null \
+    || fail "$tarball_name does not contain co.nowledge.vu.desktop"
 
   local tmp
   tmp="$(mktemp -d)"
@@ -70,9 +70,9 @@ verify_linux() {
   root="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d -print -quit)"
   [[ -n "$root" ]] || fail "$tarball_name did not extract to a top-level directory"
 
-  require_executable "$root/con"
-  require_executable "$root/con-cli"
-  "$root/con-cli" --help >/dev/null
+  require_executable "$root/vu"
+  require_executable "$root/vu-cli"
+  "$root/vu-cli" --help >/dev/null
   log "Linux artifact OK: $tarball_name"
 }
 
@@ -87,9 +87,9 @@ verify_macos() {
   require_file "$dmg"
   require_file "$checksum"
 
-  require_executable "$app/Contents/MacOS/con"
-  require_executable "$app/Contents/MacOS/con-cli"
-  "$app/Contents/MacOS/con-cli" --help >/dev/null
+  require_executable "$app/Contents/MacOS/vu"
+  require_executable "$app/Contents/MacOS/vu-cli"
+  "$app/Contents/MacOS/vu-cli" --help >/dev/null
 
   log "checking macOS checksum"
   (
@@ -98,8 +98,8 @@ verify_macos() {
   )
 
   log "checking macOS ZIP layout"
-  unzip -l "$zip" | grep -F ".app/Contents/MacOS/con-cli" >/dev/null \
-    || fail "$(basename "$zip") does not contain bundled con-cli"
+  unzip -l "$zip" | grep -F ".app/Contents/MacOS/vu-cli" >/dev/null \
+    || fail "$(basename "$zip") does not contain bundled vu-cli"
 
   log "checking macOS DMG layout"
   local mount_point
@@ -115,9 +115,9 @@ verify_macos() {
     fi
   done
   [[ -n "$mounted_app" ]] || fail "$(basename "$dmg") does not contain an app bundle"
-  require_executable "$mounted_app/Contents/MacOS/con"
-  require_executable "$mounted_app/Contents/MacOS/con-cli"
-  "$mounted_app/Contents/MacOS/con-cli" --help >/dev/null
+  require_executable "$mounted_app/Contents/MacOS/vu"
+  require_executable "$mounted_app/Contents/MacOS/vu-cli"
+  "$mounted_app/Contents/MacOS/vu-cli" --help >/dev/null
 
   log "macOS artifact OK: $(basename "$dmg")"
 }

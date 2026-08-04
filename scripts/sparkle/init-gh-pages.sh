@@ -8,7 +8,7 @@
 # After running, configure GitHub Pages:
 #   Repo Settings → Pages → Source: "Deploy from a branch" → Branch: gh-pages → / (root)
 #
-# If using a custom domain (con-releases.nowledge.co):
+# If using a custom domain (vu-releases.nowledge.co):
 #   Add a CNAME record pointing to <org>.github.io
 #   The CNAME file below handles the GitHub Pages side.
 
@@ -37,7 +37,7 @@ git checkout --orphan gh-pages
 git rm -rf . >/dev/null 2>&1 || true
 
 # Custom domain for GitHub Pages
-echo "con-releases.nowledge.co" > CNAME
+echo "vu-releases.nowledge.co" > CNAME
 
 # Create appcast directory
 mkdir -p appcast
@@ -59,4 +59,4 @@ echo "  git push -u origin gh-pages"
 echo ""
 echo "Then configure:"
 echo "  1. GitHub repo Settings → Pages → Source: gh-pages branch"
-echo "  2. DNS CNAME: con-releases.nowledge.co → nowledge-co.github.io"
+echo "  2. DNS CNAME: vu-releases.nowledge.co → nowledge-co.github.io"

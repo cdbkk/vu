@@ -1,16 +1,16 @@
 # Terminal workflows
 
-con should disappear until you need it. With one tab open and the panels hidden,
+vu should disappear until you need it. With one tab open and the panels hidden,
 the app is a clean terminal surface. The extra controls are there for the
 moments when they save movement: running a command across panes, asking the
 agent, opening a split, or focusing a worker.
 
 ## The workspace model
 
-con uses a few names consistently:
+vu uses a few names consistently:
 
 <p align="center">
-  <img width="1080" alt="Con workspace with terminal panes, tabs, and the agent panel" src="https://github.com/user-attachments/assets/81dcf6e4-6074-497e-98b8-00c884442cc2" />
+  <img width="1080" alt="Vu workspace with terminal panes, tabs, and the agent panel" src="https://github.com/user-attachments/assets/81dcf6e4-6074-497e-98b8-00c884442cc2" />
 </p>
 
 | Name | Meaning | Use it for |
@@ -87,7 +87,7 @@ The input bar is one surface with three modes:
 - **Command** sends text to the terminal.
 - **Agent** sends text to the built-in agent.
 
-This keeps con from becoming a chat app wrapped around a shell. You can hide the
+This keeps vu from becoming a chat app wrapped around a shell. You can hide the
 bar when you want a plain terminal, bring it back when you need a command or
 question, and switch modes without changing context.
 
@@ -99,7 +99,7 @@ the current pane layout, so you can choose by position instead of remembering
 pane numbers.
 
 <p align="center">
-  <img width="1080" alt="Con pane broadcast picker mirroring the current split-pane layout" src="https://github.com/user-attachments/assets/21e295c9-34eb-465c-90b8-5ba3163182e5" />
+  <img width="1080" alt="Vu pane broadcast picker mirroring the current split-pane layout" src="https://github.com/user-attachments/assets/21e295c9-34eb-465c-90b8-5ba3163182e5" />
 </p>
 
 ## Advanced: surfaces
@@ -147,7 +147,7 @@ Use the platform modifier to open links from terminal output:
 - Windows and Linux: hold <kbd>⌃</kbd>, then click a URL.
 
 Paste text normally. Dragging files into the terminal sends their paths. When a
-TUI supports image/file paste protocols, con forwards compatible clipboard and
+TUI supports image/file paste protocols, vu forwards compatible clipboard and
 drop payloads through the terminal path.
 
 ## Project layouts

@@ -106,7 +106,7 @@ def ensure_header(path: Path) -> str:
         return path.read_text()
     return (
         "# Terminal Agent Improvement Log\n\n"
-        "Tracked benchmark-backed iteration notes for Con's terminal agent.\n\n"
+        "Tracked benchmark-backed iteration notes for Vu's terminal agent.\n\n"
     )
 
 

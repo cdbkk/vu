@@ -22,8 +22,8 @@ Out of scope:
 
 The codebase already supports:
 
-- Horizontal tab-strip inline rename in `crates/con-app/src/workspace/sidebar_settings.rs`
-- Sidebar inline rename in `crates/con-app/src/sidebar.rs`
+- Horizontal tab-strip inline rename in `crates/vu-app/src/workspace/sidebar_settings.rs`
+- Sidebar inline rename in `crates/vu-app/src/sidebar.rs`
 - Shared workspace-side persistence via `SidebarRename` events and `on_sidebar_rename`
 
 The horizontal tab-strip rename already has:
@@ -138,7 +138,7 @@ Both rename entry points continue using:
 - blank => clear custom label (`None`)
 - non-blank => save trimmed string
 
-`normalize_tab_user_label` in `crates/con-app/src/workspace/helpers.rs` remains the semantic source of truth for workspace-side persistence. Sidebar may continue local trimming before event emission, but the workspace remains tolerant and authoritative.
+`normalize_tab_user_label` in `crates/vu-app/src/workspace/helpers.rs` remains the semantic source of truth for workspace-side persistence. Sidebar may continue local trimming before event emission, but the workspace remains tolerant and authoritative.
 
 ### 4. Focus-time select-all
 
@@ -196,22 +196,22 @@ This avoids stale rename/editor state after drag-reorder or close actions.
 
 ## File Map
 
-- Modify: `crates/con-app/src/sidebar.rs`
+- Modify: `crates/vu-app/src/sidebar.rs`
   - add blur-save handling to sidebar rename
   - add Escape-vs-blur cancel protection for sidebar rename input
   - normalize sidebar rename labels before emission
   - select all on the first rename input focus event
-- Modify: `crates/con-app/src/workspace/`
+- Modify: `crates/vu-app/src/workspace/`
   - refocus active terminal after successful horizontal tab rename
   - refocus active terminal after successful sidebar rename persistence
   - normalize horizontal rename labels before persistence
   - keep rename state stable across close/reorder
   - select all on the first rename input focus event
-- Test: `crates/con-app/src/workspace/tests.rs`
+- Test: `crates/vu-app/src/workspace/tests.rs`
   - tab-slot geometry tests for browser-style reorder semantics
   - rename-state remap helper tests for close/reorder behavior
   - rename normalization tests
-- Test: `crates/con-app/src/sidebar.rs` test module
+- Test: `crates/vu-app/src/sidebar.rs` test module
   - rename normalization helper tests
 
 ## Implementation Notes
@@ -255,7 +255,7 @@ Expected defensive behavior:
 
 ### Unit-level / logic coverage
 
-In `crates/con-app/src/workspace/tests.rs`:
+In `crates/vu-app/src/workspace/tests.rs`:
 
 - keep normalization tests
 - cover tab-slot helper behavior for left/right-half insertion semantics
@@ -269,8 +269,8 @@ If sidebar view testing is too heavy, keep coverage focused on pure helper behav
 
 ### Verification
 
-- `cargo test -p con`
-- `cargo build -p con`
+- `cargo test -p vu`
+- `cargo build -p vu`
 
 ### Manual checks
 
@@ -286,8 +286,8 @@ If sidebar view testing is too heavy, keep coverage focused on pure helper behav
 
 ## Files Changed
 
-- `crates/con-app/src/sidebar.rs`
-- `crates/con-app/src/workspace/`
+- `crates/vu-app/src/sidebar.rs`
+- `crates/vu-app/src/workspace/`
 
 ## Acceptance Criteria
 

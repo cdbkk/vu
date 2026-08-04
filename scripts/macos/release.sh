@@ -91,8 +91,8 @@ sign_app_bundle() {
   # 4. Sign loose executables in the app, excluding anything already covered
   #    by the framework pass. Sign auxiliary executables before the main app
   #    binary: codesign validates nested/sibling executable code when signing
-  #    the bundle's main executable, so con-cli must already be signed.
-  local main_executable="$app_path/Contents/MacOS/con"
+  #    the bundle's main executable, so vu-cli must already be signed.
+  local main_executable="$app_path/Contents/MacOS/vu"
   local has_main_executable=0
   while IFS= read -r nested; do
     if [[ "$nested" == "$main_executable" ]]; then
@@ -118,54 +118,54 @@ sign_app_bundle() {
 
 package_dmg() {
   local staging_dir
-  staging_dir="$(mktemp -d "$CON_DIST_ROOT/dmg.XXXXXX")"
+  staging_dir="$(mktemp -d "$VU_DIST_ROOT/dmg.XXXXXX")"
 
-  rsync -a "$CON_APP_BUNDLE_PATH" "$staging_dir/"
+  rsync -a "$VU_APP_BUNDLE_PATH" "$staging_dir/"
   ln -s /Applications "$staging_dir/Applications"
 
-  rm -f "$CON_DMG_PATH"
+  rm -f "$VU_DMG_PATH"
   hdiutil create \
-    -volname "$CON_APP_NAME" \
+    -volname "$VU_APP_NAME" \
     -srcfolder "$staging_dir" \
     -fs HFS+ \
     -format UDZO \
     -ov \
-    "$CON_DMG_PATH"
+    "$VU_DMG_PATH"
 
   rm -rf "$staging_dir"
 }
 
-mkdir -p "$CON_DIST_ROOT"
-rm -f "$CON_APP_ZIP_PATH" "$CON_DMG_PATH" "$CON_CHECKSUM_PATH"
+mkdir -p "$VU_DIST_ROOT"
+rm -f "$VU_APP_ZIP_PATH" "$VU_DMG_PATH" "$VU_CHECKSUM_PATH"
 
-sign_app_bundle "$CON_APP_BUNDLE_PATH"
+sign_app_bundle "$VU_APP_BUNDLE_PATH"
 
-ditto -c -k --keepParent "$CON_APP_BUNDLE_PATH" "$CON_APP_ZIP_PATH"
-notarytool_submit "$CON_APP_ZIP_PATH"
+ditto -c -k --keepParent "$VU_APP_BUNDLE_PATH" "$VU_APP_ZIP_PATH"
+notarytool_submit "$VU_APP_ZIP_PATH"
 
-if [[ "${CON_SKIP_NOTARIZATION:-0}" != "1" ]] && have_notary_credentials; then
+if [[ "${VU_SKIP_NOTARIZATION:-0}" != "1" ]] && have_notary_credentials; then
   log "Stapling app bundle"
-  xcrun stapler staple -v "$CON_APP_BUNDLE_PATH"
+  xcrun stapler staple -v "$VU_APP_BUNDLE_PATH"
 fi
 
 package_dmg
-sign_container "$CON_DMG_PATH"
-notarytool_submit "$CON_DMG_PATH"
+sign_container "$VU_DMG_PATH"
+notarytool_submit "$VU_DMG_PATH"
 
-if [[ "${CON_SKIP_NOTARIZATION:-0}" != "1" ]] && have_notary_credentials; then
+if [[ "${VU_SKIP_NOTARIZATION:-0}" != "1" ]] && have_notary_credentials; then
   log "Stapling dmg"
-  xcrun stapler staple -v "$CON_DMG_PATH"
+  xcrun stapler staple -v "$VU_DMG_PATH"
 fi
 
 "$SCRIPT_DIR/verify.sh"
 
 (
-  cd "$CON_DIST_ROOT"
-  shasum -a 256 "$(basename "$CON_APP_ZIP_PATH")" "$(basename "$CON_DMG_PATH")" >"$(basename "$CON_CHECKSUM_PATH")"
+  cd "$VU_DIST_ROOT"
+  shasum -a 256 "$(basename "$VU_APP_ZIP_PATH")" "$(basename "$VU_DMG_PATH")" >"$(basename "$VU_CHECKSUM_PATH")"
 )
 
 log "Release artifacts:"
-log "  app: $CON_APP_BUNDLE_PATH"
-log "  zip: $CON_APP_ZIP_PATH"
-log "  dmg: $CON_DMG_PATH"
-log "  sha256: $CON_CHECKSUM_PATH"
+log "  app: $VU_APP_BUNDLE_PATH"
+log "  zip: $VU_APP_ZIP_PATH"
+log "  dmg: $VU_DMG_PATH"
+log "  sha256: $VU_CHECKSUM_PATH"

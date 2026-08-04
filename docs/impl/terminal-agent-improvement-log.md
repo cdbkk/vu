@@ -1,6 +1,6 @@
 # Terminal Agent Improvement Log
 
-Tracked benchmark-backed iteration notes for Con's terminal agent.
+Tracked benchmark-backed iteration notes for Vu's terminal agent.
 
 ## 2026-04-11 11:18 UTC · operator-local-codex-git-workflow · 15/15 · world_class
 
@@ -21,7 +21,7 @@ Product changes:
 Lessons:
 - The paired local workspace model is now strong enough for git-backed coding loops, not just toy edit/test cycles.
 - Interactive local agent turns need output-settle waiting, not shell-idle waiting.
-- Raw benchmark prompts must measure Con continuity, not third-party CLI wandering; narrow, evidence-seeking prompts are much more useful than open-ended “review the repo” asks.
+- Raw benchmark prompts must measure Vu continuity, not third-party CLI wandering; narrow, evidence-seeking prompts are much more useful than open-ended “review the repo” asks.
 
 Next focus:
 - Add and stabilize session-resume benchmarks that return to the same interactive coding pane after intervening shell work.
@@ -55,7 +55,7 @@ Next focus:
 - Make the repair step verify green completion before the operator run ends.
 
 Notes:
-- A live operator rerun exposed an unbounded con-cli agent ask during the Codex repair step; that failure is now part of the loop design.
+- A live operator rerun exposed an unbounded vu-cli agent ask during the Codex repair step; that failure is now part of the loop design.
 
 ## 2026-04-10 12:47 UTC · operator-local-codex-devloop · 5/15 · below_floor
 
@@ -312,7 +312,7 @@ Lessons:
 - Startup command correctness matters as much as target selection. A wrongly quoted cwd can make a benchmark look like an agent-reasoning failure when the real issue is bootstrap plumbing.
 
 Next focus:
-- Rerun the local Codex operator benchmark on a freshly launched Con build and verify that the paired-workspace path becomes the default, not the lucky case.
+- Rerun the local Codex operator benchmark on a freshly launched Vu build and verify that the paired-workspace path becomes the default, not the lucky case.
 ## 2026-04-11 04:27 UTC · operator-local-codex-devloop · 11/15 · release_floor
 
 Paired local shell and Codex reuse were correct, but workspace bootstrap still burned one turn recovering from a missing directory and the repair loop did not close.
@@ -325,7 +325,7 @@ Score breakdown:
 - Follow-up Repair: 1/3
 
 Product changes:
-- Ran a fresh live local Codex operator benchmark against the current /tmp/con.sock app on tab 4.
+- Ran a fresh live local Codex operator benchmark against the current /tmp/vu.sock app on tab 4.
 - Confirmed the paired shell-plus-Codex structure works in practice: pane 1 for file/test work, pane 2 for Codex interaction.
 - Observed a remaining bootstrap gap: when the requested local project directory does not exist, the first Codex-launch turn burns time recovering from that missing path.
 
@@ -353,7 +353,7 @@ Score breakdown:
 - Result Clarity: 3/3
 
 Product changes:
-- Ran a fresh live dual-host operator benchmark against the current /tmp/con.sock app on tab 5.
+- Ran a fresh live dual-host operator benchmark against the current /tmp/vu.sock app on tab 5.
 - Confirmed that the same SSH workspaces were reused across healthcheck, package-state, warning-log, and continuity-proof turns.
 - Raised the dual-host profile to a world-class score for the first time in the tracked loop.
 
@@ -371,7 +371,7 @@ Notes:
 
 ## 2026-04-11 04:40 UTC · operator-ssh-tmux-devloop · 13/15 · target_met
 
-The live tmux dev loop completed all five turns correctly, but it still relied on raw tmux keystrokes and visible-screen reasoning instead of promoting Con-caused tmux setup into a native tmux anchor soon enough.
+The live tmux dev loop completed all five turns correctly, but it still relied on raw tmux keystrokes and visible-screen reasoning instead of promoting Vu-caused tmux setup into a native tmux anchor soon enough.
 
 Score breakdown:
 - tmux Targeting: 2/3
@@ -381,16 +381,16 @@ Score breakdown:
 - Truthfulness: 3/3
 
 Product changes:
-- Ran a fresh live ssh→tmux operator benchmark against the current /tmp/con.sock app on tab 6.
+- Ran a fresh live ssh→tmux operator benchmark against the current /tmp/vu.sock app on tab 6.
 - Verified that the five-turn tmux dev loop can complete end-to-end with honest reasoning and correct file/run behavior.
-- Observed the remaining architecture gap clearly: tmux succeeded through raw prefix/key navigation because Con did not expose tmux-native control soon enough after its own tmux setup actions.
+- Observed the remaining architecture gap clearly: tmux succeeded through raw prefix/key navigation because Vu did not expose tmux-native control soon enough after its own tmux setup actions.
 
 Lessons:
 - The functional tmux workflow is already strong, but the control plane still under-promotes causal tmux setup into native tmux control.
 - The biggest remaining tmux gap is not file-edit correctness; it is getting from fresh shell prompt to native tmux control before the agent falls back to raw prefix navigation.
 
 Next focus:
-- Promote recent Con-caused tmux session creation or targeting into a native tmux shell anchor while the shell prompt is still fresh.
+- Promote recent Vu-caused tmux session creation or targeting into a native tmux shell anchor while the shell prompt is still fresh.
 - Re-run the tmux operator profile after that change and verify the agent prefers tmux-native tools over raw keystrokes in the setup turn.
 
 Notes:
@@ -434,7 +434,7 @@ Product changes:
 - Fresh tmux rerun confirms the stack is strong once the target is established; remaining tmux work is cleaner native bootstrap and stronger proof on agent-cli orientation, not basic execution.
 
 Lessons:
-- Once the tmux file-work target is established, Con keeps it stable through create, edit, rerun, and separate long-running work.
+- Once the tmux file-work target is established, Vu keeps it stable through create, edit, rerun, and separate long-running work.
 - The remaining tmux gap is cleaner native orientation and verification, not basic execution.
 
 Next focus:
@@ -521,10 +521,10 @@ Score breakdown:
 - Follow-up Repair: 3/3
 
 Product changes:
-- Replaced visible agent-cli shell-idle waiting with output-settle semantics and refocused the local coding benchmark on Con-owned paired workspaces instead of third-party CLI approval UX.
+- Replaced visible agent-cli shell-idle waiting with output-settle semantics and refocused the local coding benchmark on Vu-owned paired workspaces instead of third-party CLI approval UX.
 
 Lessons:
-- The paired shell lane keeps OpenCode available without forcing Con to depend on OpenCode's own interactive approval flow.
+- The paired shell lane keeps OpenCode available without forcing Vu to depend on OpenCode's own interactive approval flow.
 
 Next focus:
 - Carry the same target clarity into multi-pane and restored-session summaries.
@@ -541,7 +541,7 @@ Score breakdown:
 - Follow-up Repair: 3/3
 
 Product changes:
-- Replaced visible agent-cli shell-idle waiting with output-settle semantics and refocused the local coding benchmark on Con-owned paired workspaces instead of third-party CLI approval UX.
+- Replaced visible agent-cli shell-idle waiting with output-settle semantics and refocused the local coding benchmark on Vu-owned paired workspaces instead of third-party CLI approval UX.
 
 Lessons:
 - The paired workspace can execute cleanly even when the assistant's target summary is still sloppy.
@@ -561,10 +561,10 @@ Score breakdown:
 - Follow-up Repair: 3/3
 
 Product changes:
-- Replaced visible agent-cli shell-idle waiting with output-settle semantics and refocused the local coding benchmark on Con-owned paired workspaces instead of third-party CLI approval UX.
+- Replaced visible agent-cli shell-idle waiting with output-settle semantics and refocused the local coding benchmark on Vu-owned paired workspaces instead of third-party CLI approval UX.
 
 Lessons:
-- When the benchmark keeps deterministic work in the shell lane, Con can keep the interactive Codex target reusable without stalling the turn.
+- When the benchmark keeps deterministic work in the shell lane, Vu can keep the interactive Codex target reusable without stalling the turn.
 
 Next focus:
 - Retain the same paired-workspace discipline in tmux and remote coding flows.
@@ -582,7 +582,7 @@ Score breakdown:
 
 Product changes:
 - Added ensure_remote_tmux_shell_target so ssh->tmux->shell preparation is one typed control-plane step instead of ad hoc tool composition.
-- Retained durable tmux shell anchors across prompt-like tmux screens after recent Con-caused tmux setup, and exposed tmux-native capabilities through that retained anchor.
+- Retained durable tmux shell anchors across prompt-like tmux screens after recent Vu-caused tmux setup, and exposed tmux-native capabilities through that retained anchor.
 
 Lessons:
 - A typed remote tmux shell-target tool plus a no-attach policy materially improves behavior even before native tmux attachment is fully retained.
@@ -609,7 +609,7 @@ Product changes:
 - Added durable prompt-like tmux shell anchors so native tmux capability can survive beyond the first strict shell-probe frame.
 
 Lessons:
-- The benchmark now proves that Con can complete a meaningful ssh->tmux dev loop even when native tmux retention fails, so the remaining gap is control-path robustness rather than high-level workflow design.
+- The benchmark now proves that Vu can complete a meaningful ssh->tmux dev loop even when native tmux retention fails, so the remaining gap is control-path robustness rather than high-level workflow design.
 - The next fix is in shell-anchor completion detection: the tmux query markers are already visible on screen while the pane still reports busy, which causes a false timeout.
 
 Next focus:
@@ -635,7 +635,7 @@ Product changes:
 - Made tmux capture/exec marker parsing tolerant of wrapped marker lines in the embedded terminal surface.
 
 Lessons:
-- The benchmark now proves that Con can complete a meaningful ssh->tmux dev loop even when native tmux retention fails, so the remaining gap is control-path robustness rather than high-level workflow design.
+- The benchmark now proves that Vu can complete a meaningful ssh->tmux dev loop even when native tmux retention fails, so the remaining gap is control-path robustness rather than high-level workflow design.
 - The next fix is in shell-anchor completion detection: the tmux query markers are already visible on screen while the pane still reports busy, which causes a false timeout.
 
 Next focus:
@@ -668,7 +668,7 @@ Next focus:
 - Broaden the operator benchmark ladder with tmux agent-cli interstitial cases and session-resume cases now that the core tmux shell lane is stable.
 
 Notes:
-- Fresh live rerun on /tmp/con.sock reached 15/15. The final install/orientation step now proves command availability inside con-bench:1.1 instead of inferring from pane inventory alone.
+- Fresh live rerun on /tmp/vu.sock reached 15/15. The final install/orientation step now proves command availability inside vu-bench:1.1 instead of inferring from pane inventory alone.
 
 ## 2026-04-11 04:30 UTC · operator-ssh-dual-host-maintenance · 14/15 · world_class
 
@@ -693,7 +693,7 @@ Next focus:
 - Keep the current host-routing path stable while shifting benchmark pressure toward stale/disconnected SSH recovery.
 
 Notes:
-- Fresh isolated dual-host maintenance run on /tmp/con.sock completed on tab 4 and closed cleanly. This validates the new-tab benchmark path rather than only the product workflow itself.
+- Fresh isolated dual-host maintenance run on /tmp/vu.sock completed on tab 4 and closed cleanly. This validates the new-tab benchmark path rather than only the product workflow itself.
 
 ## 2026-04-11 09:56 UTC · operator-ssh-tmux-devloop · 14/15 · world_class · llm_judge
 

@@ -1,4 +1,4 @@
-# con — justfile
+# vu — justfile
 # https://github.com/casey/just
 #
 # Usage:
@@ -32,8 +32,8 @@ default:
 
 # ── universal dev commands ────────────────────────────────────────────────────
 # These dispatch to the right platform recipe. Windows must use the `w*` cargo
-# aliases because `CON` is a reserved DOS device name and the Windows binary is
-# feature-gated as `con-app.exe`.
+# aliases because Windows release workflows retain the feature-gated
+# `vu-app.exe` target.
 
 # Debug build — current platform
 build:
@@ -49,7 +49,7 @@ run:
 
 # Run the platform-appropriate test set
 test:
-    {{ if os() == "windows" { "cargo wtest -p con-core -p con-cli -p con-agent -p con-terminal" } else { "cargo test --workspace" } }}
+    {{ if os() == "windows" { "cargo wtest -p vu-core -p vu-cli -p vu-agent -p vu-terminal" } else { "cargo test --workspace" } }}
 
 # Check without building — current platform
 check:
@@ -57,7 +57,7 @@ check:
 
 # Run clippy — current platform
 lint:
-    {{ if os() == "windows" { "cargo clippy --workspace --no-default-features --features con/bin-con-app -- -D warnings" } else { "cargo clippy --workspace -- -D warnings" } }}
+    {{ if os() == "windows" { "cargo clippy --workspace --no-default-features --features vu/bin-vu-app -- -D warnings" } else { "cargo clippy --workspace -- -D warnings" } }}
 
 # Clean cargo build artifacts
 clean:
@@ -69,7 +69,7 @@ install:
 
 # Print the current package id, including the workspace version
 version:
-    @cargo pkgid -p con
+    @cargo pkgid -p vu
 
 unsupported-platform:
     @echo "Unsupported platform for this justfile"
@@ -78,7 +78,7 @@ unsupported-platform:
 # ── macOS ─────────────────────────────────────────────────────────────────────
 
 # [macOS] Build a local .app bundle — no signing, no notarization
-# Output: dist/macos/{channel}/{arch}/con.app
+# Output: dist/macos/{channel}/{arch}/vu.app
 macos-bundle channel=channel arch=arch:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -86,7 +86,7 @@ macos-bundle channel=channel arch=arch:
     if [[ -z "${resolved_arch}" ]]; then
         resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
     fi
-    CON_CHANNEL={{ channel }} CON_ARCH="${resolved_arch}" ./scripts/macos/build-app.sh
+    VU_CHANNEL={{ channel }} VU_ARCH="${resolved_arch}" ./scripts/macos/build-app.sh
 
 # [macOS] Build .app and copy to /Applications (replaces existing)
 macos-install channel=channel arch=arch: (macos-bundle channel arch)
@@ -96,9 +96,9 @@ macos-install channel=channel arch=arch: (macos-bundle channel arch)
     if [[ -z "${resolved_arch}" ]]; then
         resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
     fi
-    app_name="con"
-    if [[ "{{ channel }}" == "beta" ]]; then app_name="con Beta"; fi
-    if [[ "{{ channel }}" == "dev" ]];  then app_name="con Dev";  fi
+    app_name="vu"
+    if [[ "{{ channel }}" == "beta" ]]; then app_name="vu Beta"; fi
+    if [[ "{{ channel }}" == "dev" ]];  then app_name="vu Dev";  fi
     src="dist/macos/{{ channel }}/${resolved_arch}/${app_name}.app"
     dst="/Applications/${app_name}.app"
     echo "Installing ${src} → ${dst}"
@@ -114,9 +114,9 @@ macos-bundle-adhoc channel=channel arch=arch: (macos-bundle channel arch)
     if [[ -z "${resolved_arch}" ]]; then
         resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
     fi
-    app_name="con"
-    if [[ "{{ channel }}" == "beta" ]]; then app_name="con Beta"; fi
-    if [[ "{{ channel }}" == "dev" ]];  then app_name="con Dev";  fi
+    app_name="vu"
+    if [[ "{{ channel }}" == "beta" ]]; then app_name="vu Beta"; fi
+    if [[ "{{ channel }}" == "dev" ]];  then app_name="vu Dev";  fi
     bundle="dist/macos/{{ channel }}/${resolved_arch}/${app_name}.app"
     echo "Ad-hoc signing ${bundle}"
     codesign --force --deep --sign - "${bundle}"
@@ -130,9 +130,9 @@ macos-install-adhoc channel=channel arch=arch: (macos-bundle-adhoc channel arch)
     if [[ -z "${resolved_arch}" ]]; then
         resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
     fi
-    app_name="con"
-    if [[ "{{ channel }}" == "beta" ]]; then app_name="con Beta"; fi
-    if [[ "{{ channel }}" == "dev" ]];  then app_name="con Dev";  fi
+    app_name="vu"
+    if [[ "{{ channel }}" == "beta" ]]; then app_name="vu Beta"; fi
+    if [[ "{{ channel }}" == "dev" ]];  then app_name="vu Dev";  fi
     src="dist/macos/{{ channel }}/${resolved_arch}/${app_name}.app"
     dst="/Applications/${app_name}.app"
     echo "Installing ${src} → ${dst}"
@@ -149,7 +149,7 @@ macos-release channel=channel arch=arch:
     if [[ -z "${resolved_arch}" ]]; then
         resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
     fi
-    CON_CHANNEL={{ channel }} CON_ARCH="${resolved_arch}" ./scripts/macos/release.sh
+    VU_CHANNEL={{ channel }} VU_ARCH="${resolved_arch}" ./scripts/macos/release.sh
 
 # [macOS] Download Sparkle.framework into .sparkle/ (enables auto-update in bundle)
 macos-sparkle-download:
@@ -162,15 +162,15 @@ macos-open channel=channel arch=arch:
     if [[ -z "${resolved_arch}" ]]; then
         resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
     fi
-    app_name="con"
-    if [[ "{{ channel }}" == "beta" ]]; then app_name="con Beta"; fi
-    if [[ "{{ channel }}" == "dev" ]];  then app_name="con Dev";  fi
+    app_name="vu"
+    if [[ "{{ channel }}" == "beta" ]]; then app_name="vu Beta"; fi
+    if [[ "{{ channel }}" == "dev" ]];  then app_name="vu Dev";  fi
     open "dist/macos/{{ channel }}/${resolved_arch}/${app_name}.app"
 
 # ── Linux ─────────────────────────────────────────────────────────────────────
 
 # [Linux] Build a release binary and package it
-# Output: dist/con-{version}-linux-{arch}.tar.gz
+# Output: dist/vu-{version}-linux-{arch}.tar.gz
 linux-release channel=channel arch=arch:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -178,7 +178,7 @@ linux-release channel=channel arch=arch:
     if [[ -z "${resolved_arch}" ]]; then
         resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
     fi
-    CON_RELEASE_CHANNEL={{ channel }} CON_LINUX_ARCH="${resolved_arch}" ./scripts/linux/release.sh
+    VU_RELEASE_CHANNEL={{ channel }} VU_LINUX_ARCH="${resolved_arch}" ./scripts/linux/release.sh
 
 # [Linux] Install the release binaries to ~/.local/bin
 linux-install channel=channel arch=arch: (linux-release channel arch)
@@ -188,48 +188,48 @@ linux-install channel=channel arch=arch: (linux-release channel arch)
     if [[ -z "${resolved_arch}" ]]; then
         resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
     fi
-    # scripts/linux/release.sh stages to dist/con-{version}-linux-{arch}/
+    # scripts/linux/release.sh stages to dist/vu-{version}-linux-{arch}/
     # Use || true so set -e doesn't exit when the glob has no matches.
-    stage_dir="$(ls -d dist/con-*-linux-${resolved_arch} 2>/dev/null | sort -V | tail -1 || true)"
-    if [[ -z "${stage_dir}" || ! -f "${stage_dir}/con" ]]; then
-        echo "Binary not found under dist/con-*-linux-${resolved_arch}/ — run 'just linux-release' first"
+    stage_dir="$(ls -d dist/vu-*-linux-${resolved_arch} 2>/dev/null | sort -V | tail -1 || true)"
+    if [[ -z "${stage_dir}" || ! -f "${stage_dir}/vu" ]]; then
+        echo "Binary not found under dist/vu-*-linux-${resolved_arch}/ — run 'just linux-release' first"
         exit 1
     fi
     mkdir -p "$HOME/.local/bin"
-    cp "${stage_dir}/con" "$HOME/.local/bin/con"
-    chmod 755 "$HOME/.local/bin/con"
-    echo "Installed ${stage_dir}/con → $HOME/.local/bin/con"
-    if [[ -f "${stage_dir}/con-cli" ]]; then
-        cp "${stage_dir}/con-cli" "$HOME/.local/bin/con-cli"
-        chmod 755 "$HOME/.local/bin/con-cli"
-        echo "Installed ${stage_dir}/con-cli → $HOME/.local/bin/con-cli"
+    cp "${stage_dir}/vu" "$HOME/.local/bin/vu"
+    chmod 755 "$HOME/.local/bin/vu"
+    echo "Installed ${stage_dir}/vu → $HOME/.local/bin/vu"
+    if [[ -f "${stage_dir}/vu-cli" ]]; then
+        cp "${stage_dir}/vu-cli" "$HOME/.local/bin/vu-cli"
+        chmod 755 "$HOME/.local/bin/vu-cli"
+        echo "Installed ${stage_dir}/vu-cli → $HOME/.local/bin/vu-cli"
     fi
 
 # ── Windows (run from Developer Command Prompt for VS 2022) ───────────────────
 
-# [Windows] Debug build (con-app.exe — CON is a reserved DOS device name)
+# [Windows] Debug build (`vu-app.exe` release alias)
 windows-build:
-    cargo wbuild -p con
+    cargo wbuild -p vu
 
 # [Windows] Release build
 windows-build-release:
     cargo wbuild -p vu --release
-    cargo build -p con-cli --release
+    cargo build -p vu-cli --release
 
 # [Windows] Run
 windows-run:
-    cargo wrun -p con
+    cargo wrun -p vu
 
 # [Windows] Test
 windows-test:
-    cargo wtest -p con-core -p con-cli -p con-agent -p con-terminal
+    cargo wtest -p vu-core -p vu-cli -p vu-agent -p vu-terminal
 
 # [Windows] Build and install local release binaries to the user install root
 windows-install: windows-build-release
-    if not exist "%LOCALAPPDATA%\Programs\con" mkdir "%LOCALAPPDATA%\Programs\con"
-    copy /Y "target\release\con-app.exe" "%LOCALAPPDATA%\Programs\con\con-app.exe"
-    copy /Y "target\release\con-cli.exe" "%LOCALAPPDATA%\Programs\con\con-cli.exe"
-    echo Installed con-app.exe and con-cli.exe to %LOCALAPPDATA%\Programs\con
+    if not exist "%LOCALAPPDATA%\Programs\vu" mkdir "%LOCALAPPDATA%\Programs\vu"
+    copy /Y "target\release\vu-app.exe" "%LOCALAPPDATA%\Programs\vu\vu-app.exe"
+    copy /Y "target\release\vu-cli.exe" "%LOCALAPPDATA%\Programs\vu\vu-cli.exe"
+    echo Installed vu-app.exe and vu-cli.exe to %LOCALAPPDATA%\Programs\vu
 
 # ── dist cleanup ──────────────────────────────────────────────────────────────
 

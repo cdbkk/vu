@@ -5,6 +5,22 @@ All notable changes to vu are documented here.
 vu is a fork of [con](https://github.com/nowledge-co/con-terminal) by Nowledge Labs (MIT).
 Entries below `v0.2.0` are inherited from upstream con and describe its history, not this fork's.
 
+## `v0.3.0` - 2026-08-04
+
+Completes the rename from con to vu and gives the app its own icon.
+
+### Changed
+
+- Every crate is now `vu-*`: `vu-app`, `vu-core`, `vu-paths`, `vu-terminal`, `vu-ghostty`, `vu-agent`, `vu-cli`, `vu-test`. Rust paths follow (`con_core::` is now `vu_core::`).
+- New app icon: a warm apricot mark on cocoa-black, drawn on Apple's 824-in-1024 grid.
+
+### Breaking
+
+- The control socket moved from `/tmp/con.sock` to `/tmp/vu.sock`, and the Windows pipe from `\\.\pipe\con` to `\\.\pipe\vu`. A `vu-cli` from this release cannot talk to an older running app, and vice versa. Restart the app after updating.
+- Every `CON_*` environment variable is now `VU_*`. The `CON_ZIG_BIN` compatibility fallback is gone; use `VU_ZIG_BIN`.
+
+The bundle identifier is unchanged (`co.cdbkk.vu`), so this is an in-place update: settings, permissions, and Sparkle continuity are preserved.
+
 ## `v0.2.0` - 2026-08-04
 
 First vu release. Focused on making the app customizable without editing files by hand.

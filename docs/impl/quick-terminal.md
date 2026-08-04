@@ -2,9 +2,9 @@
 
 ## Overview
 
-Con has a macOS-only **Quick Terminal**: a special Con window that can be shown or hidden with a global hotkey after the user enables it in Settings.
+Vu has a macOS-only **Quick Terminal**: a special Vu window that can be shown or hidden with a global hotkey after the user enables it in Settings.
 
-It is **not** a separate terminal subsystem. It is a normal `ConWorkspace` with a small amount of quick-terminal-specific lifecycle and AppKit behavior around it.
+It is **not** a separate terminal subsystem. It is a normal `VuWorkspace` with a small amount of quick-terminal-specific lifecycle and AppKit behavior around it.
 
 Current product behavior:
 
@@ -24,7 +24,7 @@ Current product behavior:
 
 ## Product rules
 
-1. Quick Terminal is a singleton **controller concept** within one running Con process.
+1. Quick Terminal is a singleton **controller concept** within one running Vu process.
 2. The Quick Terminal window is **lazy**, not pre-created.
 3. If the Quick Terminal window exists and is hidden, toggling shows the same live workspace again.
 4. If the Quick Terminal window has been destroyed, the next toggle creates a **fresh** Quick Terminal.
@@ -39,7 +39,7 @@ Current product behavior:
 
 ### Workspace model
 
-Quick Terminal is a normal `ConWorkspace` marked with `is_quick_terminal`.
+Quick Terminal is a normal `VuWorkspace` marked with `is_quick_terminal`.
 
 It reuses the standard workspace model for:
 
@@ -55,7 +55,7 @@ There is no parallel session model.
 
 ### Rust controller
 
-`crates/con-app/src/quick_terminal.rs` is intentionally small.
+`crates/vu-app/src/quick_terminal.rs` is intentionally small.
 
 It owns only minimal runtime state:
 
@@ -68,7 +68,7 @@ Responsibilities:
 
 - lazy creation on first toggle
 - duplicate creation prevention while the first lazy window is still opening
-- previous-app focus capture before the first lazy window activates Con
+- previous-app focus capture before the first lazy window activates Vu
 - show/hide dispatch for an existing Quick Terminal window
 - destruction-state reset when the Quick Terminal window is removed
 
@@ -76,13 +76,13 @@ It does **not** mirror tabs, panes, session contents, or geometry history.
 
 ### Native/AppKit layer
 
-`crates/con-app/src/objc/quick_terminal_trampoline.m` owns macOS-specific window behavior:
+`crates/vu-app/src/objc/quick_terminal_trampoline.m` owns macOS-specific window behavior:
 
 - borderless + resizable configuration
 - top-pinned full-width geometry normalization
 - minimum-height clamp
 - slide-in / slide-out animation
-- Con activation on show
+- Vu activation on show
 - restore of the previous app on toggle-hide
 - auto-hide on `NSWindowDidResignKeyNotification`
 
@@ -96,10 +96,10 @@ Quick Terminal is created lazily.
 
 When Quick Terminal is enabled and the global hotkey fires with no Quick Terminal window alive:
 
-1. Con loads the current config.
-2. Con captures the currently frontmost app before activating its own window.
-3. Con creates a fresh session with history and `HOME` as the default cwd on macOS.
-4. Con opens a new special Con window via `open_quick_terminal(...)`.
+1. Vu loads the current config.
+2. Vu captures the currently frontmost app before activating its own window.
+3. Vu creates a fresh session with history and `HOME` as the default cwd on macOS.
+4. Vu opens a new special Vu window via `open_quick_terminal(...)`.
 5. The new window is marked as a Quick Terminal workspace.
 6. The native window pointer is captured.
 7. The window is configured and immediately shown with slide-in animation.
@@ -110,11 +110,11 @@ There is no eager startup creation anymore.
 
 If the Quick Terminal window already exists and is hidden:
 
-1. Capture the current frontmost app pid unless it is already Con.
+1. Capture the current frontmost app pid unless it is already Vu.
 2. Recompute the frame against the current visible screen.
 3. Keep full visible width.
 4. Keep the current live height, clamped to bounds.
-5. Activate Con.
+5. Activate Vu.
 6. Make the Quick Terminal key/front.
 7. Animate it downward from the top edge.
 
@@ -147,7 +147,7 @@ Destroy paths:
 - closing the last tab
 - last shell / pane exiting
 
-In those paths Con:
+In those paths Vu:
 
 1. hides the Quick Terminal window
 2. clears the Quick Terminal controller state
@@ -244,14 +244,14 @@ These are separate features.
 
 ### Global Summon
 
-- operates on the main Con window behavior
-- toggles the main Con window in/out rather than using the special Quick Terminal window
+- operates on the main Vu window behavior
+- toggles the main Vu window in/out rather than using the special Quick Terminal window
 
 The two hotkeys are registered independently.
 
 ## Tabs and summarizer behavior
 
-Quick Terminal uses the same tab model as normal Con windows.
+Quick Terminal uses the same tab model as normal Vu windows.
 
 Important rule:
 
@@ -293,23 +293,23 @@ The final model is simpler:
 
 Diverging into Quick-Terminal-specific tab activation or layout behavior created rendering and focus regressions.
 
-The final implementation works best when Quick Terminal reuses normal `ConWorkspace` flows and only adds a narrow lifecycle shell around them.
+The final implementation works best when Quick Terminal reuses normal `VuWorkspace` flows and only adds a narrow lifecycle shell around them.
 
 ## File map
 
 Primary files:
 
-- `crates/con-app/src/main.rs`
+- `crates/vu-app/src/main.rs`
   - Quick Terminal window creation entrypoint
   - Quick Terminal window options / initial bounds
-- `crates/con-app/src/quick_terminal.rs`
+- `crates/vu-app/src/quick_terminal.rs`
   - singleton runtime controller
   - lazy create / show / hide / destroy-state reset
-- `crates/con-app/src/global_hotkey.rs`
+- `crates/vu-app/src/global_hotkey.rs`
   - global hotkey registration and callback dispatch
-- `crates/con-app/src/objc/quick_terminal_trampoline.m`
+- `crates/vu-app/src/objc/quick_terminal_trampoline.m`
   - AppKit configure / animation / auto-hide behavior
-- `crates/con-app/src/workspace/`
+- `crates/vu-app/src/workspace/`
   - shared workspace behavior
   - destroy-on-last-tab / destroy-on-last-shell-exit logic
 

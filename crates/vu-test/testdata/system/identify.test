@@ -1,0 +1,14 @@
+# system/identify.test
+# Smoke test: vu is running and responds to identify.
+
+vu-cli --json identify  # version field present
+---- contains
+"version"
+
+vu-cli --json identify  # socket_path field present
+---- contains
+"socket_path"
+
+vu-cli --json capabilities  # methods array present
+---- json-subset
+{"methods":[{"method":"system.identify"}]}

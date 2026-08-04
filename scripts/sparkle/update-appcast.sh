@@ -7,8 +7,8 @@
 #
 # Environment (all required unless noted):
 #   APPCAST_FILE          — path to appcast XML (created if absent)
-#   APPCAST_TITLE         — feed title (e.g. "con")
-#   APPCAST_LINK          — feed link (e.g. "https://con-releases.nowledge.co")
+#   APPCAST_TITLE         — feed title (e.g. "vu")
+#   APPCAST_LINK          — feed link (e.g. "https://vu-releases.nowledge.co")
 #   ITEM_TITLE            — item title (e.g. "Version 0.2.0")
 #   ITEM_VERSION          — CFBundleVersion / sparkle:version (build number)
 #   ITEM_SHORT_VERSION    — CFBundleShortVersionString (e.g. "0.2.0")

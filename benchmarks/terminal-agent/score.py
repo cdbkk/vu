@@ -156,7 +156,7 @@ def main() -> int:
         "scored_at": utc_now(),
         "scored_by": args.scored_by
         if (args.scored_by != "codex" or judge is None)
-        else "con_agent_judge",
+        else "vu_agent_judge",
         "summary": args.summary
         or (judge.get("judgment", {}).get("summary", "") if judge else ""),
         "lessons": args.lesson

@@ -4,7 +4,7 @@
   "recommended_suite": "all",
   "fresh_conversation": true,
   "setup_local_shell_commands": [
-    "ssh haswell 'tmux kill-session -t con-bench >/dev/null 2>&1 || true'",
+    "ssh haswell 'tmux kill-session -t vu-bench >/dev/null 2>&1 || true'",
     "ssh haswell 'rm -f ~/hello.py'"
   ],
   "env_checks": [
@@ -31,7 +31,7 @@
       "steps": [
         {
           "label": "describe_and_prepare_shell_target",
-          "prompt": "Please connect to haswell, create a tmux session named con-bench for this benchmark, describe that tmux workspace, and prepare a clean tmux shell target for file work.",
+          "prompt": "Please connect to haswell, create a tmux session named vu-bench for this benchmark, describe that tmux workspace, and prepare a clean tmux shell target for file work.",
           "timeout_secs": 180
         },
         {

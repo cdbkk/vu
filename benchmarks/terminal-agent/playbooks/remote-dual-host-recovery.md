@@ -2,7 +2,7 @@
 
 ## Goal
 
-Verify that Con can:
+Verify that Vu can:
 
 - keep `haswell` and `cinnamon` distinct
 - disconnect only one remote workspace
@@ -11,7 +11,7 @@ Verify that Con can:
 
 ## Setup
 
-- Start from a clean Con tab
+- Start from a clean Vu tab
 - Ensure `haswell` and `cinnamon` are reachable over SSH
 
 ## Prompt sequence

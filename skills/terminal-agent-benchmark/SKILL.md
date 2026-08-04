@@ -1,17 +1,17 @@
 ---
 name: terminal-agent-benchmark
-description: Run and maintain Con's terminal-agent benchmark against a live app session. Use when validating con-cli, SSH workspace reuse, tmux awareness, agent-target preparation, or when collecting benchmark evidence for regressions and release notes.
+description: Run and maintain Vu's terminal-agent benchmark against a live app session. Use when validating vu-cli, SSH workspace reuse, tmux awareness, agent-target preparation, or when collecting benchmark evidence for regressions and release notes.
 ---
 
 # Terminal Agent Benchmark
 
-Use this skill when you need to evaluate Con as a terminal-native agent, not just compile it.
+Use this skill when you need to evaluate Vu as a terminal-native agent, not just compile it.
 
 Primary references:
 
 - [`benchmarks/terminal-agent/README.md`](../../benchmarks/terminal-agent/README.md)
 - [`docs/impl/terminal-agent-benchmark.md`](../../docs/impl/terminal-agent-benchmark.md)
-- [`docs/impl/con-cli-e2e.md`](../../docs/impl/con-cli-e2e.md)
+- [`docs/impl/vu-cli-e2e.md`](../../docs/impl/vu-cli-e2e.md)
 
 ## Default workflow
 
@@ -19,11 +19,11 @@ Primary references:
 2. Run the strict benchmark:
    - `python3 benchmarks/terminal-agent/run.py --suite strict`
 3. If provider setup is present, run:
-   - `CON_BENCH_ENABLE_AGENT=1 python3 benchmarks/terminal-agent/run.py --suite all`
+   - `VU_BENCH_ENABLE_AGENT=1 python3 benchmarks/terminal-agent/run.py --suite all`
 4. Prefer a built-in profile when one matches the workflow:
    - `python3 benchmarks/terminal-agent/run.py --list-profiles`
    - `python3 benchmarks/terminal-agent/run.py --profile basic-local-shell`
-   - `CON_BENCH_ENABLE_AGENT=1 python3 benchmarks/terminal-agent/run.py --profile basic-local-codex --suite all`
+   - `VU_BENCH_ENABLE_AGENT=1 python3 benchmarks/terminal-agent/run.py --profile basic-local-codex --suite all`
 5. Use starter profiles for quick regression checks and operator profiles for richer coding, SSH maintenance, or tmux dev-loop evaluation.
    - `python3 benchmarks/terminal-agent/run.py --profile operator-local-codex-devloop --suite operator`
    - `python3 benchmarks/terminal-agent/run.py --profile operator-local-claude-devloop --suite operator`

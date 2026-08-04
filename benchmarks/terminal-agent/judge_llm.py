@@ -15,8 +15,8 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUBRIC_DIR = REPO_ROOT / "benchmarks" / "terminal-agent" / "rubrics"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / ".context" / "benchmarks" / "judged"
-DEFAULT_SOCKET = os.environ.get("CON_SOCKET_PATH", "/tmp/con.sock")
-DEFAULT_CON_CLI_BIN = REPO_ROOT / "target" / "debug" / "con-cli"
+DEFAULT_SOCKET = os.environ.get("VU_SOCKET_PATH", "/tmp/vu.sock")
+DEFAULT_VU_CLI_BIN = REPO_ROOT / "target" / "debug" / "vu-cli"
 
 
 class JudgeError(RuntimeError):
@@ -29,14 +29,14 @@ def utc_now() -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Ask Con's built-in agent to judge a benchmark run from the rubric, raw record, and saved conversation transcript.",
+        description="Ask Vu's built-in agent to judge a benchmark run from the rubric, raw record, and saved conversation transcript.",
     )
     parser.add_argument("--profile", required=True, help="Benchmark profile / rubric id.")
     parser.add_argument("--record", required=True, type=Path, help="Benchmark run record JSON.")
     parser.add_argument(
         "--socket",
         default=DEFAULT_SOCKET,
-        help="Path to the running Con control socket.",
+        help="Path to the running Vu control socket.",
     )
     parser.add_argument(
         "--conversations-dir",
@@ -67,12 +67,12 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def cli_base() -> list[str]:
-    override = os.environ.get("CON_BENCH_CON_CLI")
+    override = os.environ.get("VU_BENCH_VU_CLI")
     if override:
         return override.split()
-    if DEFAULT_CON_CLI_BIN.exists():
-        return [str(DEFAULT_CON_CLI_BIN)]
-    return ["cargo", "run", "-q", "-p", "con-cli", "--"]
+    if DEFAULT_VU_CLI_BIN.exists():
+        return [str(DEFAULT_VU_CLI_BIN)]
+    return ["cargo", "run", "-q", "-p", "vu-cli", "--"]
 
 
 def run_json(socket_path: str, *args: str) -> dict[str, Any]:
@@ -128,7 +128,7 @@ def candidate_conversation_dirs(record_path: Path, explicit_dir: Path | None) ->
     candidates: list[Path] = []
     if explicit_dir is not None:
         candidates.append(explicit_dir)
-    env_dir = os.environ.get("CON_CONVERSATIONS_DIR")
+    env_dir = os.environ.get("VU_CONVERSATIONS_DIR")
     if env_dir:
         candidates.append(Path(env_dir))
 
@@ -138,8 +138,8 @@ def candidate_conversation_dirs(record_path: Path, explicit_dir: Path | None) ->
     candidates.extend(runtime_matches)
 
     home = Path.home()
-    candidates.append(home / "Library" / "Application Support" / "con" / "conversations")
-    candidates.append(home / ".local" / "share" / "con" / "conversations")
+    candidates.append(home / "Library" / "Application Support" / "vu" / "conversations")
+    candidates.append(home / ".local" / "share" / "vu" / "conversations")
 
     deduped: list[Path] = []
     seen = set()

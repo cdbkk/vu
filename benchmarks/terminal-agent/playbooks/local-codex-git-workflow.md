@@ -1,16 +1,16 @@
 # Local Codex Git Workflow
 
-Use this playbook to validate that Con can sustain a richer local coding workflow with a paired Codex pane and shell companion in the same project.
+Use this playbook to validate that Vu can sustain a richer local coding workflow with a paired Codex pane and shell companion in the same project.
 
 ## Environment
 
 - Local machine
-- Project root: `~/dev/temp/con-bench-codex-git`
+- Project root: `~/dev/temp/vu-bench-codex-git`
 - Coding CLI: `codex`
 
 ## Goal
 
-Prove that Con can:
+Prove that Vu can:
 
 1. prepare one Codex target plus one paired local shell target
 2. create a small Python project and initial git commit in the shell lane
@@ -20,8 +20,8 @@ Prove that Con can:
 
 ## Operator prompts
 
-1. `Please prepare a Codex workspace in ~/dev/temp/con-bench-codex-git by launching Codex there and preparing a paired local shell target for file, git, and test work.`
-2. `Keep the Codex target prepared, but use its paired local shell target to create a tiny Python project in ~/dev/temp/con-bench-codex-git with mathops.py and test_mathops.py, initialize git, make an initial commit, and run python3 -m unittest -q. Only touch the Codex pane if a blocking trust or continue prompt must be cleared first.`
+1. `Please prepare a Codex workspace in ~/dev/temp/vu-bench-codex-git by launching Codex there and preparing a paired local shell target for file, git, and test work.`
+2. `Keep the Codex target prepared, but use its paired local shell target to create a tiny Python project in ~/dev/temp/vu-bench-codex-git with mathops.py and test_mathops.py, initialize git, make an initial commit, and run python3 -m unittest -q. Only touch the Codex pane if a blocking trust or continue prompt must be cleared first.`
 3. `Still in the same workspace pair, add a new pairwise_sum helper to mathops.py, update the tests, rerun python3 -m unittest -q, then show git status --short and git diff --stat from the paired local shell.`
 4. `Ask Codex in the existing Codex pane for a brief review summary of the current diff and a one-line commit message proposal. Do not create a new target.`
 5. `Summarize which target handled shell work, which target handled the Codex review turn, and confirm the workspace path.`

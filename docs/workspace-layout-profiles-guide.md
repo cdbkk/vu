@@ -6,7 +6,7 @@ sharing that shape with a team.
 
 ## What a layout profile is
 
-A layout profile is a con-generated `.con/workspace.toml` file.
+A layout profile is a vu-generated `.vu/workspace.toml` file.
 
 It describes workspace shape:
 
@@ -33,8 +33,8 @@ session backup. It is safe to review because it describes shape, not activity.
 1. Tune the workspace visually until it feels right.
 2. Name the tabs, panes, and surfaces so the intent is obvious.
 3. Save the layout profile.
-4. Review the generated `.con/workspace.toml`.
-5. Reopen the project later with `con ~/dev/app`, or commit the file so a
+4. Review the generated `.vu/workspace.toml`.
+5. Reopen the project later with `vu ~/dev/app`, or commit the file so a
    teammate can get the same starting shape.
 
 The profile captures the workspace you designed. It does not capture what you
@@ -45,11 +45,11 @@ never include terminal text, regardless of that setting.
 
 ## Save a profile
 
-1. Open a project in con.
+1. Open a project in vu.
 2. Arrange tabs, panes, and surfaces visually.
 3. Rename tabs, panes, and surfaces so the layout is understandable.
 4. Choose **Save Layout Profile** from Command Palette or the Workspace menu.
-5. Save as `.con/workspace.toml` under the project root.
+5. Save as `.vu/workspace.toml` under the project root.
 6. Review the generated file.
 7. Commit it only if the layout is useful to the project.
 
@@ -82,25 +82,25 @@ That keeps the file stable in git diffs and usable across machines.
 Open a project profile explicitly:
 
 ```sh
-con ~/dev/app
+vu ~/dev/app
 ```
 
-con opens `~/dev/app/.con/workspace.toml` when it exists. If no profile exists,
-con opens a fresh shell rooted at `~/dev/app`.
+vu opens `~/dev/app/.vu/workspace.toml` when it exists. If no profile exists,
+vu opens a fresh shell rooted at `~/dev/app`.
 
 Open a profile file directly:
 
 ```sh
-con ~/dev/app/.con/workspace.toml
+vu ~/dev/app/.vu/workspace.toml
 ```
 
-If the requested profile is malformed, con opens a fresh shell and shows the
+If the requested profile is malformed, vu opens a fresh shell and shows the
 profile error in the terminal. It does not silently open an unrelated workspace.
 
 Inside the app, use:
 
 - **Add Tabs from Layout Profile** to choose a project folder or profile file
-  and add its tabs to the current window. If the folder has no profile, con adds
+  and add its tabs to the current window. If the folder has no profile, vu adds
   one fresh tab rooted there.
 - **Open Layout Profile in New Window** to choose a project folder or profile
   file and open it separately.
@@ -110,7 +110,7 @@ explicitly.
 
 ## Share a profile
 
-Commit `.con/workspace.toml` when the layout is useful to other people on the
+Commit `.vu/workspace.toml` when the layout is useful to other people on the
 project.
 
 Good shared profile content:
@@ -136,7 +136,7 @@ Use these rules:
   into a multi-pane project layout.
 - **Add Tabs from Layout Profile** is the explicit "new tab(s) from this profile"
   flow. If the profile contains one tab, it behaves like a new tab. If it
-  contains several tabs, con adds all of them.
+  contains several tabs, vu adds all of them.
 - **Open Layout Profile in New Window** is the explicit "new window from this
   profile" flow.
 - **New Window** stays scratch by default. A global "default new-window layout"
@@ -147,8 +147,8 @@ Use these rules:
 | Gesture | Result |
 | --- | --- |
 | Cmd+N / New Window | Open one clean scratch shell with shared history. |
-| `con ~/dev/app` | Open the project's profile if present; otherwise one shell rooted there. |
-| `con ~/dev/app/.con/workspace.toml` | Open that profile directly. |
+| `vu ~/dev/app` | Open the project's profile if present; otherwise one shell rooted there. |
+| `vu ~/dev/app/.vu/workspace.toml` | Open that profile directly. |
 | Add Tabs from Layout Profile | Add the selected project/profile into the current window. |
 | Open Layout Profile in New Window | Open the selected project/profile separately. |
 
@@ -164,7 +164,7 @@ want processes to survive app restarts:
 tmux attach -t app || tmux new -s app
 ```
 
-con recreates the layout and directory. tmux restores the running session.
+vu recreates the layout and directory. tmux restores the running session.
 
 ## Skills
 

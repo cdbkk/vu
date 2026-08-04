@@ -1,6 +1,6 @@
 # Implementation: Terminal Agent Improvement Loop
 
-Con now has a benchmark-driven improvement loop for the terminal agent.
+Vu now has a benchmark-driven improvement loop for the terminal agent.
 
 The loop is intentionally layered:
 
@@ -12,7 +12,7 @@ The loop is intentionally layered:
 
 ## Why this exists
 
-Con should not depend on ad hoc memory and scattered screenshots to improve.
+Vu should not depend on ad hoc memory and scattered screenshots to improve.
 
 We need a repeatable loop that answers:
 
@@ -67,9 +67,9 @@ python3 benchmarks/terminal-agent/iterate.py \
   --profile operator-ssh-tmux-devloop
 ```
 
-`iterate.py` launches a fresh Con runtime per iteration with its own socket, XDG homes, session file, and conversation directory, which keeps restored pane state from contaminating the next scored run.
+`iterate.py` launches a fresh Vu runtime per iteration with its own socket, XDG homes, session file, and conversation directory, which keeps restored pane state from contaminating the next scored run.
 
-If an iteration is marked `blocked` with `ghostty_surface_bootstrap_unavailable`, treat that as environment unavailability, not a scored product result. The correct response is to switch to a live existing Con session or fix the launch environment, not to adjust the product score.
+If an iteration is marked `blocked` with `ghostty_surface_bootstrap_unavailable`, treat that as environment unavailability, not a scored product result. The correct response is to switch to a live existing Vu session or fix the launch environment, not to adjust the product score.
 
 ## Reporting
 

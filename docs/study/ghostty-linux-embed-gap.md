@@ -6,19 +6,19 @@ This note narrows Linux Phase 2a from:
 
 to:
 
-> "what exact upstream Ghostty changes would con need before a Linux
+> "what exact upstream Ghostty changes would vu need before a Linux
 > embed path becomes viable?"
 
 ## Conclusion
 
-A viable Linux embed path for con requires **three** upstream Ghostty
+A viable Linux embed path for vu requires **three** upstream Ghostty
 deliverables, not one:
 
 1. **C ABI surface expansion**
 2. **embedded Linux platform implementation**
 3. **working embedded OpenGL renderer lifecycle**
 
-Today, none of those three exists in a con-consumable way.
+Today, none of those three exists in a vu-consumable way.
 
 ## What exists already
 
@@ -49,7 +49,7 @@ functions already exist in `ghostty.h`:
 - `ghostty_surface_complete_clipboard_request`
 - `ghostty_surface_read_selection`, `ghostty_surface_read_text`
 
-That means con does **not** need Ghostty to invent a whole new embed API.
+That means vu does **not** need Ghostty to invent a whole new embed API.
 
 ## Gap 1: Linux is missing from the public embed platform contract
 
@@ -144,9 +144,9 @@ paint/composite.
 This may be attractive for GPUI interop, but it is a bigger API design
 change than the current macOS embed model.
 
-### What con needs from Ghostty
+### What vu needs from Ghostty
 
-con does not need the final perfect cross-platform abstraction. It needs:
+vu does not need the final perfect cross-platform abstraction. It needs:
 
 - one stable Linux contract
 - documented ownership/threading rules
@@ -192,16 +192,16 @@ At minimum that includes:
    - define how `present()` reaches the actual host-visible framebuffer or
      target
 
-## What this means for con
+## What this means for vu
 
-For con, a "Ghostty-first Linux embed path" is viable only if Ghostty
+For vu, a "Ghostty-first Linux embed path" is viable only if Ghostty
 upstream is willing to provide:
 
 - Linux embed platform tags
 - a Linux host contract
 - working embedded OpenGL runtime behavior
 
-Until then, con cannot honestly say "Linux is basically macOS."
+Until then, vu cannot honestly say "Linux is basically macOS."
 
 ## Suggested upstream issue structure
 
@@ -224,7 +224,7 @@ separate Phase 2b question.
 
 This study only answers:
 
-> what would Ghostty itself need to change before con could even try to
+> what would Ghostty itself need to change before vu could even try to
 > embed Linux Ghostty the way it embeds macOS Ghostty?
 
 ## References

@@ -1,9 +1,9 @@
 # macOS Release Pipeline
 
-This repo now ships a first-pass macOS release pipeline for `con` that:
+This repo now ships a first-pass macOS release pipeline for `vu` that:
 
 - builds a native `.app` bundle without depending on `cargo-bundle`
-- embeds `con-cli` in the app bundle so installers and Homebrew can expose the
+- embeds `vu-cli` in the app bundle so installers and Homebrew can expose the
   control-plane CLI without a separate source build
 - signs with a Developer ID Application certificate
 - notarizes with `notarytool`
@@ -16,23 +16,23 @@ This repo now ships a first-pass macOS release pipeline for `con` that:
 
 Scripts live in [`scripts/macos`](../../scripts/macos):
 
-- `build-app.sh` builds `con` and assembles `con.app`
-- `build-app.sh` also builds `con-cli` and places it at
-  `Contents/MacOS/con-cli`
+- `build-app.sh` builds `vu` and assembles `vu.app`
+- `build-app.sh` also builds `vu-cli` and places it at
+  `Contents/MacOS/vu-cli`
 - `import-certificate.sh` imports the Developer ID cert into a temporary keychain for CI
 - `release.sh` runs build, sign, notarize, staple, package, and checksum generation
 - `verify.sh` runs `codesign`, `spctl`, and stapler validation checks
-- `verify.sh` fails the release if the bundled `con-cli` executable is missing
+- `verify.sh` fails the release if the bundled `vu-cli` executable is missing
 
-`con-cli` exposure is deliberately layered:
+`vu-cli` exposure is deliberately layered:
 
-- Homebrew casks install a `con-cli` binary shim from the app bundle.
-- `install.sh` links `~/.local/bin/con-cli` to the bundled CLI after copying
+- Homebrew casks install a `vu-cli` binary shim from the app bundle.
+- `install.sh` links `~/.local/bin/vu-cli` to the bundled CLI after copying
   the app into `/Applications`.
 - Sparkle updates replace only the app bundle, so the app also performs a
   conservative launch-time self-heal: it creates or repairs
-  `~/.local/bin/con-cli` only when the path is missing or already points to a
-  Con `.app` bundle. It never overwrites a real user-managed binary or an
+  `~/.local/bin/vu-cli` only when the path is missing or already points to a
+  Vu `.app` bundle. It never overwrites a real user-managed binary or an
   unrelated symlink.
 
 GitHub Actions release workflow:
@@ -43,15 +43,15 @@ GitHub Actions release workflow:
 
 The website host and the bundle identifier should not use the same order.
 
-- website: `con-releases.nowledge.co`
-- macOS bundle id base: `co.nowledge.con`
+- website: `vu-releases.nowledge.co`
+- macOS bundle id base: `co.nowledge.vu`
 
 That follows reverse-DNS convention and is the long-term correct identifier layout.
 
 Channel behavior:
 
-- `stable`: bundle id `co.nowledge.con`, app name `con`
-- `beta`: bundle id `co.nowledge.con.beta`, app name `con Beta`
+- `stable`: bundle id `co.nowledge.vu`, app name `vu`
+- `beta`: bundle id `co.nowledge.vu.beta`, app name `vu Beta`
 
 That split is deliberate. If beta and stable ever need to coexist on one machine, they cannot share a bundle identifier.
 
@@ -111,9 +111,9 @@ This repo does not need any GitHub repository variables for macOS releases.
 
 The workflow builds correctly from the defaults baked into the scripts:
 
-- `MACOS_APP_NAME=con`
-- `MACOS_BUNDLE_ID_BASE=co.nowledge.con`
-- `MACOS_ICON_SOURCE=assets/Con-macOS-Dark-1024x1024@1x.png`
+- `MACOS_APP_NAME=vu`
+- `MACOS_BUNDLE_ID_BASE=co.nowledge.vu`
+- `MACOS_ICON_SOURCE=assets/Vu-macOS-Dark-1024x1024@1x.png`
 - `MACOS_MINIMUM_SYSTEM_VERSION=10.15.7`
 
 If you reuse these scripts in another app repo, override those values there instead of editing the workflow.
@@ -144,7 +144,7 @@ git push origin v0.2.0-dev.1
 The workflow maps `*-beta.*` tags to the beta channel and `*-dev.*` tags to an
 internal dev channel. Dev releases are marked as GitHub prereleases and do not
 embed or update public appcasts, and do not update Homebrew casks. Beta tags
-are not marked as prereleases while Con is still in the all-beta era, so fresh
+are not marked as prereleases while Vu is still in the all-beta era, so fresh
 installs resolve to the newest public beta after the finalizer promotes the
 draft.
 
@@ -155,14 +155,14 @@ Homebrew casks.
 
 ## Reusing Existing Apple Credentials
 
-If your existing `nowledge-identities.p12` contains the same Apple team's `Developer ID Application` identity, it can be reused for `con`.
+If your existing `nowledge-identities.p12` contains the same Apple team's `Developer ID Application` identity, it can be reused for `vu`.
 
 If your existing App Store Connect team API key is:
 
 - Key ID: `KG4RA8F5A6`
 - Issuer ID: `df090cec-9b81-4642-a0f0-5063ae39fb87`
 
-then it can also be reused for notarizing `con`, provided it is a team key and still active.
+then it can also be reused for notarizing `vu`, provided it is a team key and still active.
 
 What is reusable across apps:
 
@@ -183,8 +183,8 @@ What is app-specific and should stay per-repo:
 Ad-hoc signed local build:
 
 ```bash
-CON_ALLOW_ADHOC_SIGNING=1 \
-CON_SKIP_NOTARIZATION=1 \
+VU_ALLOW_ADHOC_SIGNING=1 \
+VU_SKIP_NOTARIZATION=1 \
 ./scripts/macos/release.sh
 ```
 
@@ -202,7 +202,7 @@ export APPLE_NOTARY_KEY_PATH="/absolute/path/to/AuthKey_XXXXXXXXXX.p8"
 Local beta updater test against the published beta appcast:
 
 ```bash
-export CON_SPARKLE_PUBLIC_ED_KEY="...public key from your release setup..."
+export VU_SPARKLE_PUBLIC_ED_KEY="...public key from your release setup..."
 
 ./scripts/macos/test-update-beta.sh
 ```
@@ -214,7 +214,7 @@ embed `Sparkle.framework`.
 
 After the update installs, verify the result from either of these product surfaces:
 
-- `con` → `About con`
+- `vu` → `About vu`
 - Settings → Updates
 
 Both should show the updated marketing version, build number, and release channel.
@@ -226,7 +226,7 @@ The workflow currently builds native artifacts on:
 - `macos-15` for Apple Silicon / `arm64`
 - `macos-15-intel` for Intel / `x86_64`
 
-That matches the current `con-ghostty` build behavior: it builds Ghostty for the host architecture in `build.rs`. This pipeline avoids pretending we have a universal build when we do not.
+That matches the current `vu-ghostty` build behavior: it builds Ghostty for the host architecture in `build.rs`. This pipeline avoids pretending we have a universal build when we do not.
 
 ## Auto-Update Architecture
 
@@ -253,14 +253,14 @@ Tag push → CI builds → signs → notarizes → uploads to GitHub Release
 Each build targets one channel and one architecture.  The feed URL is derived deterministically and baked into `Info.plist` at build time:
 
 ```
-https://con-releases.nowledge.co/appcast/{channel}-macos-{arch}.xml
+https://vu-releases.nowledge.co/appcast/{channel}-macos-{arch}.xml
 ```
 
 Examples:
 
-- `https://con-releases.nowledge.co/appcast/stable-macos-arm64.xml`
-- `https://con-releases.nowledge.co/appcast/beta-macos-arm64.xml`
-- `https://con-releases.nowledge.co/appcast/stable-macos-x86_64.xml`
+- `https://vu-releases.nowledge.co/appcast/stable-macos-arm64.xml`
+- `https://vu-releases.nowledge.co/appcast/beta-macos-arm64.xml`
+- `https://vu-releases.nowledge.co/appcast/stable-macos-x86_64.xml`
 
 This is stable across releases and extensible to Linux when needed.
 
@@ -268,7 +268,7 @@ This is stable across releases and extensible to Linux when needed.
 
 Sparkle is loaded dynamically from `Contents/Frameworks/Sparkle.framework` at app launch.  If the framework is absent (e.g. `cargo run` dev builds), auto-update silently disables.
 
-The Rust FFI bridge (`crates/con-app/src/updater.rs`) uses `objc` crate to:
+The Rust FFI bridge (`crates/vu-app/src/updater.rs`) uses `objc` crate to:
 
 1. Load `Sparkle.framework` from the app bundle
 2. Verify `SUFeedURL` is set in Info.plist
@@ -280,28 +280,28 @@ The Rust FFI bridge (`crates/con-app/src/updater.rs`) uses `objc` crate to:
 Before shipping a beta or stable build, verify these flows from the bundled app:
 
 1. Open the app from Finder and confirm the terminal renders normally.
-2. Open `About con` and confirm the app icon, version, build, and channel are visible.
-3. Run `con-cli identify` from a new shell after installing by Homebrew or
+2. Open `About vu` and confirm the app icon, version, build, and channel are visible.
+3. Run `vu-cli identify` from a new shell after installing by Homebrew or
    `install.sh`; it should connect to the running app and print app identity.
 4. For a manual DMG/Sparkle-updated app, confirm launching the app creates or
-   repairs `~/.local/bin/con-cli` when that path is missing.
+   repairs `~/.local/bin/vu-cli` when that path is missing.
 5. Open Settings → Updates and confirm the same version/build information is shown there.
 6. Run `Check for Updates…` against the intended channel and confirm Sparkle presents the expected UI.
-7. After installation, reopen `About con` and confirm the build number changed.
+7. After installation, reopen `About vu` and confirm the build number changed.
 
 ### Automated Release Gates
 
 Release safety is enforced in two layers:
 
 1. Platform release jobs verify artifact shape before upload. macOS checks the
-   app bundle, ZIP, DMG, checksums, and bundled `con-cli`; Linux checks the
-   tarball layout, checksum, and `con-cli --help`; Windows expands the ZIP,
-   verifies `con-app.exe` and `con-cli.exe`, runs `con-cli.exe --help`, and
+   app bundle, ZIP, DMG, checksums, and bundled `vu-cli`; Linux checks the
+   tarball layout, checksum, and `vu-cli --help`; Windows expands the ZIP,
+   verifies `vu-app.exe` and `vu-cli.exe`, runs `vu-cli.exe --help`, and
    checks `SHA256SUMS-windows.txt`.
 2. `release-finalize.yml` refuses to promote the draft release unless the
    expected GitHub Release assets exist, stable/beta appcasts point at the
-   same tag's artifacts, and the gh-pages installer scripts expose `con-cli`
-   / `con-cli.exe`.
+   same tag's artifacts, and the gh-pages installer scripts expose `vu-cli`
+   / `vu-cli.exe`.
    Dev tags skip appcast/Homebrew publication entirely and are only checked for
    artifact and installer-script shape.
 
@@ -311,14 +311,14 @@ older clients keep polling the previous valid appcast entry.
 
 ### Release Channel Runtime
 
-`con-core/src/release_channel.rs` provides a cross-platform `ReleaseChannel` enum:
+`vu-core/src/release_channel.rs` provides a cross-platform `ReleaseChannel` enum:
 
 - `Dev` — local or internal smoke builds, never polls for updates
 - `Beta` — pre-release, polls `beta-macos-{arch}.xml`
 - `Stable` — GA builds, polls `stable-macos-{arch}.xml`
 
-On macOS, the channel is read from `ConReleaseChannel` in the bundle's Info.plist.
-On other platforms, it falls back to the `CON_RELEASE_CHANNEL` environment variable.
+On macOS, the channel is read from `VuReleaseChannel` in the bundle's Info.plist.
+On other platforms, it falls back to the `VU_RELEASE_CHANNEL` environment variable.
 
 ### Required Secrets for Auto-Update
 
@@ -343,7 +343,7 @@ Store them:
 Appcasts are served from GitHub Pages:
 
 - Branch: `gh-pages`
-- Custom domain: `con-releases.nowledge.co` (CNAME record → `nowledge-co.github.io`)
+- Custom domain: `vu-releases.nowledge.co` (CNAME record → `nowledge-co.github.io`)
 
 Initialize the gh-pages branch:
 

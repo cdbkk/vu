@@ -7,7 +7,7 @@ vertical-tab coexistence, keybinding/focus integration.
 ## Current Model
 
 The code editor is a normal pane surface inside the workspace `PaneTree`. It is
-not a separate top-level editor area and there is no standalone `con-editor`
+not a separate top-level editor area and there is no standalone `vu-editor`
 crate. Terminal panes, editor panes, the input bar, and the agent panel all
 share the existing workspace layout and close/focus machinery.
 
@@ -23,7 +23,7 @@ file/search slot.
 
 ## Left Sidebar
 
-`crates/con-app/src/activity_bar.rs` owns the compact section switcher.
+`crates/vu-app/src/activity_bar.rs` owns the compact section switcher.
 `ActivitySlot::Files` shows the file explorer and `ActivitySlot::Search` shows
 workspace search. Clicking a different icon switches content and opens the
 panel. In vertical-tabs mode the same section choices are surfaced in
@@ -54,7 +54,7 @@ active focus:
   from the currently focused pane.
 
 Opening a file from the explorer routes through
-`ConWorkspace::open_path_in_active_editor`, which reuses the active tab's shared
+`VuWorkspace::open_path_in_active_editor`, which reuses the active tab's shared
 editor pane when possible.
 
 ## Search Panel
@@ -109,34 +109,34 @@ See `docs/impl/keybindings.md` for the binding-spec table and scope rules.
 ## Code Map
 
 ```text
-crates/con-app/src/activity_bar.rs
+crates/vu-app/src/activity_bar.rs
   File/search section switcher and slot events.
 
-crates/con-app/src/sidebar.rs
+crates/vu-app/src/sidebar.rs
   Folded/unfolded vertical tabs, tab hover cards, drag/drop, and tab actions.
 
-crates/con-app/src/file_tree_view.rs
+crates/vu-app/src/file_tree_view.rs
   File explorer rows and OpenFile events.
 
-crates/con-app/src/sidebar_search_view.rs
+crates/vu-app/src/sidebar_search_view.rs
   Sidebar search query/options/results rendering and bounded filesystem scan.
 
-crates/con-app/src/editor_buffer.rs
+crates/vu-app/src/editor_buffer.rs
   Text, cursor, selection, undo/redo, and line movement primitives.
 
-crates/con-app/src/editor_view.rs
+crates/vu-app/src/editor_view.rs
   Multi-file editor pane, tabs, hit-testing, scrolling, rendering, LSP events.
 
-crates/con-app/src/editor_syntax.rs
+crates/vu-app/src/editor_syntax.rs
   File type detection and syntax highlight runs.
 
-crates/con-app/src/editor_lsp.rs
+crates/vu-app/src/editor_lsp.rs
   Best-effort language-server process integration and diagnostics parsing.
 
-crates/con-app/src/workspace/editor_actions.rs
+crates/vu-app/src/workspace/editor_actions.rs
   Editor action dispatch and text-key fallback handling.
 
-crates/con-app/src/workspace/render.rs
+crates/vu-app/src/workspace/render.rs
   Activity rail, left panel layout, resize overlay, editor pane composition.
 ```
 
@@ -144,7 +144,7 @@ crates/con-app/src/workspace/render.rs
 
 Relevant checks:
 
-- `cargo check -p con`
-- `cargo test -p con workspace -- --nocapture`
-- `cargo test -p con sidebar_search -- --nocapture`
-- `cargo test -p con editor_view -- --nocapture`
+- `cargo check -p vu`
+- `cargo test -p vu workspace -- --nocapture`
+- `cargo test -p vu sidebar_search -- --nocapture`
+- `cargo test -p vu editor_view -- --nocapture`

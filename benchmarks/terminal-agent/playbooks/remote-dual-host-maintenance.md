@@ -2,11 +2,11 @@
 
 ## Goal
 
-Verify that Con can handle a realistic multi-host operator task across follow-up turns without mixing hosts, duplicating panes, or silently falling back to the local machine.
+Verify that Vu can handle a realistic multi-host operator task across follow-up turns without mixing hosts, duplicating panes, or silently falling back to the local machine.
 
 ## Setup
 
-- One live Con tab
+- One live Vu tab
 - Reachable SSH hosts: `haswell` and `cinnamon`
 - Package-manager commands may differ across hosts
 

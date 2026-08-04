@@ -1,7 +1,7 @@
 name: Release Windows
 
 # v0 release pipeline for the Windows port. Unsigned for now — the
-# user downloads a ZIP, unpacks it anywhere, and runs `con-app.exe`.
+# user downloads a ZIP, unpacks it anywhere, and runs `vu-app.exe`.
 # No installer, no code signature, no auto-update. Those come later.
 #
 # macOS releases live in release-macos.yml and run on the same `v*`
@@ -24,10 +24,8 @@ jobs:
 
     # Two workarounds converge here:
     #
-    # 1. CON_CHECKOUT_DIR sidesteps the CON reserved-name trap: runner
-    #    2.333.1+ rejects any workspace path whose components match a
-    #    DOS device name. Cloning to C:\src\repo keeps us out of that
-    #    namespace — same workaround ci-portable.yml uses.
+    # 1. VU_CHECKOUT_DIR keeps generated Windows paths short — the same
+    #    layout used by ci-portable.yml.
     #
     # 2. ZIG_GLOBAL_CACHE_DIR shortens the uucode package cache path so
     #    Zig's build system can spawn uucode_build_tables.exe. The
@@ -38,7 +36,7 @@ jobs:
     #    short cache root (C:\zc) keeps the composed path comfortably
     #    under the legacy limit.
     env:
-      CON_CHECKOUT_DIR: C:\src\repo
+      VU_CHECKOUT_DIR: C:\src\repo
       ZIG_GLOBAL_CACHE_DIR: C:\zc
 
     defaults:
@@ -46,17 +44,17 @@ jobs:
         working-directory: C:\src\repo
 
     steps:
-      - name: Clone repo outside the reserved-name path
+      - name: Clone repo into short path
         working-directory: C:\
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          New-Item -ItemType Directory -Force -Path $env:CON_CHECKOUT_DIR | Out-Null
+          New-Item -ItemType Directory -Force -Path $env:VU_CHECKOUT_DIR | Out-Null
           git -c core.longpaths=true clone `
             "https://x-access-token:$env:GH_TOKEN@github.com/${{ github.repository }}.git" `
-            $env:CON_CHECKOUT_DIR
-          Set-Location $env:CON_CHECKOUT_DIR
+            $env:VU_CHECKOUT_DIR
+          Set-Location $env:VU_CHECKOUT_DIR
           git fetch origin "${{ github.ref }}"
           git checkout "${{ github.ref_name }}"
           git log -1 --oneline
@@ -95,7 +93,7 @@ jobs:
         shell: pwsh
         run: |
           Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
-          Add-MpPreference -ExclusionPath $env:CON_CHECKOUT_DIR -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath $env:VU_CHECKOUT_DIR -ErrorAction SilentlyContinue
           Add-MpPreference -ExclusionPath $env:TEMP -ErrorAction SilentlyContinue
           Add-MpPreference -ExclusionPath "$env:USERPROFILE\.local" -ErrorAction SilentlyContinue
           Add-MpPreference -ExclusionPath $env:ZIG_GLOBAL_CACHE_DIR -ErrorAction SilentlyContinue
@@ -145,36 +143,35 @@ jobs:
         id: build
         shell: pwsh
         # `cargo wbuild` is the workspace alias for
-        # `cargo build --no-default-features --features con/bin-con-app`
-        # — required because CON is a reserved DOS name and plain
-        # `con.exe` cannot be created.
+        # `cargo build --no-default-features --features vu/bin-vu-app`
+        # — selects the retained `vu-app.exe` Windows release alias.
         #
-        # `CON_RELEASE_CHANNEL` is captured at compile time via
-        # `option_env!` (see crates/con-core/src/release_channel.rs) so
+        # `VU_RELEASE_CHANNEL` is captured at compile time via
+        # `option_env!` (see crates/vu-core/src/release_channel.rs) so
         # the non-macOS update-polling path and Settings → Updates card
         # know which appcast to query. Local dev builds leave it unset
         # and fall back to the Dev channel, which never polls.
         #
-        # `CON_RELEASE_VERSION` is the full tag-derived version (e.g.
+        # `VU_RELEASE_VERSION` is the full tag-derived version (e.g.
         # `0.1.0-beta.31`). Cargo.toml is frozen at `0.1.0` so
         # `CARGO_PKG_VERSION` loses the prerelease suffix; without this
         # the Settings → Updates version display would read `0.1.0`
         # for every beta build, and the appcast diff check would be
         # useless.
         env:
-          CON_RELEASE_CHANNEL: ${{ steps.meta.outputs.channel }}
-          CON_RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+          VU_RELEASE_CHANNEL: ${{ steps.meta.outputs.channel }}
+          VU_RELEASE_VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          cargo wbuild -p con --release
+          cargo wbuild -p vu --release
 
-      - name: Build con-cli
+      - name: Build vu-cli
         id: build_cli
         shell: pwsh
         env:
-          CON_RELEASE_CHANNEL: ${{ steps.meta.outputs.channel }}
-          CON_RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+          VU_RELEASE_CHANNEL: ${{ steps.meta.outputs.channel }}
+          VU_RELEASE_VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          cargo build -p con-cli --release
+          cargo build -p vu-cli --release
 
       - name: Diagnose build failure
         if: failure() && (steps.build.conclusion == 'failure' || steps.build_cli.conclusion == 'failure')
@@ -279,14 +276,14 @@ jobs:
         shell: pwsh
         run: |
           $Version = "${{ steps.meta.outputs.version }}"
-          $StagingDir = "dist\con-$Version-windows-x86_64"
+          $StagingDir = "dist\vu-$Version-windows-x86_64"
           New-Item -ItemType Directory -Force -Path $StagingDir | Out-Null
-          Copy-Item "target\release\con-app.exe" "$StagingDir\con-app.exe"
-          Copy-Item "target\release\con-cli.exe" "$StagingDir\con-cli.exe"
+          Copy-Item "target\release\vu-app.exe" "$StagingDir\vu-app.exe"
+          Copy-Item "target\release\vu-cli.exe" "$StagingDir\vu-cli.exe"
           if (Test-Path "README.md")  { Copy-Item "README.md"  $StagingDir }
           if (Test-Path "LICENSE")    { Copy-Item "LICENSE"    $StagingDir }
           if (Test-Path "LICENSE.md") { Copy-Item "LICENSE.md" $StagingDir }
-          $Zip = "dist\con-$Version-windows-x86_64.zip"
+          $Zip = "dist\vu-$Version-windows-x86_64.zip"
           Compress-Archive -Path "$StagingDir\*" -DestinationPath $Zip -Force
           $Sha = (Get-FileHash -Algorithm SHA256 $Zip).Hash.ToLower()
           "$Sha  $(Split-Path -Leaf $Zip)" | Out-File "dist\SHA256SUMS-windows.txt" -Encoding ascii
@@ -311,14 +308,14 @@ jobs:
               throw "checksum mismatch for $Zip (expected $Expected, got $Actual)"
           }
 
-          $Extract = Join-Path $env:RUNNER_TEMP "con-release-verify-$([System.Guid]::NewGuid())"
+          $Extract = Join-Path $env:RUNNER_TEMP "vu-release-verify-$([System.Guid]::NewGuid())"
           New-Item -ItemType Directory -Force -Path $Extract | Out-Null
           Expand-Archive -Path $Zip -DestinationPath $Extract -Force
 
-          $App = Join-Path $Extract 'con-app.exe'
-          $Cli = Join-Path $Extract 'con-cli.exe'
-          if (-not (Test-Path $App)) { throw 'con-app.exe missing from Windows ZIP' }
-          if (-not (Test-Path $Cli)) { throw 'con-cli.exe missing from Windows ZIP' }
+          $App = Join-Path $Extract 'vu-app.exe'
+          $Cli = Join-Path $Extract 'vu-cli.exe'
+          if (-not (Test-Path $App)) { throw 'vu-app.exe missing from Windows ZIP' }
+          if (-not (Test-Path $Cli)) { throw 'vu-cli.exe missing from Windows ZIP' }
           & $Cli --help | Out-Null
 
       - name: Upload artifacts
@@ -326,7 +323,7 @@ jobs:
         with:
           name: windows-x86_64
           path: |
-            C:\src\repo\dist\con-*-windows-x86_64.zip
+            C:\src\repo\dist\vu-*-windows-x86_64.zip
             C:\src\repo\dist\SHA256SUMS-windows.txt
           if-no-files-found: error
 
@@ -360,7 +357,7 @@ jobs:
           # public while the other two are still uploading, or new
           # users hit
           #   ✗ no ZIP found for windows-x86_64
-          # (the bug `irm https://nowled.ge/con-ps1 | iex` reported
+          # (the bug `irm https://nowled.ge/vu-ps1 | iex` reported
           # on v0.1.0-beta.35).
           #
           # The draft is promoted to public by
@@ -370,7 +367,7 @@ jobs:
           #
           # --prerelease is still set on `v*-dev.*` for defence in
           # depth (in case someone publishes the draft manually).
-          # Beta tags are NOT marked --prerelease — con is all-betas
+          # Beta tags are NOT marked --prerelease — vu is all-betas
           # today, so the latest beta IS what fresh install.ps1
           # should download.
           prerelease_args=()
@@ -464,7 +461,7 @@ jobs:
             git checkout -b gh-pages
             git remote add origin \
               "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
-            echo "con-releases.nowledge.co" > CNAME
+            echo "vu-releases.nowledge.co" > CNAME
             touch .nojekyll
             git add CNAME .nojekyll
             git commit -m "Initialize gh-pages"
@@ -511,7 +508,7 @@ jobs:
           # Windows has no OS minimum so we feed a harmless sentinel;
           # the Windows client ignores the field.
           # ITEM_SHORT_VERSION is the string the Windows client compares
-          # against its baked `CON_RELEASE_VERSION`. It must be the full
+          # against its baked `VU_RELEASE_VERSION`. It must be the full
           # tag-derived version (0.1.0-beta.31), not the stripped
           # marketing version (0.1.0) - otherwise the client, which now
           # runs a SemVer-aware `is_newer`, correctly reads GA `0.1.0`
@@ -519,8 +516,8 @@ jobs:
           # reports "update available" on the very build it was just
           # cut from.
           APPCAST_FILE="$appcast_file" \
-          APPCAST_TITLE="con" \
-          APPCAST_LINK="https://con-releases.nowledge.co" \
+          APPCAST_TITLE="vu" \
+          APPCAST_LINK="https://vu-releases.nowledge.co" \
           ITEM_TITLE="Version ${version}" \
           ITEM_VERSION="$build_number" \
           ITEM_SHORT_VERSION="$version" \

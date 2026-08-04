@@ -2,7 +2,7 @@
 
 ## Summary
 
-Con's public pane model now has two layers:
+Vu's public pane model now has two layers:
 
 - **Pane**: a visible split rectangle in a tab.
 - **Surface**: a live terminal session hosted by a pane.
@@ -24,7 +24,7 @@ Interactive subagent tools often want this lifecycle:
 3. The orchestrator can read, send keys, focus, rename, and close those tabs.
 4. When the last owned worker tab exits, the worker pane can be closed.
 
-cmux calls the inner unit a `surface`, so Con uses the same word for the
+cmux calls the inner unit a `surface`, so Vu uses the same word for the
 control-plane concept. In product terms, a surface is simply a terminal session
 inside a pane.
 
@@ -42,7 +42,7 @@ The compatibility rule is strict:
   explicitly about pane-local surfaces.
 - Surface APIs are opt-in under `surfaces.*`.
 
-This prevents a new abstraction from changing the behavior of Con's benchmarked
+This prevents a new abstraction from changing the behavior of Vu's benchmarked
 agent harness or the user-facing pane picker.
 
 ## Control API
@@ -78,7 +78,7 @@ Prefer `surface_id` for follow-up automation.
 
 Surface control is also available from Command Palette and the terminal
 right-click menu so humans can discover and exercise the same pane-local model
-without using `con-cli`.
+without using `vu-cli`.
 
 The visual rule is intentionally scoped:
 
@@ -145,26 +145,26 @@ parallel agents do not keep shrinking the main terminal layout.
 
 ## pi-interactive-subagents Readiness
 
-Con is API-ready for the pi-interactive-subagents pattern, but it is not a
-byte-for-byte cmux CLI clone. The preferred integration is a Con-specific
-backend that uses `con-cli --json` instead of parsing cmux text handles:
+Vu is API-ready for the pi-interactive-subagents pattern, but it is not a
+byte-for-byte cmux CLI clone. The preferred integration is a Vu-specific
+backend that uses `vu-cli --json` instead of parsing cmux text handles:
 
-- First worker: `con-cli --json surfaces split --location right --title <name>
+- First worker: `vu-cli --json surfaces split --location right --title <name>
   --owner pi-interactive-subagents`
 - Remember the returned `pane_id` and `surface_id`.
-- Later workers: `con-cli --json surfaces create --pane-id <worker_pane_id>
+- Later workers: `vu-cli --json surfaces create --pane-id <worker_pane_id>
   --title <name> --owner pi-interactive-subagents`
 - Drive workers with `surfaces wait-ready`, `surfaces send-text`,
   `surfaces send-key`, and `surfaces read`.
 - Clean up with `surfaces close --surface-id <surface_id>
   --close-empty-owned-pane`.
 
-This avoids cmux's `identify --surface` round trip because Con returns the
+This avoids cmux's `identify --surface` round trip because Vu returns the
 worker pane id directly from `surfaces split`.
 
-Release artifacts now include `con-cli` as part of the core install. Homebrew
+Release artifacts now include `vu-cli` as part of the core install. Homebrew
 and the one-line installers expose it on PATH, so an orchestrator adapter can
-depend on `con-cli` being present after a normal Con install instead of asking
+depend on `vu-cli` being present after a normal Vu install instead of asking
 users to build the workspace from source.
 
 ## CLI Examples
@@ -172,7 +172,7 @@ users to build the workspace from source.
 First create a visible worker pane:
 
 ```bash
-con-cli --json surfaces split \
+vu-cli --json surfaces split \
   --tab 1 \
   --pane-id 0 \
   --location right \
@@ -184,7 +184,7 @@ con-cli --json surfaces split \
 Then create more worker sessions inside the same pane:
 
 ```bash
-con-cli --json surfaces create \
+vu-cli --json surfaces create \
   --tab 1 \
   --pane-id <worker_pane_id> \
   --title worker-2 \
@@ -195,27 +195,27 @@ con-cli --json surfaces create \
 Wait for the worker before driving it:
 
 ```bash
-con-cli --json surfaces wait-ready --surface-id <surface_id> --timeout 10
+vu-cli --json surfaces wait-ready --surface-id <surface_id> --timeout 10
 ```
 
 Drive a worker:
 
 ```bash
-con-cli --json surfaces send-text --surface-id <surface_id> "explain this repo"
-con-cli --json surfaces send-key --surface-id <surface_id> enter
-con-cli --json surfaces read --surface-id <surface_id> --lines 120
+vu-cli --json surfaces send-text --surface-id <surface_id> "explain this repo"
+vu-cli --json surfaces send-key --surface-id <surface_id> enter
+vu-cli --json surfaces read --surface-id <surface_id> --lines 120
 ```
 
 Close a worker surface:
 
 ```bash
-con-cli --json surfaces close --surface-id <surface_id>
+vu-cli --json surfaces close --surface-id <surface_id>
 ```
 
 Close the last surface and its owned worker pane:
 
 ```bash
-con-cli --json surfaces close \
+vu-cli --json surfaces close \
   --surface-id <surface_id> \
   --close-empty-owned-pane
 ```
@@ -228,7 +228,7 @@ closes.
 
 - Only active surfaces are visible.
 - Hidden surfaces keep running and continue receiving terminal output.
-- Hidden surfaces keep the same PTY/grid size as their host pane. Con resizes
+- Hidden surfaces keep the same PTY/grid size as their host pane. Vu resizes
   inactive surfaces to the visible terminal host bounds even while they are not
   rendered, so TUI agents that start in background surfaces see the correct
   rows and columns before focus moves to them.
@@ -239,8 +239,8 @@ closes.
   checkpoint.
 - Tab, pane, window, and app close paths tear down every surface, not just the
   active surface.
-- If a non-last surface exits, Con removes only that surface.
-- If the last surface in a pane exits, Con follows the existing pane close
+- If a non-last surface exits, Vu removes only that surface.
+- If the last surface in a pane exits, Vu follows the existing pane close
   escalation: close pane, then close tab, then close the workspace window.
 
 ## Debugging Geometry Drift
@@ -252,21 +252,21 @@ beta/dev build is enough; no special instrumented build is required.
 For an installed beta app:
 
 ```bash
-CON_LOG_FILE="$HOME/Desktop/con-surface-geometry.log" \
-CON_GHOSTTY_PROFILE=1 \
-RUST_LOG=con::perf=info,con_ghostty::perf=info,con=warn,con_core=warn,con_agent=warn \
-"/Applications/con Beta.app/Contents/MacOS/con"
+VU_LOG_FILE="$HOME/Desktop/vu-surface-geometry.log" \
+VU_GHOSTTY_PROFILE=1 \
+RUST_LOG=vu::perf=info,vu_ghostty::perf=info,vu=warn,vu_core=warn,vu_agent=warn \
+"/Applications/vu Beta.app/Contents/MacOS/vu"
 ```
 
 After reproducing the clipping, capture the live surface state:
 
 ```bash
-con-cli --json surfaces list > "$HOME/Desktop/con-surfaces.json"
+vu-cli --json surfaces list > "$HOME/Desktop/vu-surfaces.json"
 ```
 
 Ask for both files privately if paths or terminal titles are sensitive. Useful
 signals in the log are `surface geometry mismatch`, `surface resize request`,
-and `update_frame`; together with `con-surfaces.json`, they show whether the
+and `update_frame`; together with `vu-surfaces.json`, they show whether the
 visible pane bounds, Ghostty pixel size, and TUI rows/columns agree.
 
 ## Current Limit
