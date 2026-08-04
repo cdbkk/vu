@@ -2390,7 +2390,7 @@ impl SettingsPanel {
             )
             .child(
                 div()
-                    .text_size(px(13.0))
+                    .text_size(px(14.0))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(theme.foreground.opacity(0.85))
                     .child(label.to_string()),
@@ -3441,7 +3441,7 @@ impl SettingsPanel {
                                                     .gap(px(8.0))
                                                     .child(
                                                         div()
-                                                            .text_size(px(10.0))
+                                                            .text_size(px(11.5))
                                                             .font_weight(FontWeight::MEDIUM)
                                                             .text_color(
                                                                 theme
@@ -3452,8 +3452,8 @@ impl SettingsPanel {
                                                     )
                                                     .child(
                                                         div()
-                                                            .text_size(px(13.0))
-                                                            .line_height(px(18.0))
+                                                            .text_size(px(14.0))
+                                                            .line_height(px(20.0))
                                                             .font_weight(FontWeight::MEDIUM)
                                                             .child(channel.display_name()),
                                                     ),
@@ -3466,7 +3466,7 @@ impl SettingsPanel {
                                                     .gap(px(8.0))
                                                     .child(
                                                         div()
-                                                            .text_size(px(10.0))
+                                                            .text_size(px(11.5))
                                                             .font_weight(FontWeight::MEDIUM)
                                                             .text_color(
                                                                 theme
@@ -3477,8 +3477,8 @@ impl SettingsPanel {
                                                     )
                                                     .child(
                                                         div()
-                                                            .text_size(px(12.0))
-                                                            .line_height(px(18.0))
+                                                            .text_size(px(13.5))
+                                                            .line_height(px(20.0))
                                                             .font_family(
                                                                 theme.mono_font_family.clone(),
                                                             )
@@ -3518,7 +3518,7 @@ impl SettingsPanel {
                                             .max_w(px(420.0))
                                             .child(
                                                 div()
-                                                    .text_size(px(10.0))
+                                                    .text_size(px(11.5))
                                                     .font_weight(FontWeight::MEDIUM)
                                                     .text_color(
                                                         theme
@@ -3539,8 +3539,8 @@ impl SettingsPanel {
                                                     .gap(px(3.0))
                                                     .child(
                                                         div()
-                                                            .text_size(px(12.5))
-                                                            .line_height(px(17.0))
+                                                            .text_size(px(13.5))
+                                                            .line_height(px(19.0))
                                                             .font_weight(FontWeight::MEDIUM)
                                                             .text_color(
                                                                 theme.foreground.opacity(0.88),
@@ -3549,8 +3549,8 @@ impl SettingsPanel {
                                                     )
                                                     .child(
                                                         div()
-                                                            .text_size(px(10.5))
-                                                            .line_height(px(15.0))
+                                                            .text_size(px(12.0))
+                                                            .line_height(px(17.0))
                                                             .text_color(
                                                                 theme
                                                                     .muted_foreground
@@ -3572,7 +3572,7 @@ impl SettingsPanel {
                                                                 "update-download-link",
                                                             )
                                                             .href(url)
-                                                            .text_size(px(11.0))
+                                                            .text_size(px(12.5))
                                                             .child(label),
                                                         ),
                                                     );
@@ -3670,9 +3670,9 @@ impl SettingsPanel {
                                     div()
                                         .max_w(px(500.0))
                                         .whitespace_normal()
-                                        .text_size(px(11.5))
-                                        .line_height(px(17.0))
-                                        .text_color(theme.muted_foreground.opacity(0.65))
+                                        .text_size(px(13.0))
+                                        .line_height(px(19.0))
+                                        .text_color(theme.muted_foreground.opacity(0.82))
                                         .child("Vu scans these folders for slash-command skills. Project paths follow the active working directory; global paths are always available."),
                                 ),
                         )
@@ -3693,8 +3693,8 @@ impl SettingsPanel {
                                         .child(div().text_sm().child("Project paths"))
                                         .child(
                                             div()
-                                                .text_size(px(10.0))
-                                                .text_color(theme.muted_foreground.opacity(0.5))
+                                                .text_size(px(11.5))
+                                                .text_color(theme.muted_foreground.opacity(0.75))
                                                 .child("relative to cwd"),
                                         ),
                                 )
@@ -3724,8 +3724,8 @@ impl SettingsPanel {
                                         .child(div().text_sm().child("Global paths"))
                                         .child(
                                             div()
-                                                .text_size(px(10.0))
-                                                .text_color(theme.muted_foreground.opacity(0.5))
+                                                .text_size(px(11.5))
+                                                .text_color(theme.muted_foreground.opacity(0.75))
                                                 .child("~ expanded to home"),
                                         ),
                                 )
@@ -3788,7 +3788,7 @@ impl SettingsPanel {
                     .hover(move |s| s.bg(chip_hover_bg))
                     .child(
                         div()
-                            .text_size(px(11.0))
+                            .text_size(px(12.5))
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(fg)
                             .child(path_display),
@@ -3871,7 +3871,7 @@ impl SettingsPanel {
                             .size(px(10.0))
                             .text_color(muted_fg),
                     )
-                    .child(div().text_size(px(10.0)).child(label))
+                    .child(div().text_size(px(11.5)).child(label))
                     .into_any_element()
             })
             .collect()
@@ -4061,9 +4061,9 @@ impl SettingsPanel {
             )
             .child(
                 div()
-                    .text_size(px(11.5))
-                    .line_height(px(18.0))
-                    .text_color(theme.muted_foreground.opacity(0.6))
+                    .text_size(px(13.0))
+                    .line_height(px(20.0))
+                    .text_color(theme.muted_foreground.opacity(0.8))
                     .child("Browse community Ghostty themes, copy, and paste here."),
             )
             // Name input
@@ -4074,8 +4074,8 @@ impl SettingsPanel {
                     .gap(px(4.0))
                     .child(
                         div()
-                            .text_size(px(11.0))
-                            .text_color(theme.muted_foreground.opacity(0.5))
+                            .text_size(px(12.5))
+                            .text_color(theme.muted_foreground.opacity(0.75))
                             .child("Theme name"),
                     )
                     .child(Input::new(&custom_theme_name_input)),
@@ -4106,8 +4106,8 @@ impl SettingsPanel {
                     } else {
                         theme.success.opacity(0.08)
                     })
-                    .text_size(px(11.0))
-                    .line_height(px(17.0))
+                    .text_size(px(12.5))
+                    .line_height(px(19.0))
                     .text_color(if status.starts_with("Error") {
                         theme.danger
                     } else {
@@ -4134,14 +4134,14 @@ impl SettingsPanel {
                     )
                     .child(
                         div()
-                            .text_size(px(10.0))
-                            .text_color(theme.muted_foreground.opacity(0.5))
+                            .text_size(px(11.5))
+                            .text_color(theme.muted_foreground.opacity(0.75))
                             .child(format!("{total_count} themes")),
                     ),
             )
             .child(
                 div()
-                    .text_size(px(10.5))
+                    .text_size(px(12.0))
                     .text_color(theme.muted_foreground.opacity(0.4))
                     .mb(px(10.0))
                     .child("You can also import community-maintained Ghostty styles."),
@@ -4163,12 +4163,12 @@ impl SettingsPanel {
                                 svg()
                                     .path("phosphor/folder.svg")
                                     .size(px(12.0))
-                                    .text_color(theme.muted_foreground.opacity(0.5)),
+                                    .text_color(theme.muted_foreground.opacity(0.75)),
                             )
                             .child(
                                 div()
-                                    .text_size(px(10.5))
-                                    .text_color(theme.muted_foreground.opacity(0.6))
+                                    .text_size(px(12.0))
+                                    .text_color(theme.muted_foreground.opacity(0.8))
                                     .child("Installed"),
                             ),
                     )
@@ -4447,8 +4447,8 @@ impl SettingsPanel {
                             div()
                                 .px(px(12.0))
                                 .pt(px(10.0))
-                                .text_size(px(10.5))
-                                .text_color(theme.muted_foreground.opacity(0.7))
+                                .text_size(px(12.0))
+                                .text_color(theme.muted_foreground.opacity(0.85))
                                 .child(
                                     "Surfaces are blended from the terminal background toward \
                                      its foreground; the accent follows the palette's Blue.",
@@ -4562,14 +4562,14 @@ impl SettingsPanel {
                                                 .gap(px(2.0))
                                                 .child(
                                                     div()
-                                                        .text_size(px(11.5))
+                                                        .text_size(px(13.0))
                                                         .font_weight(FontWeight::MEDIUM)
                                                         .child("Image Path"),
                                                 )
                                                 .child(
                                                     div()
-                                                        .text_size(px(10.5))
-                                                        .line_height(px(16.0))
+                                                        .text_size(px(12.0))
+                                                        .line_height(px(18.0))
                                                         .text_color(
                                                             theme.muted_foreground.opacity(0.65),
                                                         )
@@ -4640,9 +4640,9 @@ impl SettingsPanel {
                             div()
                                 .px(px(16.0))
                                 .pb(px(12.0))
-                                .text_size(px(11.0))
-                                .line_height(px(16.0))
-                                .text_color(theme.muted_foreground.opacity(0.65))
+                                .text_size(px(12.5))
+                                .line_height(px(18.0))
+                                .text_color(theme.muted_foreground.opacity(0.82))
                                 .child(
                                     "Ghostty renders the image per terminal.",
                                 ),
@@ -4709,7 +4709,7 @@ impl SettingsPanel {
                 )
                 .children(self.theme_editor_status.as_ref().map(|status| {
                     div()
-                        .text_size(px(11.0))
+                        .text_size(px(12.5))
                         .text_color(if status.starts_with("Saved") {
                             theme.success
                         } else {
@@ -4779,8 +4779,8 @@ impl SettingsPanel {
             .py(px(12.0))
             .gap(px(2.0))
             .font_family(theme.mono_font_family.clone())
-            .text_size(px(11.0))
-            .line_height(px(16.0));
+            .text_size(px(12.5))
+            .line_height(px(18.0));
 
         let selected = self.theme_editor_slot;
         for (line_idx, (indent, spans)) in lines.into_iter().enumerate() {
@@ -4863,21 +4863,21 @@ impl SettingsPanel {
                         .min_w_0()
                         .child(
                             div()
-                                .text_size(px(12.5))
+                                .text_size(px(13.5))
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .text_color(theme.foreground)
                                 .child(spec.label),
                         )
                         .child(
                             div()
-                                .text_size(px(10.5))
+                                .text_size(px(12.0))
                                 .text_color(theme.muted_foreground)
                                 .child(spec.hint),
                         ),
                 )
                 .child(
                     div()
-                        .text_size(px(11.0))
+                        .text_size(px(12.5))
                         .font_family(theme.mono_font_family.clone())
                         .text_color(theme.muted_foreground)
                         .child(color_to_hex(color)),
@@ -4946,14 +4946,14 @@ impl SettingsPanel {
                             .min_w_0()
                             .child(
                                 div()
-                                    .text_size(px(11.5))
+                                    .text_size(px(13.0))
                                     .font_weight(FontWeight::MEDIUM)
                                     .text_color(theme.foreground)
                                     .child(spec.label),
                             )
                             .child(
                                 div()
-                                    .text_size(px(10.5))
+                                    .text_size(px(12.0))
                                     .text_color(theme.muted_foreground)
                                     .child(spec.hint),
                             ),
@@ -4968,7 +4968,7 @@ impl SettingsPanel {
                                 other.read(term_theme) == color
                             }).and_then(|dupe| THEME_SLOTS.get(dupe)).map(|dupe| {
                                 div()
-                                    .text_size(px(9.5))
+                                    .text_size(px(11.0))
                                     .px(px(5.0))
                                     .py(px(1.0))
                                     .rounded(px(3.0))
@@ -4978,7 +4978,7 @@ impl SettingsPanel {
                             }))
                             .child(
                                 div()
-                                    .text_size(px(10.5))
+                                    .text_size(px(12.0))
                                     .font_family(theme.mono_font_family.clone())
                                     .text_color(theme.muted_foreground)
                                     .child(color_to_hex(color)),
@@ -5038,8 +5038,8 @@ impl SettingsPanel {
             .pb(px(6.0))
             .gap(px(1.0))
             .font_family(theme.mono_font_family.clone())
-            .text_size(px(8.0))
-            .line_height(px(12.0))
+            .text_size(px(9.5))
+            .line_height(px(13.5))
             .child(
                 div()
                     .flex()
@@ -5127,7 +5127,7 @@ impl SettingsPanel {
                     .justify_center()
                     .gap(px(4.0))
                     .h(px(26.0))
-                    .text_size(px(10.5))
+                    .text_size(px(12.0))
                     .font_weight(if is_sel {
                         FontWeight::SEMIBOLD
                     } else {
@@ -5185,9 +5185,9 @@ impl SettingsPanel {
                     )
                     .child(
                         div()
-                            .text_size(px(11.5))
-                            .line_height(px(17.0))
-                            .text_color(theme.muted_foreground.opacity(0.65))
+                            .text_size(px(13.0))
+                            .line_height(px(19.0))
+                            .text_color(theme.muted_foreground.opacity(0.82))
                             .child("Choose a default model for agent and the fast path for inline command suggestions."),
                     ),
             )
@@ -5444,8 +5444,8 @@ impl SettingsPanel {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(12.0))
-                            .line_height(px(14.0))
+                            .text_size(px(13.5))
+                            .line_height(px(15.5))
                             .font_weight(if is_selected {
                                 FontWeight::MEDIUM
                             } else {
@@ -5507,7 +5507,7 @@ impl SettingsPanel {
                                 }))
                                 .child(
                                     div()
-                                        .text_size(px(10.0))
+                                        .text_size(px(11.5))
                                         .text_color(theme.muted_foreground.opacity(0.45))
                                         .child(connection_label),
                                 ),
@@ -5551,8 +5551,8 @@ impl SettingsPanel {
                             div()
                                 .flex_1()
                                 .min_w(px(220.0))
-                                .text_size(px(11.0))
-                                .line_height(px(16.0))
+                                .text_size(px(12.5))
+                                .line_height(px(18.0))
                                 .text_color(if self.provider_model_status_error {
                                     theme.danger
                                 } else {
@@ -5624,7 +5624,7 @@ impl SettingsPanel {
                                                 .child(div().text_sm().child("Protocol"))
                                                 .child(
                                                     div()
-                                                        .text_size(px(11.0))
+                                                        .text_size(px(12.5))
                                                         .text_color(theme.muted_foreground)
                                                         .child(protocol_switch_hint.unwrap_or(
                                                             "Choose the provider transport.",
@@ -5685,7 +5685,7 @@ impl SettingsPanel {
                                                     )
                                                     .child(
                                                         div()
-                                                            .text_size(px(11.0))
+                                                            .text_size(px(12.5))
                                                             .text_color(theme.muted_foreground)
                                                             .child("Device login"),
                                                     ),
@@ -5720,13 +5720,13 @@ impl SettingsPanel {
                                     )
                                     .children(oauth.status_message.as_ref().map(|message| {
                                         div()
-                                            .text_size(px(11.0))
+                                            .text_size(px(12.5))
                                             .text_color(theme.muted_foreground)
                                             .child(message.clone())
                                     }))
                                     .children(oauth.error_message.as_ref().map(|message| {
                                         div()
-                                            .text_size(px(11.0))
+                                            .text_size(px(12.5))
                                             .text_color(theme.danger)
                                             .child(message.clone())
                                     }))
@@ -5740,7 +5740,7 @@ impl SettingsPanel {
                                             .bg(theme.muted.opacity(0.05))
                                             .child(
                                                 div()
-                                                    .text_size(px(11.0))
+                                                    .text_size(px(12.5))
                                                     .text_color(theme.muted_foreground)
                                                     .child("Browser authorization"),
                                             )
@@ -5757,7 +5757,7 @@ impl SettingsPanel {
                                                             .gap(px(2.0))
                                                             .child(
                                                                 div()
-                                                                    .text_size(px(11.0))
+                                                                    .text_size(px(12.5))
                                                                     .text_color(
                                                                         theme.muted_foreground,
                                                                     )
@@ -5792,7 +5792,7 @@ impl SettingsPanel {
                                                     .child(
                                                         div()
                                                             .flex_1()
-                                                            .text_size(px(11.0))
+                                                            .text_size(px(12.5))
                                                             .text_color(theme.muted_foreground)
                                                             .child(prompt.verification_uri.clone()),
                                                     )
@@ -5957,7 +5957,7 @@ impl SettingsPanel {
                 let is_recording = recording.as_deref() == Some(*field);
                 let badge = if is_recording {
                     div()
-                        .text_size(px(11.5))
+                        .text_size(px(13.0))
                         .font_weight(FontWeight::MEDIUM)
                         .child("Press shortcut…")
                         .into_any_element()
@@ -5976,8 +5976,8 @@ impl SettingsPanel {
                         .hover(|s| s.bg(theme.muted.opacity(0.025)))
                         .child(
                             div()
-                                .text_size(px(12.0))
-                                .line_height(px(16.0))
+                                .text_size(px(13.5))
+                                .line_height(px(18.0))
                                 .font_weight(FontWeight::MEDIUM)
                                 .text_color(theme.foreground.opacity(0.86))
                                 .child(label.to_string()),
@@ -6045,8 +6045,8 @@ impl SettingsPanel {
                 .hover(|s| s.bg(theme.muted.opacity(0.025)))
                 .child(
                     div()
-                        .text_size(px(12.0))
-                        .line_height(px(16.0))
+                        .text_size(px(13.5))
+                        .line_height(px(18.0))
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(theme.foreground.opacity(0.86))
                         .child("Select Tab by Number"),
@@ -6059,8 +6059,8 @@ impl SettingsPanel {
                         .child(crate::keycaps::keycaps_for_binding("secondary-1", theme))
                         .child(
                             div()
-                                .text_size(px(11.0))
-                                .text_color(theme.muted_foreground.opacity(0.55))
+                                .text_size(px(12.5))
+                                .text_color(theme.muted_foreground.opacity(0.78))
                                 .child("…"),
                         )
                         .child(crate::keycaps::keycaps_for_binding("secondary-9", theme)),
@@ -6084,7 +6084,7 @@ impl SettingsPanel {
                 .rounded(px(8.0))
                 .bg(theme.primary.opacity(0.10))
                 .text_color(theme.primary)
-                .text_size(px(11.5))
+                .text_size(px(13.0))
                 .font_weight(FontWeight::MEDIUM)
                 .child("Press shortcut…")
                 .into_any_element()
@@ -6098,7 +6098,7 @@ impl SettingsPanel {
                 .items_center()
                 .rounded(px(8.0))
                 .bg(theme.muted.opacity(0.08))
-                .text_size(px(11.5))
+                .text_size(px(13.0))
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(theme.muted_foreground)
                 .child("Not set")
@@ -6128,9 +6128,9 @@ impl SettingsPanel {
                         )
                         .child(
                             div()
-                                .text_size(px(11.5))
-                                .line_height(px(17.0))
-                                .text_color(theme.muted_foreground.opacity(0.68))
+                                .text_size(px(13.0))
+                                .line_height(px(19.0))
+                                .text_color(theme.muted_foreground.opacity(0.85))
                                 .child(
                                     "Show Vu from anywhere in macOS. Press it again while Vu is frontmost to hide the app.",
                                 ),
@@ -6182,15 +6182,15 @@ impl SettingsPanel {
                         .min_w_0()
                         .child(
                             div()
-                                .text_size(px(11.5))
+                                .text_size(px(13.0))
                                 .font_weight(FontWeight::MEDIUM)
                                 .child("Shortcut"),
                         )
                         .child(
                             div()
-                                .text_size(px(10.5))
-                                .line_height(px(15.0))
-                                .text_color(theme.muted_foreground.opacity(0.62))
+                                .text_size(px(12.0))
+                                .line_height(px(17.0))
+                                .text_color(theme.muted_foreground.opacity(0.8))
                                 .child(if global_summon_enabled {
                                     "Use a low-conflict system shortcut. Option-Space is familiar, but may collide with launchers."
                                 } else {
@@ -6233,7 +6233,7 @@ impl SettingsPanel {
                 .rounded(px(8.0))
                 .bg(theme.primary.opacity(0.10))
                 .text_color(theme.primary)
-                .text_size(px(11.5))
+                .text_size(px(13.0))
                 .font_weight(FontWeight::MEDIUM)
                 .child("Press shortcut…")
                 .into_any_element()
@@ -6247,7 +6247,7 @@ impl SettingsPanel {
                 .items_center()
                 .rounded(px(8.0))
                 .bg(theme.muted.opacity(0.08))
-                .text_size(px(11.5))
+                .text_size(px(13.0))
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(theme.muted_foreground)
                 .child("Not set")
@@ -6279,9 +6279,9 @@ impl SettingsPanel {
                             )
                             .child(
                                 div()
-                                    .text_size(px(11.5))
-                                    .line_height(px(17.0))
-                                    .text_color(theme.muted_foreground.opacity(0.68))
+                                    .text_size(px(13.0))
+                                    .line_height(px(19.0))
+                                    .text_color(theme.muted_foreground.opacity(0.85))
                                     .child("Show a dedicated floating Vu window that slides down from the top of the screen."),
                             ),
                     )
@@ -6328,15 +6328,15 @@ impl SettingsPanel {
                             .gap(px(3.0))
                             .child(
                                 div()
-                                    .text_size(px(11.5))
+                                    .text_size(px(13.0))
                                     .font_weight(FontWeight::MEDIUM)
                                     .child("Shortcut"),
                             )
                             .child(
                                 div()
-                                    .text_size(px(10.5))
-                                    .line_height(px(15.0))
-                                    .text_color(theme.muted_foreground.opacity(0.62))
+                                    .text_size(px(12.0))
+                                    .line_height(px(17.0))
+                                    .text_color(theme.muted_foreground.opacity(0.8))
                                     .child("Use a low-conflict macOS shortcut. Cmd-Backslash matches the requested default."),
                             ),
                     )
@@ -6570,7 +6570,7 @@ impl Render for SettingsPanel {
                 nav_item = nav_item
                     .gap(px(8.0))
                     .px(px(10.0))
-                    .text_size(px(13.0))
+                    .text_size(px(14.0))
                     .child(
                         svg()
                             .path(section.icon())
@@ -6621,11 +6621,21 @@ impl Render for SettingsPanel {
             .h_full()
             .flex_1()
             .min_w_0()
+            .gap(px(8.0))
             .pl(header_left_padding)
             .pr(px(12.0))
             .child(
+                // The app mark carries its own tile, so it reads on both the
+                // light and dark themes without a per-theme asset.
+                div().size(px(18.0)).flex_none().child(
+                    img("Vu-macOS-Dark-256x256@2x.png")
+                        .size_full()
+                        .object_fit(ObjectFit::Contain),
+                ),
+            )
+            .child(
                 div()
-                    .text_size(px(13.0))
+                    .text_size(px(14.0))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(theme.foreground)
                     .child("Settings"),
@@ -6756,8 +6766,8 @@ impl Render for SettingsPanel {
                                             )
                                             .child(
                                                 div()
-                                                    .text_size(px(11.0))
-                                                    .line_height(px(14.0))
+                                                    .text_size(px(12.5))
+                                                    .line_height(px(15.5))
                                                     .font_weight(FontWeight::MEDIUM)
                                                     .text_color(tone)
                                                     .whitespace_nowrap()
@@ -6867,8 +6877,8 @@ impl Render for SettingsPanel {
                                     )
                                     .child(
                                         div()
-                                            .text_size(px(12.0))
-                                            .line_height(px(16.0))
+                                            .text_size(px(13.5))
+                                            .line_height(px(18.0))
                                             .font_weight(FontWeight::MEDIUM)
                                             .text_color(theme.foreground.opacity(if theme.is_dark() {
                                                 0.84
@@ -7066,17 +7076,17 @@ fn section_content(title: &str, subtitle: &str, theme: &gpui_component::Theme) -
             .gap(px(6.0))
             .child(
                 div()
-                    .text_size(px(19.0))
-                    .line_height(px(24.0))
+                    .text_size(px(20.0))
+                    .line_height(px(27.0))
                     .font_weight(FontWeight::SEMIBOLD)
                     .child(title.to_string()),
             )
             .child(
                 div()
                     .max_w(px(520.0))
-                    .text_size(px(12.0))
-                    .line_height(px(19.0))
-                    .text_color(theme.muted_foreground.opacity(0.68))
+                    .text_size(px(13.5))
+                    .line_height(px(21.5))
+                    .text_color(theme.muted_foreground.opacity(0.85))
                     .child(subtitle.to_string()),
             ),
     )
@@ -7084,9 +7094,9 @@ fn section_content(title: &str, subtitle: &str, theme: &gpui_component::Theme) -
 
 fn group_label(text: &str, theme: &gpui_component::Theme) -> Div {
     div()
-        .text_size(px(10.0))
+        .text_size(px(11.5))
         .font_weight(FontWeight::MEDIUM)
-        .text_color(theme.muted_foreground.opacity(0.5))
+        .text_color(theme.muted_foreground.opacity(0.75))
         .px(px(2.0))
         .pb(px(2.0))
         .child(text.to_string())
@@ -7290,9 +7300,9 @@ fn slider_row(
                 )
                 .child(
                     div()
-                        .text_size(px(11.5))
-                        .line_height(px(17.0))
-                        .text_color(theme.muted_foreground.opacity(0.65))
+                        .text_size(px(13.0))
+                        .line_height(px(19.0))
+                        .text_color(theme.muted_foreground.opacity(0.82))
                         .child(hint.to_string()),
                 ),
         )
@@ -7311,7 +7321,7 @@ fn slider_row(
                             .py(px(4.0))
                             .rounded(px(999.0))
                             .bg(theme.muted.opacity(0.10))
-                            .text_size(px(11.0))
+                            .text_size(px(12.5))
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_align(TextAlign::Center)
                             .text_color(theme.foreground)
@@ -7354,9 +7364,9 @@ where
                 )
                 .child(
                     div()
-                        .text_size(px(11.5))
-                        .line_height(px(17.0))
-                        .text_color(theme.muted_foreground.opacity(0.65))
+                        .text_size(px(13.0))
+                        .line_height(px(19.0))
+                        .text_color(theme.muted_foreground.opacity(0.82))
                         .child(hint.to_string()),
                 ),
         )
@@ -7396,9 +7406,9 @@ fn select_row(
                 )
                 .child(
                     div()
-                        .text_size(px(11.5))
-                        .line_height(px(17.0))
-                        .text_color(theme.muted_foreground.opacity(0.65))
+                        .text_size(px(13.0))
+                        .line_height(px(19.0))
+                        .text_color(theme.muted_foreground.opacity(0.82))
                         .child(hint.to_string()),
                 ),
         )
@@ -7433,9 +7443,9 @@ fn toggle_row(label: &str, hint: &str, toggle: Switch, theme: &gpui_component::T
                 )
                 .child(
                     div()
-                        .text_size(px(11.5))
-                        .line_height(px(17.0))
-                        .text_color(theme.muted_foreground.opacity(0.65))
+                        .text_size(px(13.0))
+                        .line_height(px(19.0))
+                        .text_color(theme.muted_foreground.opacity(0.82))
                         .child(hint.to_string()),
                 ),
         )
@@ -7459,15 +7469,15 @@ fn stacked_input_field(
                 .gap(px(2.0))
                 .child(
                     div()
-                        .text_size(px(11.5))
+                        .text_size(px(13.0))
                         .font_weight(FontWeight::MEDIUM)
                         .child(label.to_string()),
                 )
                 .child(
                     div()
-                        .text_size(px(10.5))
-                        .line_height(px(16.0))
-                        .text_color(theme.muted_foreground.opacity(0.65))
+                        .text_size(px(12.0))
+                        .line_height(px(18.0))
+                        .text_color(theme.muted_foreground.opacity(0.82))
                         .child(hint.to_string()),
                 ),
         )
@@ -7549,8 +7559,8 @@ fn key_row(action: &str, shortcut: &str, theme: &gpui_component::Theme) -> Div {
         .hover(|s| s.bg(theme.muted.opacity(0.025)))
         .child(
             div()
-                .text_size(px(12.0))
-                .line_height(px(16.0))
+                .text_size(px(13.5))
+                .line_height(px(18.0))
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(theme.foreground.opacity(0.86))
                 .child(action.to_string()),
