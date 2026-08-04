@@ -43,6 +43,7 @@ impl WindowsGhosttyApp {
         _background_image_position: Option<&str>,
         _background_image_fit: Option<&str>,
         _background_image_repeat: Option<bool>,
+        _extra_config: Option<&str>,
     ) -> Result<Self, String> {
         let mut config = RendererConfig::default();
         if let Some(family) = font_family {
@@ -94,6 +95,7 @@ impl WindowsGhosttyApp {
         _background_image_position: Option<&str>,
         _background_image_fit: Option<&str>,
         _background_image_repeat: bool,
+        _extra_config: Option<&str>,
     ) -> Result<(), String> {
         let theme = theme_from_colors(colors);
         let mut config = self.config.lock();
@@ -205,6 +207,7 @@ impl WindowsGhosttyTerminal {
         _background_image_position: Option<&str>,
         _background_image_fit: Option<&str>,
         _background_image_repeat: bool,
+        _extra_config: Option<&str>,
     ) -> Result<(), String> {
         if let Some(session) = self.inner.lock().as_ref() {
             let theme = theme_from_colors(colors);
