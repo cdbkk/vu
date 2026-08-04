@@ -1,134 +1,117 @@
+<p align="center">
+  <img src="assets/Vu-macOS-Dark-256x256@2x.png" width="120" alt="vu app icon" />
+</p>
+
 <h1 align="center">vu</h1>
-<p align="center"><strong>A terminal emulator with an AI harness</strong></p>
+
+<p align="center"><strong>A better customizable terminal.</strong></p>
 
 <p align="center">
-  Open source. GPU-accelerated. Terminal-first.
+  Native, GPU-accelerated, and built to feel like yours — with AI there when you want it.
 </p>
+
 <p align="center">
-  Built for SSH, tmux, and agent-native workflows.
+  <a href="https://github.com/cdbkk/vu/actions/workflows/ci-portable.yml"><img alt="Build status" src="https://github.com/cdbkk/vu/actions/workflows/ci-portable.yml/badge.svg" /></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-FF9875" /></a>
+  <img alt="macOS beta" src="https://img.shields.io/badge/macOS-beta-222222?logo=apple&logoColor=white" />
+  <img alt="Windows beta" src="https://img.shields.io/badge/Windows-beta-0078D4?logo=windows&logoColor=white" />
+  <img alt="Linux preview" src="https://img.shields.io/badge/Linux-preview-FCC624?logo=linux&logoColor=111111" />
 </p>
+
 <p align="center">
-  <a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue?style=flat"></a>
-  <a href="https://developer.apple.com/macos/"><img alt="Native on macOS (Metal)" src="https://img.shields.io/badge/macOS-beta-3D3D3D?logo=apple&logoColor=white&style=flat"></a>
-  <a href="https://www.rust-lang.org/"><img alt="Rust" src="https://img.shields.io/badge/Rust-CE422B?logo=rust&logoColor=white&style=flat"></a>
-</p>
-<p align="center">
+  <a href="docs/media/vu-demo.mp4">
+    <img src="docs/media/vu-demo.gif" width="1080" alt="vu demo showing live theme customization, palette editing, and split panes" />
+  </a>
 </p>
 
+<p align="center"><sub>Click the demo for the full-quality video.</sub></p>
 
+## A better customizable terminal
 
-## Why vu?
+`vu` is for people who want a real terminal that looks and works like theirs.
+It keeps the speed and behavior of a native terminal, then makes the parts you
+touch every day easy to tune live — no dotfile archaeology required.
 
-`vu` is for people who want a serious terminal first and AI help only when it earns its place.
+### Make it yours
 
-If you're an old-school terminal user and only want enough AI harness when needed, nothing more or less, `vu` is for you.
+- 15 built-in themes with live previews
+- a full ANSI palette editor with direct color picking
+- Ghostty theme import and export
+- separate terminal and interface fonts
+- opacity, blur, background images, tab position, pane chrome, and icon scale
+- the terminal options power users expect, exposed in one place
 
-## What it does
+### Stay terminal-first
 
-- a terminal that is fast and elegant
-- a built-in AI harness that can read context, ask before acting, and work directly in the terminal you can already see
-- terminal-native workflows for CLI work, with `ssh`, `tmux`, and coding-agent-aware orchestration
+- native GPU rendering: Metal on macOS, D3D11/DirectWrite on Windows
+- tabs, split panes, pane zoom, drag-to-rearrange, and command broadcasting
+- first-class `ssh`, `tmux`, shells, editors, TUIs, and coding-agent CLIs
+- configurable shortcuts, a command palette, and an optional macOS Quick Terminal
+- a local `vu-cli` control plane for scripts, tests, and external agents
+
+### Use AI on your terms
+
+The built-in agent can use visible terminal context, render rich responses beside
+your work, and ask before consequential actions. Hide it and `vu` is still a
+serious terminal — not a chat app wrapped around a shell.
+
+Anthropic, OpenAI, ChatGPT, GitHub Copilot, Gemini, Ollama, OpenRouter, and other
+OpenAI-compatible providers are supported.
 
 ## Status
 
 `vu` is in active beta development.
 
-- **macOS** fully supported, beta.
-- **Windows** early beta.
-- **Linux** preview.
-
-## Screenshot
-
-<p align="center">
-  <a href="docs/screenshots.md">
-    <img width="1080" alt="vu screenshot" src="https://github.com/user-attachments/assets/389898d6-56bf-46aa-9279-65e59a57ed23" />
-  </a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots.md">View the full screenshot gallery</a>
-</p>
-
-## 2 min know-how
-
-<p align="center">
-  <video controls muted playsinline width="100%" src="https://github.com/user-attachments/assets/2b6f6145-e400-4a74-a951-cd8221493a17"></video>
-</p>
-
-Quick controls:
-
-| Action | macOS | Windows / Linux |
+| Platform | Status | Backend |
 | --- | --- | --- |
-| Switch focus between terminal and input | <kbd>⌘</kbd> <kbd>I</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>I</kbd> |
-| Show or hide the bottom input bar | <kbd>⌃</kbd> <kbd>\`</kbd> | <kbd>⌃</kbd> <kbd>\`</kbd> |
-| Show or hide the agent panel | <kbd>⌘</kbd> <kbd>L</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>L</kbd> |
-| Cycle bottom-bar mode | <kbd>⌘</kbd> <kbd>;</kbd> | <kbd>⌃</kbd> <kbd>;</kbd> |
-| Show or hide Quick Terminal | <kbd>⌘</kbd> <kbd>Backslash</kbd> after enabling | Not available |
+| macOS | Beta, primary target | libghostty + Metal |
+| Windows | Beta | ConPTY + libghostty-vt + D3D11/DirectWrite |
+| Linux | Preview | Unix PTY + libghostty-vt + GPUI |
 
-- Smart mode decides whether your text is a shell command or an agent request.
-- Command mode runs shell commands. With multiple panes, the pane mini map lets you choose the focused pane, all panes, or a selected set.
-- Agent mode sends text directly to the built-in agent.
+## Build from source
 
-Quick Terminal is off by default. On macOS, enable its global shortcut in
-Settings -> Keys, or open it from the command palette / View menu while vu is
-frontmost.
-
-## Install
-
-vu does not publish binaries yet. Build from source:
+Prebuilt `vu` releases are not published yet. The repository pins its toolchain
+with [mise](https://mise.jdx.dev/):
 
 ```sh
-mise install          # zig 0.15.2, cmake, rust
-cargo build --release -p vu
+git clone https://github.com/cdbkk/vu.git
+cd vu
+mise install
+mise exec -- cargo build --release -p vu
 ```
 
-On macOS 26 the pinned zig cannot parse the system SDK's `libSystem.tbd`, so
-prefix builds with the bundled shim:
+On macOS 26, build the app bundle through the included Zig SDK shim:
 
 ```sh
-VU_ZIG_BIN=scripts/zig-macos26-shim.sh cargo build --release -p vu
+VU_ZIG_BIN="$PWD/scripts/zig-macos26-shim.sh" \
+VU_ZIG_REAL="$(mise where zig)/bin/zig" \
+mise exec -- just channel=dev macos-bundle-adhoc
+
+open "dist/macos/dev/arm64/vu Dev.app"
 ```
 
-The installers under `scripts/` and the Homebrew cask still point at an upstream
-release host and will not install **vu** until this project publishes its own
-releases. See [HACKING.md](HACKING.md) for the full build and release setup.
+See the [install guide](docs/install.md) for platform prerequisites and
+[HACKING.md](HACKING.md) for contributor builds, tests, and release tooling.
 
-## Docs
+## Start here
 
-Start here:
+- [Quick controls](docs/quick-controls.md)
+- [Appearance and settings](docs/settings.md)
+- [Terminal workflows](docs/terminal-workflows.md)
+- [Built-in agent](docs/agent.md)
+- [CLI and control plane](docs/cli.md)
+- [Architecture](DESIGN.md)
+- [Release notes](CHANGELOG.md)
 
-- [Install](docs/install.md): get vu on macOS, Windows, or Linux.
-- [Quick controls](docs/quick-controls.md): focus switching, agent panel, and command modes.
-- [Quick Terminal](docs/quick-terminal.md): set up the optional macOS drop-down terminal.
-- [Terminal workflows](docs/terminal-workflows.md): tabs, panes, broadcast, pane zoom, links, and surfaces.
-- [Built-in agent](docs/agent.md): use AI help without leaving the terminal.
-- [Settings](docs/settings.md): choose providers, themes, suggestions, skills, and shortcuts.
-- [Skills and workflows](docs/skills-and-workflows.md): turn repeated terminal routines into project or personal slash commands.
-- [Workspace layout profiles](docs/workspace-layout-profiles-guide.md): save a project layout, reopen it later, or share it with a team.
-- [CLI and surfaces](docs/cli.md): build scripts, test runners, and external agent orchestrators driven from outside the app.
-- [Screenshot gallery](docs/screenshots.md): a visual tour of the app.
-- [Release notes](CHANGELOG.md): what changed in each beta.
+## Built on excellent work
 
-For contributors:
-
-- [Contributor quickstart](HACKING.md): build, test, and release from source.
-- [Architecture](DESIGN.md): product direction and system design.
-- `docs/impl/` and `docs/study/`: implementation records and research notes.
+`vu` builds on [Ghostty](https://github.com/ghostty-org/ghostty),
+[GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui),
+[gpui-component](https://github.com/longbridge/gpui-component),
+[Rig](https://github.com/0xPlaygrounds/rig),
+[Phosphor Icons](https://phosphoricons.com/), and
+[Flexoki](https://stephango.com/flexoki).
 
 ## License
 
 [MIT](LICENSE)
-
-## Credits ♥️
-
-`vu` depends on upstream projects we rely on directly and respect deeply:
-
-- [Ghostty](https://github.com/ghostty-org/ghostty) for the terminal runtime and rendering foundation that powers our embedded terminal surfaces.
-- [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui) from the Zed team for the native GPU UI framework we build the shell on.
-- [gpui-component](https://github.com/longbridge/gpui-component) from the Longbridge team for the component library that accelerates much of the UI layer.
-- [Rig](https://github.com/0xPlaygrounds/rig) for the lovely Rust agent framework behind the AI harness.
-- [Phosphor Icons](https://phosphoricons.com/) for the icon system used across the app.
-- [Flexoki](https://stephango.com/flexoki) for the default visual theme direction.
-- [Iosevka](https://typeof.net/Iosevka/) and [Ioskeley Mono](https://github.com/jewlexx/ioskeley) for the mono type foundation used in terminal chrome and code-heavy UI.
-
-`vu` was initially inspired by [warp.dev](http://warp.dev/), but is doing less than warp, if you need more, you should go for warp instead.
