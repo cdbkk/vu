@@ -43,4 +43,5 @@ docs/**/*.mp4
 docs/**/*.mov
 !docs/media/vu-demo.gif
 !docs/media/vu-demo.mp4
+!docs/media/vu-*.png
 .worktrees/

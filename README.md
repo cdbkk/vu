@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/media/vu-demo.mp4">
-    <img src="docs/media/vu-demo.gif" width="1080" alt="vu demo showing live theme customization, palette editing, and split panes" />
+    <img src="docs/media/vu-demo.gif" width="1080" alt="vu building a live four-pane workspace with lazygit, yazi, repository activity, and a real 89-test Rust suite" />
   </a>
 </p>
 

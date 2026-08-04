@@ -5,34 +5,36 @@ one place, so the other docs can stay focused.
 
 ## Gallery
 
-### Main window
+### Mission Control workspace
 
-<img alt="Vu main window with terminal panes, tabs, and the agent panel" src="https://github.com/user-attachments/assets/389898d6-56bf-46aa-9279-65e59a57ed23" />
+<img alt="Vu Mission Control workspace with lazygit, yazi, live repository activity, and 89 passing Rust tests" src="media/vu-01-workspace.png" />
 
-### Quick Terminal
+### Building the workspace
 
-<img alt="Quick Terminal open over the desktop on macOS" src="https://github.com/user-attachments/assets/a668bca2-eb75-4fcc-a579-719f2babde45" />
+<img alt="Vu building a live multi-pane development workspace" src="media/vu-02-split-panes.png" />
 
-### Agent panel
+### Customize
 
-<img alt="Vu agent panel next to a terminal workspace" src="https://github.com/user-attachments/assets/e1972fac-9df3-443b-be08-c0eec4697cf3" />
+<img alt="Vu Appearance settings with the terminal palette preview" src="media/vu-03-customize.png" />
 
-### Agent panel with terminal context
+### Live palette editor
 
-<img alt="Vu agent panel using visible terminal context" src="https://github.com/user-attachments/assets/15299d3d-7484-4229-a979-43001d504b14" />
+<img alt="Vu Customize editor with the live foreground color picker open" src="media/vu-04-live-palette.png" />
 
-### Theme settings
+### Applied palette
 
-<img alt="Vu Appearance settings with theme and transparency controls" src="https://github.com/user-attachments/assets/c730d158-139b-46d5-adbb-0cd48d38b603" />
+<img alt="Vu Customize editor after applying a cyan foreground color" src="media/vu-05-palette-applied.png" />
 
-### Pane broadcast picker
+### AI routing and permissions
 
-<img alt="Vu pane broadcast picker mirroring the current split-pane layout" src="https://github.com/user-attachments/assets/21e295c9-34eb-465c-90b8-5ba3163182e5" />
+<img alt="Vu AI settings for provider routing, tool approval, and command suggestions" src="media/vu-06-ai-routing.png" />
 
-### Clean terminal layout
+### AI providers
 
-<img alt="Vu terminal workspace with panels minimized" src="https://github.com/user-attachments/assets/81dcf6e4-6074-497e-98b8-00c884442cc2" />
+<img alt="Vu AI provider settings with model, OAuth, token override, and provider limits" src="media/vu-07-ai-providers.png" />
 
 ## Demo
 
-<video controls muted playsinline preload="metadata" width="100%" aria-label="Two-minute vu quick controls demo" src="https://github.com/user-attachments/assets/2b6f6145-e400-4a74-a951-cd8221493a17"></video>
+<a href="media/vu-demo.mp4">
+  <img alt="Vu building a live four-pane workspace with lazygit, yazi, repository activity, and a real 89-test Rust suite" src="media/vu-demo.gif" />
+</a>
