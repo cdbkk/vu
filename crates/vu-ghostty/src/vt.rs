@@ -529,11 +529,9 @@ unsafe extern "C" {
 
 /// Default colors handed to libghostty via `ghostty_terminal_set`.
 ///
-/// libghostty owns the SGR-color resolution: it looks up palette
-/// indices, applies bold/bright remaps, and falls back to the default
-/// fg/bg for unstyled cells. Pushing the user's theme in here means
-/// `read_cell` doesn't need any special-casing — every cell's fg/bg
-/// already arrives themed.
+/// libghostty owns the base SGR-color resolution and default fg/bg fallback.
+/// Vu retains the palette index so the optional bold-to-bright remap can be
+/// applied before cells reach a platform renderer.
 #[derive(Debug, Clone)]
 pub struct ThemeColors {
     pub fg: [u8; 3],
@@ -683,6 +681,8 @@ struct VtInner {
     scratch_rows: u16,
     scratch: Vec<Cell>,
     last_cursor: Cursor,
+    palette: Option<[[u8; 3]; 256]>,
+    bold_is_bright: bool,
     osc_state: OscParseState,
     osc_command: Vec<u8>,
     osc7_buffer: Vec<u8>,
@@ -1055,6 +1055,8 @@ impl VtScreen {
                 scratch_rows: rows,
                 scratch: Vec::with_capacity(cols as usize * rows as usize),
                 last_cursor: Cursor::default(),
+                palette: theme.map(|theme| theme.palette),
+                bold_is_bright: false,
                 osc_state: OscParseState::Ground,
                 osc_command: Vec::with_capacity(8),
                 osc7_buffer: Vec::with_capacity(256),
@@ -1067,6 +1069,17 @@ impl VtScreen {
     pub fn set_theme(&self, theme: &ThemeColors) {
         let mut inner = self.inner.lock();
         unsafe { apply_theme_to_terminal(inner.terminal, theme) };
+        inner.palette = Some(theme.palette);
+        inner.force_full_snapshot = true;
+        inner.generation = inner.generation.wrapping_add(1);
+    }
+
+    pub fn set_bold_is_bright(&self, enabled: bool) {
+        let mut inner = self.inner.lock();
+        if inner.bold_is_bright == enabled {
+            return;
+        }
+        inner.bold_is_bright = enabled;
         inner.force_full_snapshot = true;
         inner.generation = inner.generation.wrapping_add(1);
     }
@@ -1253,6 +1266,8 @@ impl VtScreen {
         }
 
         let mut dirty_rows: Vec<u16> = Vec::new();
+        let palette = inner.palette;
+        let bold_is_bright = inner.bold_is_bright;
 
         // Bind the row iterator to the current state.
         // SAFETY: state + iter valid.
@@ -1313,7 +1328,14 @@ impl VtScreen {
                 if col_idx >= cols {
                     break;
                 }
-                let cell = read_cell(inner.row_cells, default_fg, default_bg, alternate_screen);
+                let cell = read_cell(
+                    inner.row_cells,
+                    default_fg,
+                    default_bg,
+                    alternate_screen,
+                    palette.as_ref(),
+                    bold_is_bright,
+                );
                 let idx = row_start + col_idx as usize;
                 row_changed |= inner.scratch[idx] != cell;
                 inner.scratch[idx] = cell;
@@ -1741,6 +1763,8 @@ fn read_cell(
     default_fg: GhosttyColorRgb,
     default_bg: GhosttyColorRgb,
     alternate_screen: bool,
+    palette: Option<&[[u8; 3]; 256]>,
+    bold_is_bright: bool,
 ) -> Cell {
     // RAW here is an **opaque `GhosttyCell` u64 snapshot**, not a packed
     // codepoint. Decode fields via `ghostty_cell_get(cell, KEY, &out)`
@@ -1809,6 +1833,19 @@ fn read_cell(
     const PALETTE_BLACK: u8 = 0;
     let fg_was_default = style.fg_color.tag == STYLE_COLOR_TAG_NONE;
     let bg_was_default = style.bg_color.tag == STYLE_COLOR_TAG_NONE;
+    if bold_is_bright
+        && style.bold
+        && style.fg_color.tag == STYLE_COLOR_TAG_PALETTE
+        && style.fg_color.value < 8
+        && let Some(palette) = palette
+    {
+        let bright = palette[style.fg_color.value as usize + 8];
+        fg = GhosttyColorRgb {
+            r: bright[0],
+            g: bright[1],
+            b: bright[2],
+        };
+    }
     // Curses-style full-screen apps often paint their canvas with SGR
     // 40 instead of default background. For themes whose ANSI black is
     // a raised surface (Catppuccin, Nord, Everforest), that makes htop
@@ -1973,6 +2010,21 @@ mod tests {
         let cell = snapshot.cells.first().expect("first cell");
         assert_eq!(cell.codepoint, 'X' as u32);
         assert_eq!(cell.bg, rgba([0x1E, 0x1E, 0x2E], 0x00));
+    }
+
+    #[test]
+    fn bold_is_bright_remaps_ansi_foreground_to_bright_palette() {
+        let mut ansi = [[0u8; 3]; 16];
+        ansi[1] = [0x80, 0x00, 0x00];
+        ansi[9] = [0xFF, 0x00, 0x00];
+        let theme = ThemeColors::from_ansi16([0xCC; 3], [0; 3], ansi);
+        let screen = VtScreen::new(4, 2, Some(&theme)).expect("create vt screen");
+        screen.set_bold_is_bright(true);
+
+        screen.feed(b"\x1b[1;31mX");
+        let snapshot = screen.snapshot();
+
+        assert_eq!(snapshot.cells.first().expect("first cell").fg, 0xFF0000FF);
     }
 
     fn catppuccin_like_theme() -> ThemeColors {

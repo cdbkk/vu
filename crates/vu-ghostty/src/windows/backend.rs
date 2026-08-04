@@ -13,8 +13,9 @@ use super::host_view::RenderSession;
 use super::render::{RendererConfig, ThemeColors};
 use crate::stub::{
     CommandFinishedSignal, CommandRecord, GhosttyConfigPatch, GhosttyScrollbar,
-    GhosttySplitDirection, GhosttySurfaceEvent, MouseButton, SurfaceSize, TerminalColors,
+    GhosttySplitDirection, GhosttySurfaceEvent, MouseButton, SurfaceSize,
 };
+use crate::{AppearanceConfig, TerminalColors};
 
 fn theme_from_colors(colors: &TerminalColors) -> ThemeColors {
     ThemeColors::from_ansi16(colors.foreground, colors.background, colors.palette)
@@ -30,41 +31,19 @@ pub struct WindowsGhosttyApp {
 }
 
 impl WindowsGhosttyApp {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        colors: Option<&TerminalColors>,
-        font_family: Option<&str>,
-        font_size: Option<f32>,
-        background_opacity: Option<f32>,
-        _background_blur: Option<bool>,
-        _cursor_style: Option<&str>,
-        _background_image: Option<&str>,
-        _background_image_opacity: Option<f32>,
-        _background_image_position: Option<&str>,
-        _background_image_fit: Option<&str>,
-        _background_image_repeat: Option<bool>,
-        _extra_config: Option<&str>,
-    ) -> Result<Self, String> {
+    pub fn new(appearance: &AppearanceConfig) -> Result<Self, String> {
         let mut config = RendererConfig::default();
-        if let Some(family) = font_family {
-            config.font_family = family.to_string();
-        }
-        if let Some(size) = font_size {
-            config.font_size_px = size;
-        }
-        if let Some(colors) = colors {
-            let theme = theme_from_colors(colors);
-            config.clear_color = [
-                colors.background[0] as f32 / 255.0,
-                colors.background[1] as f32 / 255.0,
-                colors.background[2] as f32 / 255.0,
-                1.0,
-            ];
-            config.theme = Some(theme);
-        }
-        if let Some(op) = background_opacity {
-            config.background_opacity = clamp_opacity(op);
-        }
+        config.font_family = appearance.font_family.clone();
+        config.font_size_px = appearance.font_size;
+        let theme = theme_from_colors(&appearance.colors);
+        config.clear_color = [
+            appearance.colors.background[0] as f32 / 255.0,
+            appearance.colors.background[1] as f32 / 255.0,
+            appearance.colors.background[2] as f32 / 255.0,
+            1.0,
+        ];
+        config.theme = Some(theme);
+        config.background_opacity = clamp_opacity(appearance.background_opacity);
         Ok(Self {
             config: Mutex::new(config),
         })
@@ -81,34 +60,19 @@ impl WindowsGhosttyApp {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_appearance(
-        &self,
-        colors: &TerminalColors,
-        font_family: &str,
-        font_size: f32,
-        background_opacity: f32,
-        _background_blur: bool,
-        _cursor_style: &str,
-        _background_image: Option<&str>,
-        _background_image_opacity: f32,
-        _background_image_position: Option<&str>,
-        _background_image_fit: Option<&str>,
-        _background_image_repeat: bool,
-        _extra_config: Option<&str>,
-    ) -> Result<(), String> {
-        let theme = theme_from_colors(colors);
+    pub fn update_appearance(&self, appearance: &AppearanceConfig) -> Result<(), String> {
+        let theme = theme_from_colors(&appearance.colors);
         let mut config = self.config.lock();
-        config.font_family = font_family.to_string();
-        config.font_size_px = font_size;
+        config.font_family = appearance.font_family.clone();
+        config.font_size_px = appearance.font_size;
         config.clear_color = [
-            colors.background[0] as f32 / 255.0,
-            colors.background[1] as f32 / 255.0,
-            colors.background[2] as f32 / 255.0,
+            appearance.colors.background[0] as f32 / 255.0,
+            appearance.colors.background[1] as f32 / 255.0,
+            appearance.colors.background[2] as f32 / 255.0,
             1.0,
         ];
         config.theme = Some(theme);
-        config.background_opacity = clamp_opacity(background_opacity);
+        config.background_opacity = clamp_opacity(appearance.background_opacity);
         Ok(())
     }
 
@@ -193,25 +157,10 @@ impl WindowsGhosttyTerminal {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_appearance(
-        &self,
-        colors: &TerminalColors,
-        _font_family: &str,
-        _font_size: f32,
-        background_opacity: f32,
-        _background_blur: bool,
-        _cursor_style: &str,
-        _background_image: Option<&str>,
-        _background_image_opacity: f32,
-        _background_image_position: Option<&str>,
-        _background_image_fit: Option<&str>,
-        _background_image_repeat: bool,
-        _extra_config: Option<&str>,
-    ) -> Result<(), String> {
+    pub fn update_appearance(&self, appearance: &AppearanceConfig) -> Result<(), String> {
         if let Some(session) = self.inner.lock().as_ref() {
-            let theme = theme_from_colors(colors);
-            session.set_appearance(Some(&theme), clamp_opacity(background_opacity));
+            let theme = theme_from_colors(&appearance.colors);
+            session.set_appearance(Some(&theme), clamp_opacity(appearance.background_opacity));
         }
         Ok(())
     }

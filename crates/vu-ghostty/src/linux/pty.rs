@@ -8,7 +8,8 @@ use anyhow::{Context, Result};
 use parking_lot::Mutex;
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
-use crate::stub::{CommandFinishedSignal, SurfaceSize, TerminalColors};
+use crate::TerminalColors;
+use crate::stub::{CommandFinishedSignal, SurfaceSize};
 use crate::transcript::{TranscriptBuffer, snapshot_to_lines};
 use crate::vt::{ScreenSnapshot, ThemeColors, VtScreen};
 
@@ -26,6 +27,7 @@ pub struct LinuxPtyOptions {
     pub wake_generation: Option<Arc<AtomicU64>>,
     pub wake_callback: Option<LinuxWakeCallback>,
     pub theme: Option<TerminalColors>,
+    pub bold_is_bright: bool,
 }
 
 impl Default for LinuxPtyOptions {
@@ -45,6 +47,7 @@ impl Default for LinuxPtyOptions {
             wake_generation: None,
             wake_callback: None,
             theme: None,
+            bold_is_bright: false,
         }
     }
 }
@@ -199,6 +202,7 @@ impl LinuxPtySession {
             )
             .context("failed to create linux vt screen")?,
         );
+        screen.set_bold_is_bright(options.bold_is_bright);
         if let Some(output) = options
             .initial_output
             .as_deref()
@@ -369,6 +373,11 @@ impl LinuxPtySession {
     pub fn set_theme(&self, colors: &TerminalColors) {
         let theme = theme_colors_to_vt(colors);
         self.shared.screen.set_theme(&theme);
+        self.mark_needs_render();
+    }
+
+    pub fn set_bold_is_bright(&self, enabled: bool) {
+        self.shared.screen.set_bold_is_bright(enabled);
         self.mark_needs_render();
     }
 

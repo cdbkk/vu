@@ -12,6 +12,26 @@ pub(super) fn theme_to_ghostty_colors(theme: &TerminalTheme) -> vu_ghostty::Term
     }
 }
 
+pub(super) fn terminal_tweaks_to_ghostty(
+    tweaks: &vu_core::config::TerminalTweaks,
+) -> vu_ghostty::Tweaks {
+    vu_ghostty::Tweaks {
+        line_height_percent: tweaks.line_height_percent,
+        letter_spacing_percent: tweaks.letter_spacing_percent,
+        ligatures: tweaks.ligatures,
+        font_thicken: tweaks.font_thicken,
+        cursor_blink: tweaks.cursor_blink,
+        bold_is_bright: tweaks.bold_is_bright,
+        minimum_contrast: tweaks.minimum_contrast,
+        unfocused_split_opacity: tweaks.unfocused_split_opacity,
+        window_padding_x: tweaks.window_padding_x,
+        window_padding_y: tweaks.window_padding_y,
+        mouse_hide_while_typing: tweaks.mouse_hide_while_typing,
+        selection_background: tweaks.selection_background.clone(),
+        selection_foreground: tweaks.selection_foreground.clone(),
+    }
+}
+
 // ── Terminal factory functions ────────────────────────────────
 //
 // Standalone so they can be called both during VuWorkspace::new()

@@ -19,13 +19,7 @@
 
 use std::time::Duration;
 
-/// Palette colors passed to the backend when (re)configuring a surface.
-#[derive(Debug, Clone)]
-pub struct TerminalColors {
-    pub foreground: [u8; 3],
-    pub background: [u8; 3],
-    pub palette: [[u8; 3]; 16],
-}
+use crate::{AppearanceConfig, TerminalColors, Tweaks};
 
 /// Incremental config patch. Empty on the stub path; kept for API parity.
 #[derive(Debug, Clone, Default)]
@@ -42,6 +36,7 @@ pub struct GhosttyConfigPatch {
     pub background_image_position: Option<String>,
     pub background_image_fit: Option<String>,
     pub background_image_repeat: Option<bool>,
+    pub tweaks: Option<Tweaks>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,22 +99,8 @@ pub struct GhosttyApp {
 }
 
 impl GhosttyApp {
-    /// Matches the macOS signature so `workspace.rs` can call it without
-    /// `cfg` gating. All arguments are accepted and ignored.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        _colors: Option<&TerminalColors>,
-        _font_family: Option<&str>,
-        _font_size: Option<f32>,
-        _background_opacity: Option<f32>,
-        _background_blur: Option<bool>,
-        _cursor_style: Option<&str>,
-        _background_image: Option<&str>,
-        _background_image_opacity: Option<f32>,
-        _background_image_position: Option<&str>,
-        _background_image_fit: Option<&str>,
-        _background_image_repeat: Option<bool>,
-    ) -> Result<Self, String> {
+    /// Matches the real backends while accepting and ignoring all appearance.
+    pub fn new(_config: &AppearanceConfig) -> Result<Self, String> {
         Ok(Self { _sealed: () })
     }
 
@@ -135,21 +116,7 @@ impl GhosttyApp {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_appearance(
-        &self,
-        _colors: &TerminalColors,
-        _font_family: &str,
-        _font_size: f32,
-        _background_opacity: f32,
-        _background_blur: bool,
-        _cursor_style: &str,
-        _background_image: Option<&str>,
-        _background_image_opacity: f32,
-        _background_image_position: Option<&str>,
-        _background_image_fit: Option<&str>,
-        _background_image_repeat: bool,
-    ) -> Result<(), String> {
+    pub fn update_appearance(&self, _config: &AppearanceConfig) -> Result<(), String> {
         Ok(())
     }
 
@@ -200,21 +167,7 @@ impl GhosttyTerminal {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_appearance(
-        &self,
-        _colors: &TerminalColors,
-        _font_family: &str,
-        _font_size: f32,
-        _background_opacity: f32,
-        _background_blur: bool,
-        _cursor_style: &str,
-        _background_image: Option<&str>,
-        _background_image_opacity: f32,
-        _background_image_position: Option<&str>,
-        _background_image_fit: Option<&str>,
-        _background_image_repeat: bool,
-    ) -> Result<(), String> {
+    pub fn update_appearance(&self, _config: &AppearanceConfig) -> Result<(), String> {
         Ok(())
     }
 

@@ -1,8 +1,8 @@
 use anyhow::Result;
-use vu_agent::{AgentConfig, ProviderKind};
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use vu_agent::{AgentConfig, ProviderKind};
 
 pub const MIN_UI_FONT_SIZE: f32 = 12.0;
 pub const MAX_UI_FONT_SIZE: f32 = 24.0;
@@ -104,12 +104,8 @@ impl Default for TerminalConfig {
     }
 }
 
-/// Terminal rendering options passed straight through to ghostty.
-///
-/// These render to a ghostty config fragment rather than typed fields on
-/// `GhosttyConfigPatch`, because `vu-ghostty` deliberately has no dependency on
-/// this crate and adding ten Option fields to the patch/merge path would cost
-/// far more than the string it produces.
+/// Terminal rendering options converted to the backend's plain-data tweak type
+/// at the `vu-app` boundary.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct TerminalTweaks {
@@ -206,64 +202,6 @@ impl TerminalTweaks {
         {
             self.selection_foreground = None;
         }
-    }
-
-    /// Render as ghostty config lines. Options left at their default are
-    /// omitted so ghostty keeps its own behaviour rather than being pinned to
-    /// a value we happened to pick.
-    pub fn to_ghostty_config(&self) -> String {
-        let mut s = String::new();
-        if self.line_height_percent != 0.0 {
-            s.push_str(&format!(
-                "adjust-cell-height = {:.0}%\n",
-                self.line_height_percent
-            ));
-        }
-        if self.letter_spacing_percent != 0.0 {
-            s.push_str(&format!(
-                "adjust-cell-width = {:.0}%\n",
-                self.letter_spacing_percent
-            ));
-        }
-        if !self.ligatures {
-            // Ghostty takes one feature per line; these three cover the
-            // ligature sets the bundled mono face ships with.
-            s.push_str("font-feature = -calt\nfont-feature = -liga\nfont-feature = -dlig\n");
-        }
-        if self.font_thicken {
-            s.push_str("font-thicken = true\n");
-        }
-        if !self.cursor_blink {
-            s.push_str("cursor-style-blink = false\n");
-        }
-        if self.bold_is_bright {
-            s.push_str("bold-is-bright = true\n");
-        }
-        if self.minimum_contrast > 1.0 {
-            s.push_str(&format!("minimum-contrast = {:.2}\n", self.minimum_contrast));
-        }
-        if self.unfocused_split_opacity < 1.0 {
-            s.push_str(&format!(
-                "unfocused-split-opacity = {:.2}\n",
-                self.unfocused_split_opacity
-            ));
-        }
-        if self.window_padding_x > 0.0 {
-            s.push_str(&format!("window-padding-x = {:.0}\n", self.window_padding_x));
-        }
-        if self.window_padding_y > 0.0 {
-            s.push_str(&format!("window-padding-y = {:.0}\n", self.window_padding_y));
-        }
-        if self.mouse_hide_while_typing {
-            s.push_str("mouse-hide-while-typing = true\n");
-        }
-        if let Some(bg) = &self.selection_background {
-            s.push_str(&format!("selection-background = {bg}\n"));
-        }
-        if let Some(fg) = &self.selection_foreground {
-            s.push_str(&format!("selection-foreground = {fg}\n"));
-        }
-        s
     }
 }
 
@@ -373,7 +311,13 @@ impl AppearanceConfig {
         } else {
             default_icon_scale()
         };
-        let strength = |v: f32| if v.is_finite() { v.clamp(0.0, 4.0) } else { 1.0 };
+        let strength = |v: f32| {
+            if v.is_finite() {
+                v.clamp(0.0, 4.0)
+            } else {
+                1.0
+            }
+        };
         self.chrome_surface_strength = strength(self.chrome_surface_strength);
         self.chrome_border_strength = strength(self.chrome_border_strength);
     }
@@ -1269,24 +1213,6 @@ mod tests {
     #[test]
     fn new_configs_enable_restore_terminal_text_by_default() {
         assert!(Config::default().appearance.restore_terminal_text);
-    }
-
-    #[test]
-    fn tweaks_emit_only_non_default_ghostty_keys() {
-        use super::TerminalTweaks;
-        // Emitting defaults would pin ghostty to values we picked rather than
-        // letting it keep its own, so an untouched config must produce nothing.
-        let mut tweaks = TerminalTweaks::default();
-        assert_eq!(tweaks.to_ghostty_config(), "");
-
-        tweaks.line_height_percent = 20.0;
-        tweaks.ligatures = false;
-        tweaks.minimum_contrast = 3.0;
-        let out = tweaks.to_ghostty_config();
-        assert!(out.contains("adjust-cell-height = 20%"), "{out}");
-        assert!(out.contains("font-feature = -liga"), "{out}");
-        assert!(out.contains("minimum-contrast = 3.00"), "{out}");
-        assert!(!out.contains("font-thicken"), "{out}");
     }
 
     #[test]

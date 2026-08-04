@@ -54,22 +54,21 @@ impl VuWorkspace {
         let background_image_repeat = config.appearance.background_image_repeat;
         let terminal_theme = TerminalTheme::by_name(&config.terminal.theme).unwrap_or_default();
         let colors = theme_to_ghostty_colors(&terminal_theme);
-        let ghostty_app = vu_ghostty::GhosttyApp::new(
-            Some(&colors),
-            Some(&terminal_font_family),
-            Some(font_size),
-            Some(terminal_opacity),
-            Some(terminal_blur),
-            Some(&terminal_cursor_style),
-            background_image.as_deref(),
-            Some(background_image_opacity),
-            Some(&background_image_position),
-            Some(&background_image_fit),
-            Some(background_image_repeat),
-            // Without this the tweaks only reach ghostty after the first
-            // settings change, so a configured tweak did nothing at startup.
-            Some(&config.terminal.tweaks.to_ghostty_config()),
-        )
+        let terminal_tweaks = terminal_tweaks_to_ghostty(&config.terminal.tweaks);
+        let ghostty_app = vu_ghostty::GhosttyApp::new(&vu_ghostty::AppearanceConfig {
+            colors,
+            font_family: terminal_font_family.clone(),
+            font_size,
+            background_opacity: terminal_opacity,
+            background_blur: terminal_blur,
+            cursor_style: terminal_cursor_style.clone(),
+            background_image: background_image.clone(),
+            background_image_opacity,
+            background_image_position: Some(background_image_position.clone()),
+            background_image_fit: Some(background_image_fit.clone()),
+            background_image_repeat,
+            tweaks: terminal_tweaks.clone(),
+        })
         .map(std::sync::Arc::new)
         .unwrap_or_else(|e| panic!("Fatal: failed to initialize Ghostty: {}", e));
         let harness = AgentHarness::new(&config).unwrap_or_else(|e| {
@@ -677,7 +676,7 @@ impl VuWorkspace {
             active_tab,
             is_quick_terminal: false,
             terminal_font_family,
-            terminal_tweaks_config: config.terminal.tweaks.to_ghostty_config(),
+            terminal_tweaks,
             ui_font_family,
             ui_font_size,
             font_size,

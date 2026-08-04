@@ -984,8 +984,8 @@ impl VuWorkspace {
                 - appearance_config.chrome_border_strength)
                 .abs()
                 > f32::EPSILON;
-        let next_tweaks_config = term_config.tweaks.to_ghostty_config();
-        let tweaks_changed = self.terminal_tweaks_config != next_tweaks_config;
+        let next_tweaks = terminal_tweaks_to_ghostty(&term_config.tweaks);
+        let tweaks_changed = self.terminal_tweaks != next_tweaks;
 
         crate::theme::set_chrome_strengths(
             appearance_config.chrome_surface_strength,
@@ -1013,7 +1013,7 @@ impl VuWorkspace {
             || (self.ui_font_size - next_ui_font_size).abs() > f32::EPSILON;
 
         self.terminal_font_family = next_terminal_font_family;
-        self.terminal_tweaks_config = next_tweaks_config;
+        self.terminal_tweaks = next_tweaks;
         self.ui_font_family = next_ui_font_family;
         self.ui_font_size = next_ui_font_size;
         self.font_size = next_font_size;
@@ -1116,43 +1116,34 @@ impl VuWorkspace {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let colors = theme_to_ghostty_colors(theme);
+        let appearance = vu_ghostty::AppearanceConfig {
+            colors: theme_to_ghostty_colors(theme),
+            font_family: self.terminal_font_family.clone(),
+            font_size: self.font_size,
+            background_opacity: self.terminal_opacity,
+            background_blur: self.terminal_blur,
+            cursor_style: self.terminal_cursor_style.clone(),
+            background_image: self.background_image.clone(),
+            background_image_opacity: self.background_image_opacity,
+            background_image_position: Some(self.background_image_position.clone()),
+            background_image_fit: Some(self.background_image_fit.clone()),
+            background_image_repeat: self.background_image_repeat,
+            tweaks: self.terminal_tweaks.clone(),
+        };
         // Update all terminal panes (legacy gets full theme, ghostty gets color scheme)
         for tab in &self.tabs {
             for terminal in tab.pane_tree.all_surface_terminals() {
-                terminal.set_theme(
-                    theme,
-                    &colors,
-                    &self.terminal_font_family,
-                    self.font_size,
-                    self.terminal_opacity,
-                    self.terminal_blur,
-                    &self.terminal_cursor_style,
-                    self.background_image.as_deref(),
-                    self.background_image_opacity,
-                    Some(&self.background_image_position),
-                    Some(&self.background_image_fit),
-                    self.background_image_repeat,
-                    &self.terminal_tweaks_config,
-                    cx,
-                );
+                terminal.set_theme(theme, &appearance, cx);
             }
         }
-        if let Err(e) = self.ghostty_app.update_appearance(
-            &colors,
-            &self.terminal_font_family,
-            self.font_size,
-            self.terminal_opacity,
-            self.terminal_blur,
-            &self.terminal_cursor_style,
-            self.background_image.as_deref(),
-            self.background_image_opacity,
-            Some(&self.background_image_position),
-            Some(&self.background_image_fit),
-            self.background_image_repeat,
-            Some(&self.terminal_tweaks_config),
-        ) {
+        if let Err(e) = self.ghostty_app.update_appearance(&appearance) {
             log::error!("Failed to update Ghostty appearance: {}", e);
+        }
+        #[cfg(target_os = "linux")]
+        for tab in &self.tabs {
+            for terminal in tab.pane_tree.all_surface_terminals() {
+                terminal.appearance_changed(cx);
+            }
         }
         for tab in &self.tabs {
             for terminal in tab.pane_tree.all_surface_terminals() {
