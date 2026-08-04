@@ -1,8 +1,58 @@
 # Changelog
 
-All notable changes to con are documented here.
+All notable changes to vu are documented here.
 
-con is still pre-release, so entries may group related beta work while the product shape is stabilizing.
+vu is a fork of [con](https://github.com/nowledge-co/con-terminal) by Nowledge Labs (MIT).
+Entries below `v0.2.0` are inherited from upstream con and describe its history, not this fork's.
+
+## `v0.2.0` - 2026-08-04
+
+First vu release. Focused on making the app customizable without editing files by hand.
+
+### Added
+
+**Theming**
+
+- Palette editor under Appearance with a live agent-session preview, 18 labeled slots, and a colour picker per slot (HSL sliders, swatches, hex field).
+- Clicking coloured text in the preview jumps to and opens the picker for the slot that painted it.
+- Edits apply to the live window as you pick, via a new `ThemeLivePreview` event. Closing without saving restores the previous theme.
+- Clipboard import now loads into the editor instead of a separate preview, and `Copy` exports the working palette as a Ghostty theme file.
+- Slots whose colour duplicates an earlier slot are flagged, since most themes point several bright variants at their base colour.
+
+**Terminal rendering**
+
+- Ten ghostty options that were never surfaced: line spacing, letter spacing, ligatures, font thickening, cursor blink, bold-is-bright, minimum contrast, unfocused split dimming, window padding, and mouse-hide-while-typing.
+
+**Chrome**
+
+- `Surface Contrast` and `Border Contrast` control how far the title bar, tab strip, sidebar, cards, and borders sit from the terminal background. Previously these came from hardcoded blends with no control at all.
+- `Icon Size` scales activity bar, tab strip, and pane header icons independently of `ui_font_size`. Controls grow only once the scaled glyph would overflow.
+
+**Settings**
+
+- All 16 settings groups collapse from a clickable heading.
+- Font pickers render each family in its own typeface with a specimen.
+- Providers is folded into the AI tab.
+- `agent.purpose` is reachable: its control was fully wired but never rendered.
+
+### Fixed
+
+- Tweaks and chrome strengths never reached the app: startup built its ghostty config before they were sent, and the change detection that gates the sync did not test either value.
+- Selecting a palette slot opened two stacked popovers, because the same picker state was bound to two `ColorPicker` elements.
+- Selecting Foreground highlighted every blank line in the preview.
+- Long font names overflowed into the specimen column instead of truncating.
+
+### Changed
+
+- Renamed from con to vu: Cargo package, both bin targets, bundle identifier, and `CON_ZIG_BIN` to `VU_ZIG_BIN` (the old name still works).
+- The Sparkle feed no longer defaults to upstream's appcast.
+- Tab settings moved out of a group called `Pane` into `Tabs & Top Bar`.
+
+### Build
+
+- `scripts/zig-macos26-shim.sh` works around zig 0.15.2 being unable to parse the macOS 26 SDK's `libSystem.tbd`, which breaks every link including zig's own build runner.
+- Ships the SIL OFL text for the bundled Iosevka fonts, which upstream omitted.
+- `gpui-component` is pinned to a fork carrying `ColorPickerState::set_open` ([upstream PR](https://github.com/longbridge/gpui-component/pull/2645)).
 
 ## `v0.1.0-beta.79` - 2026-07-25
 

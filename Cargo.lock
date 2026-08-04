@@ -1272,7 +1272,7 @@ checksum = "75984efb6ed102a0d42db99afb6c1948f0380d1d91808d5529916e6c08b49d8d"
 
 [[package]]
 name = "con-agent"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1296,7 +1296,7 @@ dependencies = [
 
 [[package]]
 name = "con-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1309,7 +1309,7 @@ dependencies = [
 
 [[package]]
 name = "con-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "con-agent",
@@ -1329,7 +1329,7 @@ dependencies = [
 
 [[package]]
 name = "con-ghostty"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cc",
@@ -1349,21 +1349,21 @@ dependencies = [
 
 [[package]]
 name = "con-paths"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dirs",
 ]
 
 [[package]]
 name = "con-terminal"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "con-paths",
 ]
 
 [[package]]
 name = "con-test"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -8373,7 +8373,7 @@ dependencies = [
 
 [[package]]
 name = "vu"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cc",
