@@ -68,10 +68,21 @@ OpenAI-compatible providers are supported.
 | Windows | Beta | ConPTY + libghostty-vt + D3D11/DirectWrite |
 | Linux | Preview | Unix PTY + libghostty-vt + GPUI |
 
+## Install
+
+Download the unsigned macOS beta for Apple silicon (M1 or newer):
+
+- [Download the DMG](https://github.com/cdbkk/vu/releases/download/v0.4.0-beta.1/vu-Beta-0.4.0-beta.1-macos-arm64.dmg)
+
+> **Unsigned beta:** Apple has not notarized this build. After trying to open
+> it, go to **System Settings → Privacy & Security** and click **Open Anyway**.
+
+Open the DMG, then drag **vu Beta** to Applications. The checksum and ZIP build
+are available on the [release page](https://github.com/cdbkk/vu/releases/tag/v0.4.0-beta.1).
+
 ## Build from source
 
-Prebuilt `vu` releases are not published yet. The repository pins its toolchain
-with [mise](https://mise.jdx.dev/):
+The repository pins its toolchain with [mise](https://mise.jdx.dev/):
 
 ```sh
 git clone https://github.com/cdbkk/vu.git
