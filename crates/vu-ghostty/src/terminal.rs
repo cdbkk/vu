@@ -96,18 +96,16 @@ impl Tweaks {
                 self.unfocused_split_opacity
             ));
         }
-        if self.window_padding_x > 0.0 {
-            s.push_str(&format!(
-                "window-padding-x = {:.0}\n",
-                self.window_padding_x
-            ));
-        }
-        if self.window_padding_y > 0.0 {
-            s.push_str(&format!(
-                "window-padding-y = {:.0}\n",
-                self.window_padding_y
-            ));
-        }
+        // Always emit padding: Ghostty's default is 2, so skipping the key
+        // would make slider value 0 silently mean "2px" and never resettable.
+        s.push_str(&format!(
+            "window-padding-x = {:.0}\n",
+            self.window_padding_x
+        ));
+        s.push_str(&format!(
+            "window-padding-y = {:.0}\n",
+            self.window_padding_y
+        ));
         if self.mouse_hide_while_typing {
             s.push_str("mouse-hide-while-typing = true\n");
         }

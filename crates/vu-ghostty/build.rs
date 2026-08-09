@@ -64,6 +64,7 @@ fn build_macos() {
     let ghostty_dir = resolve_ghostty_source();
     let ghostty_dir = patchable_ghostty_source(ghostty_dir);
     let _initial_output_restore_enabled = apply_embedded_initial_output_patch(&ghostty_dir);
+    apply_runtime_padding_patch(&ghostty_dir);
     let optimize = ghostty_optimize();
     let zig_bin =
         env::var_os("VU_ZIG_BIN").unwrap_or_else(|| std::ffi::OsString::from("zig"));
@@ -765,6 +766,43 @@ fn try_apply_embedded_initial_output_patch(ghostty_dir: &Path) -> Result<(), Str
     println!("cargo:rerun-if-changed={}", exec.display());
     println!("cargo:rerun-if-changed={}", header.display());
     Ok(())
+}
+
+/// Upstream Ghostty computes a surface's pixel padding only at surface init
+/// and on DPI change, so `ghostty_surface_update_config` never moves the
+/// padding of a live surface — window-padding slider changes in Vu's settings
+/// panel only affected newly created terminals. Recompute padding and force a
+/// resize on config update, mirroring upstream's contentScaleCallback.
+fn apply_runtime_padding_patch(ghostty_dir: &Path) {
+    let surface = ghostty_dir.join("src/Surface.zig");
+    let result = patch_file_once(
+        &surface,
+        "Vu: recompute surface padding",
+        &[(
+            "    self.config.deinit();\n    self.config = derived;\n",
+            "    self.config.deinit();\n    self.config = derived;\n\n    \
+             // Vu: recompute surface padding so runtime window-padding changes\n    \
+             // reach live surfaces; upstream only computes it at init/DPI change.\n    \
+             if (self.rt_surface.getContentScale()) |content_scale| {\n        \
+             const x_dpi = content_scale.x * font.face.default_dpi;\n        \
+             const y_dpi = content_scale.y * font.face.default_dpi;\n        \
+             const explicit = self.config.scaledPadding(x_dpi, y_dpi);\n        \
+             if (self.config.window_padding_balance != .false) {\n            \
+             self.size.balancePadding(explicit, self.config.window_padding_balance);\n        \
+             } else {\n            \
+             self.size.padding = explicit;\n        \
+             }\n        \
+             self.resize(self.size.screen) catch |err| {\n            \
+             log.warn(\"failed to apply window padding change err={}\", .{err});\n        \
+             };\n    \
+             } else |err| {\n        \
+             log.warn(\"failed to read content scale for padding change err={}\", .{err});\n    \
+             }\n",
+        )],
+    );
+    if let Err(err) = result {
+        println!("cargo:warning=vu-ghostty: runtime window-padding patch not applied: {err}");
+    }
 }
 
 fn patch_file_once(path: &Path, marker: &str, replacements: &[(&str, &str)]) -> Result<(), String> {
