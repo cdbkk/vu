@@ -172,6 +172,10 @@ pub struct GhosttyView {
     /// mouse-move event when the pointer is stationary.
     #[cfg(target_os = "macos")]
     last_mouse_position: Option<Point<Pixels>>,
+    /// True while a left-button selection drag that started in this view is
+    /// active. GPUI element listeners stop firing once the pointer leaves the
+    /// hitbox, so drags are forwarded via a window-level listener instead.
+    left_button_dragging: bool,
     #[cfg(target_os = "macos")]
     native_transition_underlay_visible: Cell<bool>,
     #[cfg(target_os = "macos")]
@@ -233,6 +237,7 @@ impl GhosttyView {
             next_surface_init_retry_at: None,
             #[cfg(target_os = "macos")]
             last_mouse_position: None,
+            left_button_dragging: false,
             #[cfg(target_os = "macos")]
             native_transition_underlay_visible: Cell::new(false),
             #[cfg(target_os = "macos")]
@@ -1932,6 +1937,16 @@ impl Render for GhosttyView {
                     cx.write_to_clipboard(ClipboardItem::new_string(selection));
                 }
             }))
+            .on_action(cx.listener(|this, _: &crate::SelectAll, _window, cx| {
+                let Some(terminal) = &this.terminal else {
+                    return;
+                };
+                match terminal.perform_binding_action("select_all") {
+                    Ok(true) => cx.notify(),
+                    Ok(false) => log::warn!("Ghostty rejected select_all binding action"),
+                    Err(err) => log::error!("select_all binding action failed: {}", err),
+                }
+            }))
             .on_action(cx.listener(|this, _: &crate::Paste, _window, cx| {
                 this.restored_screen_text = None;
                 if this.paste_from_clipboard(cx) {
@@ -1964,6 +1979,7 @@ impl Render for GhosttyView {
                 cx.listener(move |this, event: &MouseDownEvent, window, cx| {
                     window.focus(&focus, cx);
                     this.last_mouse_position = Some(event.position);
+                    this.left_button_dragging = true;
                     if let Some(ref terminal) = this.terminal {
                         let (x, y) = this.view_local_pos(event.position);
                         let mods = gpui_mods_to_ghostty(&event.modifiers);
@@ -1978,6 +1994,27 @@ impl Render for GhosttyView {
                 gpui::MouseButton::Left,
                 cx.listener(|this, event: &MouseUpEvent, _window, cx| {
                     this.last_mouse_position = Some(event.position);
+                    this.left_button_dragging = false;
+                    if let Some(ref terminal) = this.terminal {
+                        let (x, y) = this.view_local_pos(event.position);
+                        let mods = gpui_mods_to_ghostty(&event.modifiers);
+                        terminal.send_mouse_pos(x, y, mods);
+                        terminal.send_mouse_button(false, MouseButton::Left, mods);
+                    }
+                    let changed = this.drain_surface_state(true, cx);
+                    if changed {
+                        cx.notify();
+                    }
+                }),
+            )
+            .on_mouse_up_out(
+                gpui::MouseButton::Left,
+                cx.listener(|this, event: &MouseUpEvent, _window, cx| {
+                    if !this.left_button_dragging {
+                        return;
+                    }
+                    this.last_mouse_position = Some(event.position);
+                    this.left_button_dragging = false;
                     if let Some(ref terminal) = this.terminal {
                         let (x, y) = this.view_local_pos(event.position);
                         let mods = gpui_mods_to_ghostty(&event.modifiers);
@@ -1991,6 +2028,10 @@ impl Render for GhosttyView {
                 }),
             )
             .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _window, _cx| {
+                if this.left_button_dragging {
+                    // Window-level drag listener owns position updates.
+                    return;
+                }
                 this.last_mouse_position = Some(event.position);
                 if let Some(ref terminal) = this.terminal {
                     let (x, y) = this.view_local_pos(event.position);
@@ -2065,6 +2106,32 @@ impl Render for GhosttyView {
                                 },
                                 cx,
                             );
+                            // Element mouse-move listeners stop firing once the
+                            // pointer leaves the hitbox, so selection drags are
+                            // forwarded window-wide. Ghostty clamps
+                            // out-of-bounds coordinates and autoscrolls.
+                            let entity = entity.clone();
+                            window.on_mouse_event(move |event: &MouseMoveEvent, phase, _window, cx| {
+                                if phase != DispatchPhase::Bubble
+                                    || event.pressed_button != Some(gpui::MouseButton::Left)
+                                {
+                                    return;
+                                }
+                                let _ = entity.update(cx, |view: &mut GhosttyView, _cx| {
+                                    if !view.left_button_dragging {
+                                        return;
+                                    }
+                                    view.last_mouse_position = Some(event.position);
+                                    if let Some(ref terminal) = view.terminal {
+                                        let (x, y) = view.view_local_pos(event.position);
+                                        terminal.send_mouse_pos(
+                                            x,
+                                            y,
+                                            gpui_mods_to_ghostty(&event.modifiers),
+                                        );
+                                    }
+                                });
+                            });
                         }
                     },
                 )
