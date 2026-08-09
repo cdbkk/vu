@@ -16,6 +16,7 @@
 
 use crate::activity_bar::ActivitySlot;
 use crate::motion::MotionValue;
+use crate::ui_scale::{icon_box_px, icon_px, ui_px};
 use gpui::{
     AnyElement, App, Bounds, Context, Div, Entity, EventEmitter, FontWeight, Hsla,
     InteractiveElement, IntoElement, MouseButton, MouseDownEvent, ParentElement, Pixels, Point,
@@ -46,11 +47,40 @@ const HOVER_CARD_WIDTH: f32 = 240.0;
 const ROW_HEIGHT: f32 = 44.0;
 /// Per-icon size in the rail.
 const RAIL_ICON_SIZE: f32 = 32.0;
+/// Glyph size of the icon painted inside a rail pill.
+const RAIL_PILL_ICON_SIZE: f32 = 16.0;
+/// Glyph size of the icon painted inside a panel row.
+const ROW_ICON_SIZE: f32 = 15.0;
+/// Base (unscaled) line height of a row's name label.
+const ROW_NAME_LINE_HEIGHT: f32 = 16.0;
+/// Base (unscaled) line height of a row's subtitle label.
+const ROW_SUBTITLE_LINE_HEIGHT: f32 = 14.0;
 /// Vertical gap between rail icons. Used to compute the icon's
 /// y-center for hover-card anchoring.
 const RAIL_ICON_GAP: f32 = 2.0;
 const RAIL_TOP_CONTROLS_HEIGHT: f32 =
     28.0 + RAIL_ICON_GAP + 28.0 + RAIL_ICON_GAP + 5.0 + RAIL_ICON_GAP;
+
+/// Rail pill box size — grows once the scaled icon glyph would
+/// overflow the base `RAIL_ICON_SIZE` box. Pixel-identical to the
+/// original constant at the default icon scale.
+fn rail_pill_px() -> Pixels {
+    icon_box_px(RAIL_ICON_SIZE, RAIL_PILL_ICON_SIZE)
+}
+
+/// Panel row height — grows once scaled icon or text content would
+/// overflow the base `ROW_HEIGHT` box. Pixel-identical to the
+/// original constant at the default icon/text scale.
+fn row_height_px(theme: &gpui_component::Theme) -> Pixels {
+    let name_line = f32::from(ui_px(theme, ROW_NAME_LINE_HEIGHT));
+    let sub_line = f32::from(ui_px(theme, ROW_SUBTITLE_LINE_HEIGHT));
+    let icon_h = f32::from(icon_px(ROW_ICON_SIZE));
+    let text_stack_gap = 1.0;
+    let content = (name_line + text_stack_gap + sub_line).max(icon_h);
+    let base_content = ROW_NAME_LINE_HEIGHT + text_stack_gap + ROW_SUBTITLE_LINE_HEIGHT;
+    let padding = (ROW_HEIGHT - base_content).max(0.0);
+    px(ROW_HEIGHT.max(content + padding))
+}
 
 /// Cubic ease-out feel for the panel width animation.
 #[cfg(not(target_os = "macos"))]
@@ -199,12 +229,12 @@ impl Render for DraggedTab {
             .rounded(px(4.0))
             .bg(theme.title_bar.opacity(0.92))
             .text_color(theme.foreground.opacity(0.82))
-            .text_size(px(12.0))
+            .text_size(ui_px(theme, 12.0))
             .font_family(theme.font_family.clone())
             .child(
                 svg()
                     .path(self.icon)
-                    .size(px(12.0))
+                    .size(icon_px(12.0))
                     .text_color(theme.foreground),
             )
             .child(div().truncate().child(self.label.clone()))
@@ -569,12 +599,12 @@ impl SessionSidebar {
                 .cursor_grab()
                 .bg(theme.title_bar.opacity(0.92))
                 .font_family(theme.font_family.clone())
-                .text_size(px(12.0))
+                .text_size(ui_px(theme, 12.0))
                 .text_color(theme.foreground.opacity(0.82))
                 .child(
                     svg()
                         .path(preview.icon)
-                        .size(px(12.0))
+                        .size(icon_px(12.0))
                         .flex_shrink_0()
                         .text_color(theme.foreground),
                 )
@@ -998,7 +1028,7 @@ impl SessionSidebar {
                 .flex()
                 .items_center()
                 .justify_center()
-                .size(px(RAIL_ICON_SIZE))
+                .size(rail_pill_px())
                 .rounded(px(8.0))
                 .cursor_pointer()
                 .bg(pill_bg)
@@ -1039,7 +1069,7 @@ impl SessionSidebar {
                 .child(
                     svg()
                         .path(session.icon)
-                        .size(px(16.0))
+                        .size(icon_px(RAIL_PILL_ICON_SIZE))
                         .text_color(if is_active {
                             theme.foreground
                         } else {
@@ -1128,14 +1158,14 @@ impl SessionSidebar {
 
         let name_color = theme.foreground;
         let sub_color = theme.muted_foreground.opacity(0.65);
-        let meta_color = theme.muted_foreground.opacity(0.50);
+        let meta_color = theme.muted_foreground.opacity(0.65);
         let mono_font = theme.mono_font_family.clone();
         let sys_font = theme.font_family.clone();
 
         let mut card_inner = div().px(px(12.0)).py(px(8.0)).child(
             div()
-                .text_size(px(12.5))
-                .line_height(px(16.0))
+                .text_size(ui_px(theme, 12.5))
+                .line_height(ui_px(theme, 16.0))
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(name_color)
                 .font_family(sys_font)
@@ -1147,8 +1177,8 @@ impl SessionSidebar {
             card_inner = card_inner.child(
                 div()
                     .mt(px(2.0))
-                    .text_size(px(11.0))
-                    .line_height(px(14.0))
+                    .text_size(ui_px(theme, 11.0))
+                    .line_height(ui_px(theme, 14.0))
                     .text_color(sub_color)
                     .font_family(mono_font)
                     .truncate()
@@ -1161,8 +1191,8 @@ impl SessionSidebar {
             .flex()
             .items_center()
             .gap(px(8.0))
-            .text_size(px(10.5))
-            .line_height(px(13.0))
+            .text_size(ui_px(theme, 10.5))
+            .line_height(ui_px(theme, 13.0))
             .text_color(meta_color);
 
         let pane_label = match session.pane_count {
@@ -1219,11 +1249,13 @@ impl SessionSidebar {
         let body_bg;
         let header_color;
         let header_font;
+        let header_text_size;
         {
             let theme = cx.theme();
             body_bg = sidebar_surface(theme, self.ui_opacity, 0.045);
-            header_color = theme.muted_foreground.opacity(0.55);
+            header_color = theme.muted_foreground.opacity(0.65);
             header_font = theme.font_family.clone();
+            header_text_size = ui_px(theme, 10.5);
         }
 
         let header_top = self.leading_top_pad.max(0.0);
@@ -1241,7 +1273,7 @@ impl SessionSidebar {
                     .px(px(12.0))
                     .child(
                         div()
-                            .text_size(px(10.5))
+                            .text_size(header_text_size)
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(header_color)
                             .font_family(header_font)
@@ -1324,7 +1356,7 @@ impl SessionSidebar {
                         return;
                     }
                     // Sidebar drag: "below last row" fallback.
-                    let approx_row_h = ROW_HEIGHT;
+                    let approx_row_h = f32::from(row_height_px(cx.theme()));
                     let last_row_bottom_estimate =
                         f32::from(event.bounds.origin.y) + (total as f32) * (approx_row_h + 2.0);
                     if f32::from(event.event.position.y) >= last_row_bottom_estimate {
@@ -1452,7 +1484,7 @@ impl SessionSidebar {
         let drop_above = drop_slot == Some(i) && drag_in_sidebar;
         let drop_below = i + 1 == total && drop_slot == Some(total) && drag_in_sidebar;
 
-        let row_h = ROW_HEIGHT;
+        let row_h = row_height_px(theme);
 
         let label_block: AnyElement = if is_renaming {
             if let Some(input) = rename_input {
@@ -1477,7 +1509,7 @@ impl SessionSidebar {
             } else {
                 theme.muted_foreground.opacity(0.92)
             };
-            let sub_fg = theme.muted_foreground.opacity(0.55);
+            let sub_fg = theme.muted_foreground.opacity(0.65);
             let mut block = div()
                 .flex()
                 .flex_col()
@@ -1488,8 +1520,8 @@ impl SessionSidebar {
                     div()
                         .overflow_hidden()
                         .truncate()
-                        .text_size(px(12.5))
-                        .line_height(px(16.0))
+                        .text_size(ui_px(theme, 12.5))
+                        .line_height(ui_px(theme, 16.0))
                         .font_family(sys)
                         .text_color(fg)
                         .when(is_active, |s| s.font_weight(FontWeight::MEDIUM))
@@ -1500,8 +1532,8 @@ impl SessionSidebar {
                     div()
                         .overflow_hidden()
                         .truncate()
-                        .text_size(px(10.5))
-                        .line_height(px(14.0))
+                        .text_size(ui_px(theme, 10.5))
+                        .line_height(ui_px(theme, 14.0))
                         .font_family(mono)
                         .text_color(sub_fg)
                         .child(sub),
@@ -1603,7 +1635,7 @@ impl SessionSidebar {
         let mut icon_stack = div().relative().flex_shrink_0().child(
             svg()
                 .path(session.icon)
-                .size(px(15.0))
+                .size(icon_px(ROW_ICON_SIZE))
                 .text_color(if is_active {
                     theme.foreground
                 } else {
@@ -1647,7 +1679,7 @@ impl SessionSidebar {
             .gap(px(8.0))
             .pl(px(10.0))
             .pr(px(4.0))
-            .h(px(row_h))
+            .h(row_h)
             .rounded(px(8.0))
             .cursor_pointer()
             .bg(row_bg)
@@ -1994,14 +2026,14 @@ where
     let hover_bg = surface_tone(theme, 0.065);
     div()
         .id(id)
-        .size(px(28.0))
+        .size(icon_box_px(28.0, 14.0))
         .flex()
         .items_center()
         .justify_center()
         .rounded(px(6.0))
         .cursor_pointer()
         .hover(move |s| s.bg(hover_bg))
-        .child(svg().path(icon).size(px(14.0)).text_color(icon_color))
+        .child(svg().path(icon).size(icon_px(14.0)).text_color(icon_color))
         .on_mouse_down(MouseButton::Left, handler)
 }
 
@@ -2128,7 +2160,7 @@ where
     let hover_bg = surface_tone(theme, 0.08);
     div()
         .id(id)
-        .size(px(20.0))
+        .size(icon_box_px(20.0, 11.0))
         .flex()
         .items_center()
         .justify_center()
@@ -2138,7 +2170,7 @@ where
         .child(
             svg()
                 .path(icon)
-                .size(px(11.0))
+                .size(icon_px(11.0))
                 .text_color(theme.muted_foreground.opacity(0.72)),
         )
         .on_mouse_down(MouseButton::Left, handler)
@@ -2200,7 +2232,7 @@ pub struct SidebarDragPreviewState {
 pub fn tab_drag_preview_size(pinned: bool) -> Size<Pixels> {
     Size {
         width: if pinned { px(180.0) } else { px(RAIL_WIDTH) },
-        height: if pinned { px(28.0) } else { px(RAIL_ICON_SIZE) },
+        height: if pinned { px(28.0) } else { rail_pill_px() },
     }
 }
 

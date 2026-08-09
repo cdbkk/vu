@@ -11,6 +11,7 @@ use gpui_component::{
 use crate::editor_view::EditorView;
 use crate::sidebar::{DraggedTab, DraggedTabOrigin};
 use crate::terminal_pane::TerminalPane;
+use crate::ui_scale::icon_px;
 
 const RESTORED_SCREEN_TEXT_MAX_LINES: usize = 600;
 const RESTORED_SCREEN_TEXT_MAX_BYTES: usize = 128 * 1024;
@@ -2229,7 +2230,7 @@ impl PaneTree {
                 window.prevent_default();
                 cx.stop_propagation();
             })
-            .child(svg().path(zoom_icon).size(px(11.0)).text_color(btn_color));
+            .child(svg().path(zoom_icon).size(icon_px(11.0)).text_color(btn_color));
 
         // ✕ close button — only when there are splits
         let close_btn = if has_splits {
@@ -2254,7 +2255,7 @@ impl PaneTree {
                     .child(
                         svg()
                             .path("phosphor/x.svg")
-                            .size(px(11.0))
+                            .size(icon_px(11.0))
                             .text_color(btn_color),
                     ),
             )
@@ -2592,7 +2593,7 @@ impl PaneTree {
                     .child(
                         svg()
                             .path("phosphor/terminal.svg")
-                            .size(px(10.0))
+                            .size(icon_px(10.0))
                             .flex_shrink_0()
                             .text_color(icon_color),
                     )
@@ -2636,7 +2637,7 @@ impl PaneTree {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .size(px(15.0))
+                            .size(icon_px(15.0))
                             .flex_shrink_0()
                             .rounded(px(5.0))
                             .text_color(if is_active {

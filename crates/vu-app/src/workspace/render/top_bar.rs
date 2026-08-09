@@ -1,5 +1,5 @@
 use super::super::*;
-use crate::ui_scale::{icon_box_px, icon_px};
+use crate::ui_scale::{icon_box_px, icon_px, ui_px};
 use gpui_component::menu::ContextMenuExt;
 
 fn sanitize_tab_accent_alpha(alpha: f32) -> f32 {
@@ -369,6 +369,10 @@ impl VuWorkspace {
             // accounting for ghost tab insertions (each ghost shifts subsequent
             // tabs by +1). Used as the key into tab_strip_tab_bounds so that
             // pane_title_drag_tab_slot sees a contiguous, gap-free bounds array.
+            let tab_row_text_size = ui_px(theme, 11.5);
+            let tab_row_line_height = ui_px(theme, 14.0);
+            let tab_row_height = px((tab_row_line_height.as_f32() + 16.0).max(30.0));
+
             let mut visual_pos: usize = 0;
             for render_pos in 0..render_indices.len() {
                 let index = render_indices[render_pos];
@@ -492,8 +496,8 @@ impl VuWorkspace {
                     .max_w(px(220.0))
                     .items_center()
                     .px(px(10.0))
-                    .h(px(30.0))
-                    .text_size(px(11.5))
+                    .h(tab_row_height)
+                    .text_size(tab_row_text_size)
                     .cursor_pointer()
                     // Windows: without `.occlude()` the parent top_bar's
                     // `WindowControlArea::Drag` hit-test routes the click
@@ -734,7 +738,7 @@ impl VuWorkspace {
                         .child(
                             svg()
                                 .path(tab_icon)
-                                .size(px(12.5))
+                                .size(icon_px(12.5))
                                 .flex_shrink_0()
                                 .text_color(if is_active {
                                     tab_color
@@ -743,7 +747,7 @@ impl VuWorkspace {
                                         })
                                         .unwrap_or_else(|| theme.foreground.opacity(0.68))
                                 } else {
-                                    theme.muted_foreground.opacity(0.50)
+                                    theme.muted_foreground.opacity(0.65)
                                 }),
                         )
                         .child(
@@ -753,7 +757,7 @@ impl VuWorkspace {
                                 .whitespace_nowrap()
                                 .text_ellipsis()
                                 .font_family(theme.mono_font_family.clone())
-                                .line_height(px(14.0))
+                                .line_height(tab_row_line_height)
                                 .font_weight(if is_active {
                                     FontWeight::SEMIBOLD
                                 } else {
@@ -843,11 +847,11 @@ impl VuWorkspace {
                             .flex()
                             .flex_1()
                             .min_w_0()
-                            .max_w(px(200.0))
+                            .max_w(px(220.0))
                             .items_center()
                             .px(px(10.0))
-                            .h(px(30.0))
-                            .text_size(px(11.5))
+                            .h(tab_row_height)
+                            .text_size(tab_row_text_size)
                             .rounded_t(px(6.0))
                             .bg(theme.primary.opacity(0.18))
                             .text_color(theme.foreground.opacity(0.6))
@@ -869,7 +873,7 @@ impl VuWorkspace {
                                     .child(
                                         svg()
                                             .path("phosphor/terminal.svg")
-                                            .size(icon_px(12.0))
+                                            .size(icon_px(12.5))
                                             .flex_shrink_0()
                                             .text_color(theme.primary.opacity(0.7)),
                                     )
@@ -1047,11 +1051,11 @@ impl VuWorkspace {
                                 .flex()
                                 .flex_1()
                                 .min_w_0()
-                                .max_w(px(200.0))
+                                .max_w(px(220.0))
                                 .items_center()
                                 .px(px(10.0))
-                                .h(px(30.0))
-                                .text_size(px(11.5))
+                                .h(tab_row_height)
+                                .text_size(tab_row_text_size)
                                 .rounded_t(px(6.0))
                                 .bg(theme.primary.opacity(0.18))
                                 .text_color(theme.foreground.opacity(0.6))
@@ -1074,7 +1078,7 @@ impl VuWorkspace {
                                         .child(
                                             svg()
                                                 .path("phosphor/terminal.svg")
-                                                .size(icon_px(12.0))
+                                                .size(icon_px(12.5))
                                                 .flex_shrink_0()
                                                 .text_color(theme.primary.opacity(0.7)),
                                         )
