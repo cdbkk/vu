@@ -411,12 +411,13 @@ impl VuWorkspace {
 
                 let close_id = ElementId::Name(format!("tab-close-{}", index).into());
 
+                let close_icon_px = self.tab_close_size;
                 let mut close_el = div()
                     .id(close_id)
                     .flex()
                     .items_center()
                     .justify_center()
-                    .size(px(17.0))
+                    .size(px(close_icon_px + 7.0))
                     .flex_shrink_0()
                     .rounded(px(5.0))
                     .cursor_pointer()
@@ -438,8 +439,8 @@ impl VuWorkspace {
                     .child(
                         svg()
                             .path("phosphor/x.svg")
-                            .size(px(10.0))
-                            .text_color(theme.muted_foreground.opacity(0.42)),
+                            .size(px(close_icon_px))
+                            .text_color(theme.muted_foreground.opacity(0.55)),
                     );
 
                 // Drop indicator: 2px vertical line on the left edge of
@@ -652,11 +653,12 @@ impl VuWorkspace {
                     let inactive_hover_alpha =
                         sanitize_tab_accent_alpha(self.tab_accent_inactive_hover_alpha)
                             .max(inactive_alpha);
+                    let inactive_surface = self.tab_inactive_opacity;
                     let inactive_bg = tab_color
                         .map(|color| {
                             crate::tab_colors::tab_accent_surface_hsla(color, inactive_alpha, cx)
                         })
-                        .unwrap_or(theme.background.opacity(0.14));
+                        .unwrap_or(theme.background.opacity(inactive_surface));
                     let inactive_hover_bg = tab_color
                         .map(|color| {
                             crate::tab_colors::tab_accent_surface_hsla(
@@ -665,7 +667,7 @@ impl VuWorkspace {
                                 cx,
                             )
                         })
-                        .unwrap_or(theme.background.opacity(0.20));
+                        .unwrap_or(theme.background.opacity((inactive_surface + 0.08).min(1.0)));
                     tab_el = tab_el
                         .rounded_t(px(6.0))
                         .bg(inactive_bg)
@@ -741,7 +743,7 @@ impl VuWorkspace {
                                         })
                                         .unwrap_or_else(|| theme.foreground.opacity(0.68))
                                 } else {
-                                    theme.muted_foreground.opacity(0.38)
+                                    theme.muted_foreground.opacity(0.50)
                                 }),
                         )
                         .child(
@@ -760,7 +762,7 @@ impl VuWorkspace {
                                 .text_color(if is_active {
                                     theme.foreground.opacity(0.88)
                                 } else {
-                                    theme.muted_foreground.opacity(0.62)
+                                    theme.muted_foreground.opacity(0.75)
                                 })
                                 .child(display_title),
                         ),

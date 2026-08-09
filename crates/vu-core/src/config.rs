@@ -55,6 +55,12 @@ fn default_tab_accent_inactive_alpha() -> f32 {
 fn default_tab_accent_inactive_hover_alpha() -> f32 {
     0.22
 }
+fn default_tab_inactive_opacity() -> f32 {
+    0.35
+}
+fn default_tab_close_size() -> f32 {
+    13.0
+}
 
 fn sanitize_tab_accent_alpha(value: f32, default: f32, max: f32) -> f32 {
     if value.is_finite() {
@@ -227,6 +233,11 @@ pub struct AppearanceConfig {
     pub tab_accent_inactive_alpha: f32,
     /// Accent color alpha when hovering inactive tabs.
     pub tab_accent_inactive_hover_alpha: f32,
+    /// Surface opacity of inactive tab chips without an accent color. 0 hides
+    /// the chip entirely; accent-colored tabs use `tab_accent_inactive_alpha`.
+    pub tab_inactive_opacity: f32,
+    /// Tab close (X) glyph size in px. The hit target grows with it.
+    pub tab_close_size: f32,
     /// Keep bounded private terminal text so restart continuity can show what
     /// was on screen. This is never exported to workspace layout profiles.
     pub restore_terminal_text: bool,
@@ -265,6 +276,8 @@ impl Default for AppearanceConfig {
             background_image_repeat: false,
             tab_accent_inactive_alpha: default_tab_accent_inactive_alpha(),
             tab_accent_inactive_hover_alpha: default_tab_accent_inactive_hover_alpha(),
+            tab_inactive_opacity: default_tab_inactive_opacity(),
+            tab_close_size: default_tab_close_size(),
             restore_terminal_text: default_restore_terminal_text(),
             hide_pane_title_bar: false,
             tabs_orientation: TabsOrientation::Vertical,
@@ -291,10 +304,23 @@ impl TabsOrientation {
 
 impl AppearanceConfig {
     pub const MIN_TAB_ACCENT_ALPHA: f32 = 0.05;
-    pub const MAX_TAB_ACCENT_INACTIVE_ALPHA: f32 = 0.30;
-    pub const MAX_TAB_ACCENT_INACTIVE_HOVER_ALPHA: f32 = 0.40;
+    pub const MAX_TAB_ACCENT_INACTIVE_ALPHA: f32 = 1.0;
+    pub const MAX_TAB_ACCENT_INACTIVE_HOVER_ALPHA: f32 = 1.0;
+    pub const MIN_TAB_CLOSE_SIZE: f32 = 8.0;
+    pub const MAX_TAB_CLOSE_SIZE: f32 = 24.0;
 
     pub fn normalize(&mut self) {
+        self.tab_inactive_opacity = if self.tab_inactive_opacity.is_finite() {
+            self.tab_inactive_opacity.clamp(0.0, 1.0)
+        } else {
+            default_tab_inactive_opacity()
+        };
+        self.tab_close_size = if self.tab_close_size.is_finite() {
+            self.tab_close_size
+                .clamp(Self::MIN_TAB_CLOSE_SIZE, Self::MAX_TAB_CLOSE_SIZE)
+        } else {
+            default_tab_close_size()
+        };
         self.tab_accent_inactive_alpha = sanitize_tab_accent_alpha(
             self.tab_accent_inactive_alpha,
             default_tab_accent_inactive_alpha(),

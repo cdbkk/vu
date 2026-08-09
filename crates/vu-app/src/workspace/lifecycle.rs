@@ -37,6 +37,8 @@ impl VuWorkspace {
         let ui_opacity = Self::clamp_ui_opacity(config.appearance.ui_opacity);
         let tab_accent_inactive_alpha = config.appearance.tab_accent_inactive_alpha;
         let tab_accent_inactive_hover_alpha = config.appearance.tab_accent_inactive_hover_alpha;
+        let tab_inactive_opacity = config.appearance.tab_inactive_opacity;
+        let tab_close_size = config.appearance.tab_close_size;
         let effective_ui_opacity = Self::effective_ui_opacity(ui_opacity);
         sidebar.update(cx, |s, cx| {
             s.set_ui_opacity(effective_ui_opacity, cx);
@@ -686,6 +688,8 @@ impl VuWorkspace {
             ui_opacity,
             tab_accent_inactive_alpha,
             tab_accent_inactive_hover_alpha,
+            tab_inactive_opacity,
+            tab_close_size,
             background_image,
             background_image_opacity,
             background_image_position,

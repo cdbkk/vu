@@ -1049,6 +1049,19 @@ impl VuWorkspace {
         self.tab_accent_inactive_hover_alpha =
             sanitize_tab_accent_alpha(appearance_config.tab_accent_inactive_hover_alpha)
                 .max(self.tab_accent_inactive_alpha);
+        self.tab_inactive_opacity = if appearance_config.tab_inactive_opacity.is_finite() {
+            appearance_config.tab_inactive_opacity.clamp(0.0, 1.0)
+        } else {
+            self.tab_inactive_opacity
+        };
+        self.tab_close_size = if appearance_config.tab_close_size.is_finite() {
+            appearance_config.tab_close_size.clamp(
+                vu_core::config::AppearanceConfig::MIN_TAB_CLOSE_SIZE,
+                vu_core::config::AppearanceConfig::MAX_TAB_CLOSE_SIZE,
+            )
+        } else {
+            self.tab_close_size
+        };
         self.background_image = next_background_image;
         self.background_image_opacity = next_background_image_opacity;
         self.background_image_position = next_background_image_position;

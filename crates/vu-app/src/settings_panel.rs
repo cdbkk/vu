@@ -224,6 +224,8 @@ pub struct SettingsPanel {
     ui_opacity_slider: Entity<SliderState>,
     tab_accent_inactive_alpha_slider: Entity<SliderState>,
     tab_accent_inactive_hover_alpha_slider: Entity<SliderState>,
+    tab_inactive_opacity_slider: Entity<SliderState>,
+    tab_close_size_slider: Entity<SliderState>,
     background_image_input: Entity<InputState>,
     background_image_opacity_slider: Entity<SliderState>,
     background_image_position_select: Entity<SelectState<Vec<String>>>,
@@ -380,6 +382,33 @@ impl SettingsPanel {
             crate::tab_colors::TAB_ACCENT_INACTIVE_HOVER_ALPHA
         };
         value.max(inactive)
+    }
+
+    fn clamp_tab_inactive_opacity(value: f32) -> f32 {
+        if value.is_finite() {
+            value.clamp(0.0, 1.0)
+        } else {
+            0.35
+        }
+    }
+
+    fn clamp_tab_close_size(value: f32) -> f32 {
+        if value.is_finite() {
+            value.clamp(
+                AppearanceConfig::MIN_TAB_CLOSE_SIZE,
+                AppearanceConfig::MAX_TAB_CLOSE_SIZE,
+            )
+        } else {
+            13.0
+        }
+    }
+
+    fn tab_inactive_opacity_value(&self) -> f32 {
+        Self::clamp_tab_inactive_opacity(self.config.appearance.tab_inactive_opacity)
+    }
+
+    fn tab_close_size_value(&self) -> f32 {
+        Self::clamp_tab_close_size(self.config.appearance.tab_close_size)
     }
 
     fn tab_accent_inactive_alpha_value(&self) -> f32 {
@@ -1481,6 +1510,22 @@ impl SettingsPanel {
                     inactive,
                 ))
         });
+        let tab_inactive_opacity_slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.0)
+                .max(1.0)
+                .step(0.01)
+                .default_value(Self::clamp_tab_inactive_opacity(
+                    config.appearance.tab_inactive_opacity,
+                ))
+        });
+        let tab_close_size_slider = cx.new(|_| {
+            SliderState::new()
+                .min(AppearanceConfig::MIN_TAB_CLOSE_SIZE)
+                .max(AppearanceConfig::MAX_TAB_CLOSE_SIZE)
+                .step(1.0)
+                .default_value(Self::clamp_tab_close_size(config.appearance.tab_close_size))
+        });
         let background_image_input = cx.new(|cx| {
             let mut s = InputState::new(window, cx);
             s.set_placeholder("~/Pictures/wallpaper.jpg", window, cx);
@@ -1674,6 +1719,30 @@ impl SettingsPanel {
         )
         .detach();
         cx.subscribe(
+            &tab_inactive_opacity_slider,
+            |this, _, event: &SliderEvent, cx| match event {
+                SliderEvent::Change(value) => {
+                    this.config.appearance.tab_inactive_opacity =
+                        Self::clamp_tab_inactive_opacity(value.end());
+                    cx.emit(AppearancePreview);
+                    cx.notify();
+                }
+            },
+        )
+        .detach();
+        cx.subscribe(
+            &tab_close_size_slider,
+            |this, _, event: &SliderEvent, cx| match event {
+                SliderEvent::Change(value) => {
+                    this.config.appearance.tab_close_size =
+                        Self::clamp_tab_close_size(value.end());
+                    cx.emit(AppearancePreview);
+                    cx.notify();
+                }
+            },
+        )
+        .detach();
+        cx.subscribe(
             &background_image_opacity_slider,
             |this, _, event: &SliderEvent, cx| match event {
                 SliderEvent::Change(value) => {
@@ -1844,6 +1913,8 @@ impl SettingsPanel {
             ui_opacity_slider,
             tab_accent_inactive_alpha_slider,
             tab_accent_inactive_hover_alpha_slider,
+            tab_inactive_opacity_slider,
+            tab_close_size_slider,
             background_image_input,
             background_image_opacity_slider,
             background_image_position_select,
@@ -2044,6 +2115,20 @@ impl SettingsPanel {
                     cx,
                 );
             });
+        self.tab_inactive_opacity_slider.update(cx, |slider, cx| {
+            slider.set_value(
+                Self::clamp_tab_inactive_opacity(self.config.appearance.tab_inactive_opacity),
+                window,
+                cx,
+            );
+        });
+        self.tab_close_size_slider.update(cx, |slider, cx| {
+            slider.set_value(
+                Self::clamp_tab_close_size(self.config.appearance.tab_close_size),
+                window,
+                cx,
+            );
+        });
         self.background_image_input.update(cx, |s, cx| {
             s.set_value(
                 &self
@@ -2944,6 +3029,10 @@ impl SettingsPanel {
                     .end(),
                 self.config.appearance.tab_accent_inactive_alpha,
             );
+        self.config.appearance.tab_inactive_opacity =
+            Self::clamp_tab_inactive_opacity(self.tab_inactive_opacity_slider.read(cx).value().end());
+        self.config.appearance.tab_close_size =
+            Self::clamp_tab_close_size(self.tab_close_size_slider.read(cx).value().end());
         let background_image_text = self
             .background_image_input
             .read(cx)
@@ -3920,6 +4009,10 @@ impl SettingsPanel {
         let ui_opacity = self.ui_opacity_value();
         let tab_accent_inactive_alpha = self.tab_accent_inactive_alpha_value();
         let tab_accent_inactive_hover_alpha = self.tab_accent_inactive_hover_alpha_value();
+        let tab_inactive_opacity_slider = self.tab_inactive_opacity_slider.clone();
+        let tab_close_size_slider = self.tab_close_size_slider.clone();
+        let tab_inactive_opacity = self.tab_inactive_opacity_value();
+        let tab_close_size = self.tab_close_size_value();
         let background_image_opacity = self.background_image_opacity_value();
         let card_opacity = self.card_opacity();
         let image_repeat_toggle = Switch::new("background-image-repeat")
@@ -4504,6 +4597,22 @@ impl SettingsPanel {
                                     cx.emit(AppearancePreview);
                                     cx.notify();
                                 })),
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(slider_row(
+                            "Inactive Tab Visibility",
+                            "Surface opacity of inactive tab chips. Raise it to make background tabs read as tabs.",
+                            &tab_inactive_opacity_slider,
+                            tab_inactive_opacity,
+                            theme,
+                        ))
+                        .child(row_separator(theme))
+                        .child(slider_row(
+                            "Tab Close Size",
+                            "Size of the tab close (X) button in px.",
+                            &tab_close_size_slider,
+                            tab_close_size,
                             theme,
                         ))
                         .child(row_separator(theme))
