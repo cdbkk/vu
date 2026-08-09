@@ -501,6 +501,89 @@ fn run_step(step: &Step, config: &RunConfig) -> Result<StepOutcome> {
             }
         }
 
+        MatchMode::JsonFieldEq => {
+            if !exit_ok {
+                return Ok(StepOutcome::Fail(exit_failure(step, &cmd_display, &stderr)));
+            }
+            let actual_val: Value = serde_json::from_str(stdout.trim()).with_context(|| {
+                format!(
+                    "step {:?}: actual output is not valid JSON:\n{stdout}",
+                    step.label
+                )
+            })?;
+            let spec: Value = serde_json::from_str(step.expected.trim()).with_context(|| {
+                format!(
+                    "step {:?}: expected block is not a valid json-field-eq spec:\n{}",
+                    step.label, step.expected
+                )
+            })?;
+            let array_key = spec.get("array").and_then(Value::as_str).with_context(|| {
+                format!(
+                    "step {:?}: json-field-eq spec missing string \"array\" key",
+                    step.label
+                )
+            })?;
+            let fields = spec.get("fields").and_then(Value::as_array).with_context(|| {
+                format!(
+                    "step {:?}: json-field-eq spec missing \"fields\" array",
+                    step.label
+                )
+            })?;
+            let elements: Vec<Value> = actual_val
+                .get(array_key)
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            if elements.len() < 2 {
+                return Ok(StepOutcome::Fail(StepFailure {
+                    step_label: format!("{} (line {})", step.label, step.line),
+                    cmd: cmd_display,
+                    expected: format!("at least 2 elements in \"{array_key}\" to compare"),
+                    actual: format!("{} element(s)", elements.len()),
+                    diff: serde_json::to_string_pretty(&actual_val).unwrap_or_default(),
+                }));
+            }
+
+            let mut mismatches = Vec::new();
+            for field in fields {
+                let field_name = field.as_str().with_context(|| {
+                    format!(
+                        "step {:?}: json-field-eq \"fields\" entries must be strings",
+                        step.label
+                    )
+                })?;
+                let values: Vec<Option<&Value>> =
+                    elements.iter().map(|item| item.get(field_name)).collect();
+                let first = values[0];
+                if values.iter().any(|v| v != &first) {
+                    let rendered = values
+                        .iter()
+                        .map(|v| {
+                            v.map(|v| v.to_string())
+                                .unwrap_or_else(|| "<missing>".to_string())
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    mismatches.push(format!("{field_name}: [{rendered}]"));
+                }
+            }
+
+            if mismatches.is_empty() {
+                Ok(StepOutcome::Pass)
+            } else {
+                Ok(StepOutcome::Fail(StepFailure {
+                    step_label: format!("{} (line {})", step.label, step.line),
+                    cmd: cmd_display,
+                    expected: format!(
+                        "identical fields across all \"{array_key}\" elements: {}",
+                        step.expected.trim()
+                    ),
+                    actual: mismatches.join("\n"),
+                    diff: serde_json::to_string_pretty(&elements).unwrap_or_default(),
+                }))
+            }
+        }
+
         MatchMode::Regex => {
             if !exit_ok {
                 return Ok(StepOutcome::Fail(exit_failure(step, &cmd_display, &stderr)));

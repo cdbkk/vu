@@ -16,6 +16,9 @@
 ///   ---- exact        → full string equality
 ///   ---- contains     → actual output contains the expected string
 ///   ---- json-subset  → every key/value in expected JSON exists in actual JSON
+///   ---- json-field-eq → expected is `{"array": "<key>", "fields": ["a", "b"]}`;
+///                        every listed field must have an identical value across
+///                        all elements of the actual JSON array at `<key>`
 ///   ---- ok           → only checks exit code == 0; expected block ignored
 ///   ---- error        → checks exit code != 0; expected matched against stderr
 ///   ---- regex        → expected is a regex pattern (not yet implemented)
@@ -36,6 +39,9 @@ pub enum MatchMode {
     Contains,
     /// Expected is valid JSON; every key present in expected must match in actual
     JsonSubset,
+    /// Expected is `{"array": "<key>", "fields": [...]}`; every listed field must
+    /// be identical across all elements of the actual JSON array at `<key>`
+    JsonFieldEq,
     /// Expected is a regex matched against actual
     Regex,
     /// Only check exit code == 0; ignore expected block
@@ -57,11 +63,12 @@ impl MatchMode {
             "exact" => Ok(MatchMode::Exact),
             "contains" => Ok(MatchMode::Contains),
             "json-subset" => Ok(MatchMode::JsonSubset),
+            "json-field-eq" => Ok(MatchMode::JsonFieldEq),
             "regex" => Ok(MatchMode::Regex),
             "ok" => Ok(MatchMode::Ok),
             "error" => Ok(MatchMode::Error),
             other => bail!(
-                "unknown match mode {:?}; valid: exact, contains, json-subset, ok, error",
+                "unknown match mode {:?}; valid: exact, contains, json-subset, json-field-eq, ok, error",
                 other
             ),
         }

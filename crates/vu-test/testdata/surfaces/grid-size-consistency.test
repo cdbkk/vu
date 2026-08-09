@@ -1,0 +1,35 @@
+# surfaces/grid-size-consistency.test
+#
+# Regression for postmortem/2026-05-02-hidden-surface-terminal-size.md and
+# postmortem/2026-05-06-pane-surface-geometry-drift.md. Both postmortems
+# asked for a control-plane E2E that creates multiple surfaces in one pane,
+# resizes the pane via a split, changes surface focus, and asserts every
+# surface in the pane reports the same grid size afterwards. A hidden or
+# just-refocused surface must never be left at a stale rows/cols.
+
+vu-cli --json surfaces list --tab 1 --pane-index 1  # start with 1 active surface
+---- json-subset
+{"surfaces":[{"surface_index":1,"is_active":true}]}
+
+vu-cli --json surfaces create --tab 1 --pane-index 1  # add a second surface to the pane
+---- ok
+
+vu-cli --json surfaces wait-ready --tab 1 --pane-index 1 --timeout 10  # wait for the new (now active) surface
+---- ok
+
+vu-cli --json surfaces list --tab 1 --pane-index 1  # pane 1 now has 2 surfaces
+---- contains
+"surface_index":2
+
+vu-cli --json panes create --tab 1 --location right  # split pane 1, resizing it
+---- ok
+
+vu-cli --json panes wait --tab 1 --pane-index 2 --timeout 15  # wait for the split pane to come up
+---- ok
+
+vu-cli --json surfaces focus --tab 1 --pane-index 1  # re-focus pane 1's surface (geometry checkpoint)
+---- ok
+
+vu-cli --json surfaces list --tab 1 --pane-index 1  # every surface in pane 1 reports the same grid size
+---- json-field-eq
+{"array":"surfaces","fields":["rows","cols"]}
