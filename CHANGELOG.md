@@ -5,6 +5,55 @@ All notable changes to vu are documented here.
 vu is a fork of [con](https://github.com/nowledge-co/con-terminal) by Nowledge Labs (MIT).
 Entries below `v0.2.0` are inherited from upstream con and describe its history, not this fork's.
 
+## Unreleased
+
+### Changed
+
+**Tabs**
+
+- Inactive tab chips without an accent color are visible again; they previously painted at 0.14 opacity against the tab bar background.
+- Tab close button size is now a setting (`tab_close_size`, default 13px, up from a fixed 10px), with the hit target scaling alongside it and never shrinking below 20px.
+- Accent-color sliders for inactive tabs now span their full range; the previous 0.30/0.40 clamps are gone.
+- The Icon Size setting now reaches everything its description names: sidebar rail, tab hover cards, panel rows, and pane header icons previously ignored it. UI Size now scales tab strip and sidebar text too, and tab rows and sidebar rows grow instead of clipping at larger sizes.
+- Dragging a tab no longer shifts the strip: the drag ghost matched neither the real tab's width nor its icon scale.
+- Inactive tab and sidebar icons are brighter; they previously read as disabled next to their labels.
+
+### Fixed
+
+**Panes**
+
+- The pane header stack icon rendered blank; its SVG asset was missing from the bundle.
+
+## `v0.4.0-beta.2` - 2026-08-09
+
+### Fixed
+
+**macOS**
+
+- Cmd-A now selects all terminal output when the terminal pane has focus; it previously only worked in the editor.
+- Fixed drag-to-select losing the new selection when the mouse left the pane during the drag: releasing outside the pane no longer reverts to the previous selection.
+
+## `v0.4.0-beta.1` - 2026-08-05
+
+### Fixed
+
+**Settings**
+
+- Settings panel body text is easier to read: it sat below the macOS system default of 13px and its label colors were dimmed twice over (a muted token further reduced to 0.68 opacity). Type scale and line heights are raised throughout; surface and border colors are unchanged. _(PR [#3](https://github.com/cdbkk/vu/pull/3) by [@cdbkk](https://github.com/cdbkk))_
+- The app icon read as a dark blob at the 16 and 32 pt sizes used in the settings header and elsewhere, since every size was a downscale of the 1024px master. Those sizes now use dedicated small-scale artwork. _(PR [#3](https://github.com/cdbkk/vu/pull/3) by [@cdbkk](https://github.com/cdbkk))_
+
+### Changed
+
+**Linux**
+
+- Terminal tweaks (line spacing, letter spacing, ligatures, cursor blink, and the rest) now apply on Linux, not only macOS; the settings existed before but only rendered into a config file on Mac. _(PR [#1](https://github.com/cdbkk/vu/pull/1), [#2](https://github.com/cdbkk/vu/pull/2) by [@cdbkk](https://github.com/cdbkk))_
+
+### Added
+
+**Docs**
+
+- README now links macOS beta downloads.
+
 ## `v0.3.0` - 2026-08-04
 
 Completes the rename from con to vu and gives the app its own icon.
