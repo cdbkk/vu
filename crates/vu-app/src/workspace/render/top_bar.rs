@@ -417,7 +417,7 @@ impl VuWorkspace {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .size(px(close_icon_px + 7.0))
+                    .size(px((close_icon_px + 7.0).max(20.0)))
                     .flex_shrink_0()
                     .rounded(px(5.0))
                     .cursor_pointer()
