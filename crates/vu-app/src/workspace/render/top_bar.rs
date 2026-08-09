@@ -674,6 +674,10 @@ impl VuWorkspace {
                         .unwrap_or(theme.background.opacity((inactive_surface + 0.08).min(1.0)));
                     tab_el = tab_el
                         .rounded_t(px(6.0))
+                        .border_t_1()
+                        .border_l_1()
+                        .border_r_1()
+                        .border_color(gpui::white().opacity(0.28))
                         .bg(inactive_bg)
                         .text_color(theme.muted_foreground.opacity(0.72))
                         .hover(move |s: gpui::StyleRefinement| {

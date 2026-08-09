@@ -17,12 +17,18 @@ Entries below `v0.2.0` are inherited from upstream con and describe its history,
 - The Icon Size setting now reaches everything its description names: sidebar rail, tab hover cards, panel rows, and pane header icons previously ignored it. UI Size now scales tab strip and sidebar text too, and tab rows and sidebar rows grow instead of clipping at larger sizes.
 - Dragging a tab no longer shifts the strip: the drag ghost matched neither the real tab's width nor its icon scale.
 - Inactive tab and sidebar icons are brighter; they previously read as disabled next to their labels.
+- Inactive tab chips have a subtle white outline (top and sides) so they stay legible on themes where the chip surface blends into the tab bar.
 
 ### Fixed
 
 **Panes**
 
 - The pane header stack icon rendered blank; its SVG asset was missing from the bundle.
+
+**Terminal**
+
+- The Window Padding slider now applies to open terminals. Ghostty computes surface padding only at surface creation and on DPI change, so runtime config updates never reached live surfaces; a build-time patch recomputes padding and forces a resize on config update.
+- Window Padding 0 now really means 0. The config key was only emitted for values above 0, which silently fell back to Ghostty's 2px default and made padding impossible to reset.
 
 ## `v0.4.0-beta.2` - 2026-08-09
 
