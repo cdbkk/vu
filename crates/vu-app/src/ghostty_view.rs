@@ -265,7 +265,7 @@ impl GhosttyView {
                     cx.emit(GhosttySplitRequested(direction));
                 }
                 GhosttySurfaceEvent::OpenUrl(url) => {
-                    cx.open_url(&url);
+                    cx.open_url(&resolve_open_url(&url, self.last_cwd.as_deref()));
                 }
                 GhosttySurfaceEvent::PwdChanged(cwd) => {
                     self.last_cwd = Some(cwd.clone());
@@ -2159,5 +2159,47 @@ mod tests {
         assert!(!should_send_ime_insert_as_key_event(""));
         assert!(!should_send_ime_insert_as_key_event("hello\n"));
         assert!(!should_send_ime_insert_as_key_event("你好"));
+    }
+}
+
+/// libghostty fires OPEN_URL for bare file paths too. `cx.open_url` needs a
+/// real URL, so a scheme-less path reaches macOS as an invalid URL (-50).
+/// Turn it into a `file://` URL, resolving relative paths against the cwd.
+fn resolve_open_url(url: &str, cwd: Option<&str>) -> String {
+    let has_scheme = url
+        .split_once(':')
+        .map(|(scheme, _)| {
+            !scheme.is_empty()
+                && scheme
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+        })
+        .unwrap_or(false);
+    if has_scheme {
+        return url.to_string();
+    }
+    let path = if url.starts_with('/') {
+        std::path::PathBuf::from(url)
+    } else if let Some(rest) = url.strip_prefix("~/") {
+        std::env::home_dir().map(|h| h.join(rest)).unwrap_or_else(|| std::path::PathBuf::from(url))
+    } else if let Some(cwd) = cwd {
+        std::path::Path::new(cwd).join(url)
+    } else {
+        std::path::PathBuf::from(url)
+    };
+    // ponytail: percent-encoding skipped, spaces are the one case that matters
+    format!("file://{}", path.to_string_lossy().replace(' ', "%20"))
+}
+
+#[cfg(test)]
+mod open_url_tests {
+    use super::resolve_open_url;
+
+    #[test]
+    fn bare_paths_become_file_urls() {
+        assert_eq!(resolve_open_url("/tmp/a b.png", None), "file:///tmp/a%20b.png");
+        assert_eq!(resolve_open_url("x.png", Some("/tmp")), "file:///tmp/x.png");
+        assert_eq!(resolve_open_url("https://a.b/c", Some("/tmp")), "https://a.b/c");
+        assert_eq!(resolve_open_url("mailto:a@b.c", None), "mailto:a@b.c");
     }
 }
