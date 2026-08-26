@@ -1,7 +1,7 @@
 # Workspace Module Map
 
 `crates/vu-app/src/workspace/` owns the live GPUI window: tabs, pane trees,
-agent/input chrome, settings, session persistence, terminal event wiring, and
+input chrome, settings, session persistence, terminal event wiring, and
 control-plane dispatch.
 
 The module split keeps those responsibilities explicit:
@@ -9,13 +9,13 @@ The module split keeps those responsibilities explicit:
 | Module | Responsibility |
 |---|---|
 | `mod.rs` | `VuWorkspace` field definitions and shared imports. Keep this file structural. |
-| `types.rs` | Workspace-local data shapes such as tabs, pane drag state, pending control requests, and suggestion results. |
+| `types.rs` | Workspace-local data shapes such as tabs, pane drag state, and pending control requests. |
 | `lifecycle.rs` | Workspace construction, terminal creation, native view visibility, and deferred window-aware work. |
-| `control_surfaces.rs`, `control_requests.rs`, `control_agent_tools.rs` | Socket/control-plane routing, pane/surface targeting, and agent-visible terminal operations. |
+| `control_surfaces.rs`, `control_requests.rs`, `control_terminal_tools.rs` | Socket/control-plane routing, pane/surface targeting, and terminal operations for clients. |
 | `session_worker.rs`, `session_state.rs`, `terminal_factory.rs` | Session persistence, layout/profile restore, and Ghostty terminal construction helpers. |
-| `agent_panel_events.rs`, `input_events.rs`, `sidebar_settings.rs`, `editor_actions.rs` | UI event handlers for agent panel, input bar, sidebar, editor actions, palette, settings, and theme changes. |
+| `input_events.rs`, `sidebar_settings.rs`, `editor_actions.rs` | UI event handlers for the input bar, sidebar, editor actions, palette, settings, and theme changes. |
 | `chrome.rs`, `chrome_actions.rs`, `caption.rs` | Window chrome math, transparency seam guards, pane scope picker, layout profile actions, and non-macOS caption buttons. |
-| `pane_actions.rs`, `tab_actions.rs`, `suggestions.rs` | Terminal commands, pane/surface/tab lifecycle, shell history, suggestions, and tab summaries. |
+| `pane_actions.rs`, `tab_actions.rs`, `suggestions.rs` | Terminal commands, pane/surface/tab lifecycle, shell history, and suggestions. |
 | `render.rs`, `render/top_bar.rs`, `render/popups.rs` | GPUI render tree, top chrome/tab strip composition, and workspace-level popup overlays. Rendering stays isolated from behavior modules. |
 | `tab_presentation.rs`, `helpers.rs`, `tests.rs` | Tab/pane naming, geometry helpers, rename helpers, and workspace unit tests. |
 

@@ -13,8 +13,6 @@
         { "label": "Welcome", "path": "docs/README.md", "route": "/docs/" },
         { "label": "Install", "path": "docs/install.md" },
         { "label": "Quick controls", "path": "docs/quick-controls.md" },
-        { "label": "Quick Terminal", "path": "docs/quick-terminal.md" },
-        { "label": "Built-in agent", "path": "docs/agent.md" },
         { "label": "Settings", "path": "docs/settings.md" }
       ]
     },
@@ -22,7 +20,6 @@
       "label": "Use vu",
       "items": [
         { "label": "Terminal workflows", "path": "docs/terminal-workflows.md" },
-        { "label": "Skills and workflows", "path": "docs/skills-and-workflows.md" },
         { "label": "Workspace profiles", "path": "docs/workspace-layout-profiles-guide.md" },
         { "label": "Screenshots", "path": "docs/screenshots.md" }
       ]

@@ -45,8 +45,8 @@ Linux with a real terminal pane:
   (minimize / maximize / close) extended to also build on Linux.
   The X11 backend's `on_hit_test_window_control` is a no-op, so
   each Linux caption button gets an explicit `on_mouse_down`. The
-  Close button routes through `prepare_window_close` (cancel agent
-  sessions, flush state, drop pending control-request responses)
+  Close button routes through `prepare_window_close` (flush state and
+  drop pending control-request responses)
   before `remove_window` — same shutdown semantics the macOS /
   Windows close button uses via `on_window_should_close`.
 - **Transparent ARGB window with rounded corners**:

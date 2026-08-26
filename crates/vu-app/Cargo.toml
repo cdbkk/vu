@@ -32,7 +32,6 @@ bin-vu-app = []
 vu-core.workspace = true
 vu-paths.workspace = true
 vu-terminal.workspace = true
-vu-agent.workspace = true
 vu-ghostty.workspace = true
 gpui.workspace = true
 gpui_platform.workspace = true
@@ -43,22 +42,16 @@ log.workspace = true
 env_logger.workspace = true
 tracing = { version = "0.1", features = ["log"] }
 crossbeam-channel.workspace = true
-parking_lot.workspace = true
-serde.workspace = true
 serde_json.workspace = true
 futures.workspace = true
 tokio.workspace = true
-uuid.workspace = true
 toml.workspace = true
 rust-embed.workspace = true
 dirs.workspace = true
 chrono.workspace = true
 reqwest.workspace = true
 url.workspace = true
-markdown = { version = "1.0.0", features = ["serde"] }
 ropey.workspace = true
-mermaid-rs-renderer.workspace = true
-mathjax-svg-rs.workspace = true
 regex = "1"
 
 [target.'cfg(target_os = "macos")'.dependencies]

@@ -2,7 +2,6 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use vu_agent::{AgentConfig, ProviderKind};
 
 pub const MIN_UI_FONT_SIZE: f32 = 12.0;
 pub const MAX_UI_FONT_SIZE: f32 = 24.0;
@@ -87,7 +86,7 @@ pub fn sanitize_terminal_font_family(name: &str) -> String {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TerminalConfig {
     pub font_family: String,
@@ -216,7 +215,7 @@ fn is_hex_color(v: &str) -> bool {
     h.len() == 6 && h.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AppearanceConfig {
     pub terminal_opacity: f32,
@@ -358,15 +357,6 @@ impl AppearanceConfig {
 // app-level modifier space instead of borrowing terminal control
 // characters like Ctrl+D, which terminals consume as EOF before Vu's
 // keybindings ever see them.
-#[cfg(target_os = "macos")]
-fn default_toggle_agent() -> String {
-    "secondary-l".into()
-}
-#[cfg(not(target_os = "macos"))]
-fn default_toggle_agent() -> String {
-    "ctrl-shift-l".into()
-}
-
 fn default_command_palette() -> String {
     // Ctrl+Shift+P on Windows / Linux, Cmd+Shift+P on macOS.
     "secondary-shift-p".into()
@@ -487,25 +477,8 @@ fn default_focus_input() -> String {
     "ctrl-shift-i".into()
 }
 
-#[cfg(target_os = "macos")]
-fn default_ask_ai() -> String {
-    // Pairs with Cmd+L (toggle agent): Cmd+Shift+L sends the current
-    // terminal selection to the agent input, matching the editor
-    // convention of "add selection to chat".
-    "secondary-shift-l".into()
-}
-#[cfg(not(target_os = "macos"))]
-fn default_ask_ai() -> String {
-    // Ctrl+Shift+L is taken by toggle-agent off macOS; Ctrl+Shift+A
-    // ("Ask") stays free of terminal control characters.
-    "ctrl-shift-a".into()
-}
-
 fn default_toggle_input_bar() -> String {
     "ctrl-`".into()
-}
-fn default_cycle_input_mode() -> String {
-    "secondary-;".into()
 }
 fn default_toggle_pane_scope() -> String {
     "secondary-'".into()
@@ -600,17 +573,9 @@ fn default_global_summon() -> String {
 fn default_global_summon_enabled() -> bool {
     false
 }
-fn default_quick_terminal_enabled() -> bool {
-    false
-}
-fn default_quick_terminal() -> String {
-    "cmd-\\".into()
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct KeybindingConfig {
-    pub toggle_agent: String,
     pub command_palette: String,
     pub new_window: String,
     pub new_tab: String,
@@ -624,8 +589,6 @@ pub struct KeybindingConfig {
     pub split_right: String,
     pub split_down: String,
     pub focus_input: String,
-    pub ask_ai: String,
-    pub cycle_input_mode: String,
     pub toggle_input_bar: String,
     pub toggle_pane_scope: String,
     #[serde(alias = "toggle_vertical_tabs")]
@@ -642,8 +605,6 @@ pub struct KeybindingConfig {
     pub close_surface: String,
     pub global_summon_enabled: bool,
     pub global_summon: String,
-    pub quick_terminal_enabled: bool,
-    pub quick_terminal: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -681,11 +642,8 @@ impl KeybindingConfig {
             ("Toggle Pane Zoom", self.toggle_pane_zoom.as_str()),
             ("Settings", self.settings.as_str()),
             ("Command Palette", self.command_palette.as_str()),
-            ("Toggle Agent", self.toggle_agent.as_str()),
             ("Toggle Input Bar", self.toggle_input_bar.as_str()),
             ("Toggle Input / Terminal", self.focus_input.as_str()),
-            ("Ask AI About Selection", self.ask_ai.as_str()),
-            ("Cycle Input Mode", self.cycle_input_mode.as_str()),
             ("Split Right", self.split_right.as_str()),
             ("Split Down", self.split_down.as_str()),
             ("Toggle Pane Scope", self.toggle_pane_scope.as_str()),
@@ -712,10 +670,6 @@ impl KeybindingConfig {
         if self.global_summon_enabled {
             shortcuts.push(("Summon / Hide Vu", self.global_summon.as_str()));
         }
-        if self.quick_terminal_enabled {
-            shortcuts.push(("Quick Terminal", self.quick_terminal.as_str()));
-        }
-
         shortcuts
             .into_iter()
             .filter(|(_, binding)| !binding.trim().is_empty())
@@ -755,7 +709,6 @@ impl KeybindingConfig {
 impl Default for KeybindingConfig {
     fn default() -> Self {
         Self {
-            toggle_agent: default_toggle_agent(),
             command_palette: default_command_palette(),
             new_window: default_new_window(),
             new_tab: default_new_tab(),
@@ -769,8 +722,6 @@ impl Default for KeybindingConfig {
             split_right: default_split_right(),
             split_down: default_split_down(),
             focus_input: default_focus_input(),
-            ask_ai: default_ask_ai(),
-            cycle_input_mode: default_cycle_input_mode(),
             toggle_input_bar: default_toggle_input_bar(),
             toggle_pane_scope: default_toggle_pane_scope(),
             toggle_left_panel: default_toggle_left_panel(),
@@ -786,8 +737,6 @@ impl Default for KeybindingConfig {
             close_surface: default_close_surface(),
             global_summon_enabled: default_global_summon_enabled(),
             global_summon: default_global_summon(),
-            quick_terminal_enabled: default_quick_terminal_enabled(),
-            quick_terminal: default_quick_terminal(),
         }
     }
 }
@@ -869,7 +818,7 @@ fn push_unique_modifier(modifiers: &mut Vec<&'static str>, modifier: &'static st
 /// http_proxy  = "http://127.0.0.1:1086"
 /// https_proxy = "http://127.0.0.1:1086"
 /// ```
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct NetworkConfig {
     /// HTTP proxy URL, e.g. `http://127.0.0.1:1086`.
@@ -882,7 +831,7 @@ pub struct NetworkConfig {
 
 impl NetworkConfig {
     /// Apply the configured proxy values to the current process environment so
-    /// that all downstream `reqwest` clients (Rig, model registry, updater)
+    /// that all downstream `reqwest` clients, including the updater,
     /// pick them up automatically.
     ///
     /// - `Some(non_empty)` → sets the env var (overrides shell-inherited value).
@@ -916,89 +865,13 @@ impl NetworkConfig {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub terminal: TerminalConfig,
     pub appearance: AppearanceConfig,
-    pub agent: AgentConfig,
     pub keybindings: KeybindingConfig,
-    pub skills: SkillsConfig,
     pub network: NetworkConfig,
-}
-
-/// Configuration for skill discovery paths.
-///
-/// Skills are SKILL.md files following the open skills ecosystem format (skills.sh).
-/// vu scans both project-local and global directories for skills.
-///
-/// # Defaults
-/// ```toml
-/// [skills]
-/// project_paths = [".vu/skills"]
-/// global_paths = ["~/.config/vu/skills"]
-/// ```
-/// On Windows, the default global path uses `~/.config/vu-terminal/skills`
-/// to match the platform app-directory name.
-///
-/// # Sharing with other agents
-/// ```toml
-/// [skills]
-/// # Scan other agent-specific and shared paths too
-/// project_paths = [".vu/skills", ".agents/skills"]
-/// global_paths = ["~/.config/vu/skills", "~/.agents/skills"]
-/// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
-pub struct SkillsConfig {
-    /// Project-local skill directories (relative to cwd).
-    /// Scanned in order; later entries override earlier ones on name collision.
-    pub project_paths: Vec<String>,
-    /// Global skill directories (absolute paths, ~ expanded).
-    /// Scanned before project paths; project skills override global on collision.
-    pub global_paths: Vec<String>,
-}
-
-impl Default for SkillsConfig {
-    fn default() -> Self {
-        Self {
-            project_paths: vec![
-                "skills".into(),
-                ".agents/skills".into(),
-                ".vu/skills".into(),
-            ],
-            global_paths: vec![
-                vu_paths::default_global_skills_path(),
-                "~/.agents/skills".into(),
-            ],
-        }
-    }
-}
-
-impl SkillsConfig {
-    /// Resolve global paths, expanding ~ to the user's home directory.
-    pub fn resolved_global_paths(&self) -> Vec<PathBuf> {
-        let home = dirs::home_dir();
-        self.global_paths
-            .iter()
-            .map(|p| {
-                if p.starts_with("~/") {
-                    if let Some(ref h) = home {
-                        h.join(&p[2..])
-                    } else {
-                        PathBuf::from(p)
-                    }
-                } else {
-                    PathBuf::from(p)
-                }
-            })
-            .collect()
-    }
-
-    /// Resolve project-local paths relative to a cwd.
-    pub fn resolved_project_paths(&self, cwd: &std::path::Path) -> Vec<PathBuf> {
-        self.project_paths.iter().map(|p| cwd.join(p)).collect()
-    }
 }
 
 impl Config {
@@ -1012,50 +885,13 @@ impl Config {
         let config_path = Self::config_path();
         let mut config = if config_path.exists() {
             let content = std::fs::read_to_string(&config_path)?;
-            let document: toml::Value = toml::from_str(&content)?;
-            let provider_provenance_is_present =
-                config_declares_agent_provider_provenance(&document);
-            let mut config: Config = document.try_into()?;
-            config.agent.migrate_legacy();
-            migrate_agent_provider_provenance(&mut config, provider_provenance_is_present);
-            config
+            toml::from_str(&content)?
         } else {
             Config::default()
         };
 
         config.normalize();
-        config.apply_zero_touch_chatgpt_default();
         Ok(config)
-    }
-
-    /// Zero-touch ChatGPT Subscription sign-in applied on every config load.
-    ///
-    /// 1. Sync the ChatGPT OAuth cache from Codex's `~/.codex/auth.json` (cheap
-    ///    and idempotent — a fingerprint check short-circuits when nothing
-    ///    changed), so a user already signed in to Codex never has to do a
-    ///    manual device login.
-    /// 2. Recompute an automatic provider choice from current credentials:
-    ///    configured Anthropic wins; otherwise ChatGPT is used while an API-key
-    ///    override or its OAuth cache is ready. Explicit choices are never
-    ///    changed.
-    ///
-    /// Best-effort: failures are logged, never fatal. Conservative: a user who
-    /// configured Anthropic or picked another provider is never redirected
-    /// (see [`vu_agent::preferred_default_provider`]).
-    fn apply_zero_touch_chatgpt_default(&mut self) {
-        match vu_agent::ensure_chatgpt_oauth_synced_from_codex() {
-            Ok(true) => log::info!("[config] Synced ChatGPT OAuth cache from Codex"),
-            Ok(false) => {}
-            Err(err) => {
-                log::warn!("[config] Failed to sync ChatGPT OAuth cache from Codex: {err}")
-            }
-        }
-        if let Some(provider) = vu_agent::preferred_default_provider(&self.agent) {
-            log::info!(
-                "[config] Recomputed automatic agent provider as {provider} from credential readiness"
-            );
-            self.agent.provider = provider;
-        }
     }
 
     pub fn config_path() -> PathBuf {
@@ -1066,19 +902,6 @@ impl Config {
         let path = Self::config_path();
         let content = toml::to_string_pretty(self)?;
         write_private_atomic(&path, content.as_bytes())
-    }
-}
-
-fn config_declares_agent_provider_provenance(document: &toml::Value) -> bool {
-    document
-        .get("agent")
-        .and_then(toml::Value::as_table)
-        .is_some_and(|agent| agent.contains_key("provider_is_explicit"))
-}
-
-fn migrate_agent_provider_provenance(config: &mut Config, provenance_is_present: bool) {
-    if !provenance_is_present && config.agent.provider != ProviderKind::default() {
-        config.agent.provider_is_explicit = true;
     }
 }
 
@@ -1155,70 +978,9 @@ fn replace_file(tmp_path: &Path, path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        Config, DEFAULT_TERMINAL_FONT_FAMILY, NetworkConfig, SkillsConfig, TabsOrientation,
-        config_declares_agent_provider_provenance, migrate_agent_provider_provenance,
+        Config, DEFAULT_TERMINAL_FONT_FAMILY, NetworkConfig, TabsOrientation,
         sanitize_terminal_font_family,
     };
-    use vu_agent::ProviderKind;
-
-    #[test]
-    fn explicit_agent_provider_choice_round_trips_with_provenance() {
-        let mut config = Config::default();
-        config.agent.select_provider(ProviderKind::Anthropic);
-        let encoded = toml::to_string(&config).unwrap();
-        let decoded: Config = toml::from_str(&encoded).unwrap();
-
-        assert!(encoded.contains("provider_is_explicit = true"));
-        assert!(decoded.agent.provider_is_explicit);
-    }
-
-    #[test]
-    fn legacy_serialized_default_provider_remains_implicit() {
-        let document: toml::Value = toml::from_str("[agent]\nprovider = \"anthropic\"").unwrap();
-        let provenance_is_present = config_declares_agent_provider_provenance(&document);
-        let mut config: Config = document.try_into().unwrap();
-        migrate_agent_provider_provenance(&mut config, provenance_is_present);
-
-        assert_eq!(config.agent.provider, ProviderKind::Anthropic);
-        assert!(!config.agent.provider_is_explicit);
-    }
-
-    #[test]
-    fn legacy_non_default_provider_is_migrated_as_explicit() {
-        let document: toml::Value = toml::from_str("[agent]\nprovider = \"chatgpt\"").unwrap();
-        let provenance_is_present = config_declares_agent_provider_provenance(&document);
-        let mut config: Config = document.try_into().unwrap();
-        migrate_agent_provider_provenance(&mut config, provenance_is_present);
-
-        assert!(config.agent.provider_is_explicit);
-    }
-
-    #[test]
-    fn serialized_automatic_provider_remains_automatic() {
-        let mut config = Config::default();
-        config.agent.provider = ProviderKind::ChatGPT;
-        let encoded = toml::to_string(&config).unwrap();
-        let document: toml::Value = toml::from_str(&encoded).unwrap();
-        let provenance_is_present = config_declares_agent_provider_provenance(&document);
-        let mut decoded: Config = document.try_into().unwrap();
-        migrate_agent_provider_provenance(&mut decoded, provenance_is_present);
-
-        assert!(encoded.contains("provider_is_explicit = false"));
-        assert!(!decoded.agent.provider_is_explicit);
-    }
-
-    #[test]
-    fn default_skill_path_uses_shared_app_path_policy() {
-        let config = SkillsConfig::default();
-        assert_eq!(
-            config.global_paths.first().map(String::as_str),
-            Some(if cfg!(target_os = "windows") {
-                "~/.config/vu-terminal/skills"
-            } else {
-                "~/.config/vu/skills"
-            })
-        );
-    }
 
     #[test]
     fn terminal_font_sanitizer_rejects_gpui_pseudo_families() {
@@ -1283,13 +1045,6 @@ restore_terminal_text = false
     }
 
     #[test]
-    fn default_keybindings_include_quick_terminal_fields() {
-        let config = Config::default();
-        assert!(!config.keybindings.quick_terminal_enabled);
-        assert_eq!(config.keybindings.quick_terminal, "cmd-\\");
-    }
-
-    #[test]
     fn default_keybindings_include_file_sidebar_shortcuts() {
         let config = Config::default();
         let expected_focus = if cfg!(target_os = "macos") {
@@ -1334,26 +1089,6 @@ restore_terminal_text = false
 
         assert_eq!(config.keybindings.next_surface, "secondary-ctrl-]");
         assert_eq!(config.keybindings.previous_surface, "secondary-ctrl-[");
-    }
-
-    #[test]
-    fn serialized_config_omits_removed_quick_terminal_always_on_top_field() {
-        let config = Config::default();
-        let serialized = toml::to_string(&config).unwrap();
-        assert!(!serialized.contains("quick_terminal_always_on_top"));
-    }
-
-    #[test]
-    fn legacy_configs_receive_quick_terminal_defaults() {
-        let content = r#"
-[keybindings]
-global_summon_enabled = true
-global_summon = "alt-space"
-"#;
-        let config: Config = toml::from_str(content).unwrap();
-
-        assert!(!config.keybindings.quick_terminal_enabled);
-        assert_eq!(config.keybindings.quick_terminal, "cmd-\\");
     }
 
     #[test]
@@ -1446,30 +1181,17 @@ tabs_orientation = "horizontal"
     }
 
     #[test]
-    fn loaded_configs_preserve_explicit_quick_terminal_fields() {
-        let content = r#"
-[keybindings]
-quick_terminal_enabled = true
-quick_terminal = "cmd-\\"
-"#;
-        let config: Config = toml::from_str(content).unwrap();
-
-        assert!(config.keybindings.quick_terminal_enabled);
-        assert_eq!(config.keybindings.quick_terminal, "cmd-\\");
-    }
-
-    #[test]
     fn keybinding_conflicts_detect_duplicate_configured_shortcuts() {
         let mut config = Config::default();
         config.keybindings.command_palette = "ctrl-shift-p".to_string();
-        config.keybindings.toggle_agent = "control-shift-p".to_string();
+        config.keybindings.settings = "control-shift-p".to_string();
 
         let conflicts = config.keybindings.shortcut_conflicts(&[]);
 
         assert_eq!(conflicts.len(), 1);
         assert_eq!(
             conflicts[0].actions,
-            vec!["Command Palette".to_string(), "Toggle Agent".to_string()]
+            vec!["Settings".to_string(), "Command Palette".to_string()]
         );
     }
 
@@ -1477,7 +1199,7 @@ quick_terminal = "cmd-\\"
     fn keybinding_conflicts_match_secondary_to_platform_modifier() {
         let mut config = Config::default();
         config.keybindings.command_palette = "secondary-shift-p".to_string();
-        config.keybindings.toggle_agent = if cfg!(target_os = "macos") {
+        config.keybindings.settings = if cfg!(target_os = "macos") {
             "cmd-shift-p".to_string()
         } else {
             "ctrl-shift-p".to_string()
@@ -1488,7 +1210,7 @@ quick_terminal = "cmd-\\"
         assert_eq!(conflicts.len(), 1);
         assert_eq!(
             conflicts[0].actions,
-            vec!["Command Palette".to_string(), "Toggle Agent".to_string()]
+            vec!["Settings".to_string(), "Command Palette".to_string()]
         );
     }
 
@@ -1496,14 +1218,14 @@ quick_terminal = "cmd-\\"
     fn keybinding_conflicts_include_minus_key_shortcuts() {
         let mut config = Config::default();
         config.keybindings.command_palette = "ctrl--".to_string();
-        config.keybindings.toggle_agent = "control--".to_string();
+        config.keybindings.settings = "control--".to_string();
 
         let conflicts = config.keybindings.shortcut_conflicts(&[]);
 
         assert_eq!(conflicts.len(), 1);
         assert_eq!(
             conflicts[0].actions,
-            vec!["Command Palette".to_string(), "Toggle Agent".to_string()]
+            vec!["Settings".to_string(), "Command Palette".to_string()]
         );
     }
 

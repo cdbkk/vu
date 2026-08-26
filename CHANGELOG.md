@@ -7,6 +7,10 @@ Entries below `v0.2.0` are inherited from upstream con and describe its history,
 
 ## Unreleased
 
+### Removed
+
+- Removed the AI agent panel and quick terminal
+
 ### Changed
 
 **Tabs**

@@ -9,7 +9,6 @@ const LINUX_WINDOW_CORNER_RADIUS: Pixels = px(14.0);
 impl VuWorkspace {
     fn has_active_resize_drag(&self) -> bool {
         self.sidebar_drag.is_some()
-            || self.agent_panel_drag.is_some()
             || self
                 .tabs
                 .get(self.active_tab)
@@ -21,11 +20,6 @@ impl VuWorkspace {
         let mut should_save_session = false;
 
         if self.sidebar_drag.take().is_some() {
-            changed = true;
-            should_save_session = true;
-        }
-
-        if self.agent_panel_drag.take().is_some() {
             changed = true;
             should_save_session = true;
         }
@@ -85,29 +79,13 @@ impl VuWorkspace {
 
         if let Some((start_x, start_width)) = self.sidebar_drag {
             let win_w = win.bounds().size.width.as_f32();
-            let agent_w = if self.agent_panel_open {
-                self.agent_panel_width.min(max_agent_panel_width(win_w)) + 1.0
-            } else {
-                0.0
-            };
-            let max_width = max_sidebar_panel_width(win_w, agent_w);
+            let max_width = max_sidebar_panel_width(win_w, 0.0);
             let delta = f32::from(event.position.x) - start_x;
             let new_width = (start_width + delta).clamp(PANEL_MIN_WIDTH, max_width);
             let current_width = self.sidebar.read(cx).panel_width();
             if (current_width - new_width).abs() > 0.5 {
                 self.sidebar
                     .update(cx, |sidebar, cx| sidebar.set_panel_width(new_width, cx));
-                cx.notify();
-            }
-            return true;
-        }
-
-        if let Some((start_x, start_width)) = self.agent_panel_drag {
-            let delta = start_x - f32::from(event.position.x);
-            let max_width = max_agent_panel_width(win.bounds().size.width.as_f32());
-            let new_width = (start_width + delta).clamp(AGENT_PANEL_MIN_WIDTH, max_width);
-            if (self.agent_panel_width - new_width).abs() > 1.0 {
-                self.agent_panel_width = new_width;
                 cx.notify();
             }
             return true;
@@ -125,12 +103,6 @@ impl VuWorkspace {
         };
         let win_w = f32::from(win.bounds().size.width);
         let win_h = f32::from(win.bounds().size.height);
-        let effective_agent_panel_width = self.agent_panel_width.min(max_agent_panel_width(win_w));
-        let agent_panel_drag_width = if self.agent_panel_open {
-            effective_agent_panel_width + 7.0
-        } else {
-            0.0
-        };
         let leading_panel_w = self.leading_panel_width_for_pane_resize(cx);
 
         let pane_tree = &mut self.tabs[self.active_tab].pane_tree;
@@ -142,7 +114,7 @@ impl VuWorkspace {
             match dir {
                 SplitDirection::Horizontal => (
                     f32::from(event.position.x) - leading_panel_w,
-                    win_w - agent_panel_drag_width - leading_panel_w,
+                    win_w - leading_panel_w,
                 ),
                 SplitDirection::Vertical => (
                     f32::from(event.position.y),
@@ -172,21 +144,13 @@ impl Render for VuWorkspace {
 
         // If a modal was dismissed internally (escape/backdrop), restore terminal focus
         let is_modal_open = self.is_modal_open(cx);
-        let has_skill_popup = !self.input_bar.read(cx).filtered_skills(cx).is_empty();
         let has_path_popup = self.input_bar.read(cx).has_path_completion_candidates();
-        let has_inline_skill_popup = self.agent_panel_open
-            && !self.input_bar_visible
-            && !self
-                .agent_panel
-                .read(cx)
-                .filtered_inline_skills(cx)
-                .is_empty();
         let needs_ghostty_hidden = false;
 
         if self.modal_was_open && !is_modal_open {
             self.focus_terminal(window, cx);
         }
-        // Manage ghostty NSView visibility separately — hide for modals AND skill popup
+        // Manage Ghostty NSView visibility separately from workspace overlays.
         if needs_ghostty_hidden && !self.ghostty_hidden {
             self.set_ghostty_views_visible(false, cx);
             self.ghostty_hidden = true;
@@ -254,55 +218,19 @@ impl Render for VuWorkspace {
             })
             .unwrap_or_else(|| "~".to_string());
 
-        let skill_entries: Vec<crate::input_bar::SkillEntry> = self
-            .harness
-            .skill_summaries()
-            .into_iter()
-            .map(|(name, desc)| crate::input_bar::SkillEntry {
-                name,
-                description: desc,
-            })
-            .collect();
         self.input_bar.update(cx, |bar, cx| {
             bar.set_panes(pane_infos, focused_pane_id, window, cx);
             bar.set_cwd(display_cwd, cx);
-            bar.set_skills(skill_entries.clone(), cx);
         });
-        // Up/Down is command-bar recall, not shell suggestion ranking. Keep it
-        // backed by the global submitted-input history across all modes.
+        // Up/Down is command-bar recall, backed by global submitted-input history.
         let recent_commands = self.recent_input_history(80);
         self.input_bar
             .update(cx, |bar, cx| bar.set_recent_commands(recent_commands, cx));
 
-        // Sync model name, inline input, and skills to agent panel
-        let active_agent_config = self.active_tab_agent_config();
-        let model_name = AgentHarness::active_model_name_for(&active_agent_config);
-        let provider = active_agent_config.provider.clone();
-        let available_models = self.provider_models_for_config(&active_agent_config);
-        let show_inline = !self.input_bar_visible && self.agent_panel_open;
-        self.agent_panel.update(cx, |panel, cx| {
-            panel.set_session_provider_options(
-                AgentPanel::configured_session_providers(&active_agent_config),
-                window,
-                cx,
-            );
-            panel.set_provider_name(provider, window, cx);
-            panel.set_model_name(model_name);
-            panel.set_session_model_options(available_models, window, cx);
-            panel.set_show_inline_input(show_inline);
-            panel.set_skills(skill_entries, cx);
-            panel.set_recent_inputs(self.recent_input_history(80));
-        });
-
-        let agent_panel_progress = self.agent_panel_motion.value(window);
         let input_bar_progress = self.input_bar_motion.value(window);
         let tab_strip_progress = self.tab_strip_motion.value(window);
-        let agent_panel_transitioning = self.agent_panel_motion.is_animating();
         let input_bar_transitioning = self.input_bar_motion.is_animating();
         let tab_strip_transitioning = self.tab_strip_motion.is_animating();
-        #[cfg(target_os = "macos")]
-        let (agent_panel_snap_guard_active, agent_panel_snap_guard_expired) =
-            Self::snap_guard_state(&mut self.agent_panel_snap_guard_until, window);
         #[cfg(target_os = "macos")]
         let (input_bar_snap_guard_active, input_bar_snap_guard_expired) =
             Self::snap_guard_state(&mut self.input_bar_snap_guard_until, window);
@@ -310,17 +238,12 @@ impl Render for VuWorkspace {
         let (top_chrome_snap_guard_active, top_chrome_snap_guard_expired) =
             Self::snap_guard_state(&mut self.top_chrome_snap_guard_until, window);
         #[cfg(not(target_os = "macos"))]
-        let agent_panel_snap_guard_active = false;
-        #[cfg(not(target_os = "macos"))]
         let input_bar_snap_guard_active = false;
         #[cfg(not(target_os = "macos"))]
         let top_chrome_snap_guard_active = false;
         #[cfg(target_os = "macos")]
         {
             let release_cover = Duration::from_millis(CHROME_RELEASE_COVER_MS);
-            if agent_panel_snap_guard_expired && !self.agent_panel_open {
-                Self::extend_guard(&mut self.agent_panel_release_cover_until, release_cover);
-            }
             if input_bar_snap_guard_expired && !self.input_bar_visible {
                 Self::extend_guard(&mut self.input_bar_release_cover_until, release_cover);
             }
@@ -329,16 +252,11 @@ impl Render for VuWorkspace {
             }
         }
         #[cfg(target_os = "macos")]
-        let agent_panel_release_cover_active =
-            Self::snap_guard_active(&mut self.agent_panel_release_cover_until, window);
-        #[cfg(target_os = "macos")]
         let input_bar_release_cover_active =
             Self::snap_guard_active(&mut self.input_bar_release_cover_until, window);
         #[cfg(target_os = "macos")]
         let top_chrome_release_cover_active =
             Self::snap_guard_active(&mut self.top_chrome_release_cover_until, window);
-        #[cfg(not(target_os = "macos"))]
-        let agent_panel_release_cover_active = false;
         #[cfg(not(target_os = "macos"))]
         let input_bar_release_cover_active = false;
         #[cfg(not(target_os = "macos"))]
@@ -367,10 +285,8 @@ impl Render for VuWorkspace {
             let pane_dragging =
                 self.has_active_tab() && self.tabs[self.active_tab].pane_tree.is_dragging();
             let underlay_active = allow_native_transition_underlay
-                && (agent_panel_transitioning
-                    || input_bar_transitioning
+                && (input_bar_transitioning
                     || tab_strip_transitioning
-                    || self.agent_panel_drag.is_some()
                     || self.sidebar_drag.is_some()
                     || pane_dragging
                     || guard_active);
@@ -378,27 +294,6 @@ impl Render for VuWorkspace {
         }
 
         let window_width = window.bounds().size.width.as_f32();
-        let effective_agent_panel_width = self
-            .agent_panel_width
-            .min(max_agent_panel_width(window_width));
-        #[cfg(not(target_os = "macos"))]
-        let animated_panel_width = effective_agent_panel_width * agent_panel_progress;
-        let agent_panel_reserved_for_layout =
-            self.agent_panel_open || agent_panel_progress > 0.01 || agent_panel_snap_guard_active;
-        #[cfg(target_os = "macos")]
-        let agent_panel_outer_width = if agent_panel_reserved_for_layout {
-            effective_agent_panel_width + 1.0
-        } else {
-            0.0
-        };
-        #[cfg(not(target_os = "macos"))]
-        let agent_panel_outer_width = if agent_panel_progress > 0.01 {
-            animated_panel_width + 1.0
-        } else if agent_panel_reserved_for_layout {
-            effective_agent_panel_width + 1.0
-        } else {
-            0.0
-        };
         let vertical_tabs_enabled = self.vertical_tabs_enabled();
         let show_left_panel = self.left_panel_open;
         let show_vertical_tabs = show_left_panel && vertical_tabs_enabled;
@@ -415,9 +310,6 @@ impl Render for VuWorkspace {
         let theme = cx.theme();
         let ui_surface_opacity = self.ui_surface_opacity();
         let elevated_ui_surface_opacity = self.elevated_ui_surface_opacity();
-        let agent_panel_content_progress = ((agent_panel_progress - 0.16) / 0.84)
-            .clamp(0.0, 1.0)
-            .powf(0.9);
         let input_bar_content_progress = ((input_bar_progress - 0.08) / 0.92)
             .clamp(0.0, 1.0)
             .powf(0.92);
@@ -482,8 +374,7 @@ impl Render for VuWorkspace {
             sidebar_content_width
         };
         let terminal_content_left = left_panel_width;
-        let terminal_content_width =
-            (window_width - terminal_content_left - agent_panel_outer_width).max(0.0);
+        let terminal_content_width = (window_width - terminal_content_left).max(0.0);
         let pane_tree_rendered = {
             let workspace = cx.weak_entity();
             let begin_drag_cb =
@@ -877,80 +768,6 @@ impl Render for VuWorkspace {
             );
         }
 
-        let render_agent_panel = agent_panel_reserved_for_layout;
-
-        if render_agent_panel {
-            #[cfg(target_os = "macos")]
-            let panel_width = effective_agent_panel_width + 1.0;
-            #[cfg(not(target_os = "macos"))]
-            let panel_width = if agent_panel_progress > 0.01 {
-                animated_panel_width + 1.0
-            } else {
-                effective_agent_panel_width + 1.0
-            };
-            #[cfg(target_os = "macos")]
-            let agent_panel_content_opacity =
-                if self.agent_panel_open || agent_panel_progress > 0.01 {
-                    agent_panel_content_progress
-                } else {
-                    0.0
-                };
-            #[cfg(not(target_os = "macos"))]
-            let agent_panel_content_opacity = agent_panel_content_progress;
-
-            main_area = main_area.child(
-                div()
-                    .w(px(panel_width))
-                    .h_full()
-                    .overflow_hidden()
-                    .flex_shrink_0()
-                    .flex()
-                    .flex_row()
-                    .bg(elevated_panel_surface_color)
-                    .child(
-                        div()
-                            .id("agent-panel-divider")
-                            .relative()
-                            .w(px(1.0))
-                            .h_full()
-                            .flex_shrink_0()
-                            .bg(chrome_static_seam_color)
-                            .child(
-                                div()
-                                    .absolute()
-                                    .top_0()
-                                    .bottom_0()
-                                    .left(px(-2.0))
-                                    .w(px(5.0))
-                                    .cursor_col_resize()
-                                    .bg(theme.transparent)
-                                    .hover(|s| s.bg(chrome_static_seam_color.opacity(0.18)))
-                                    .on_mouse_down(
-                                        MouseButton::Left,
-                                        cx.listener(
-                                            move |this, event: &MouseDownEvent, _window, cx| {
-                                                this.release_active_terminal_mouse_selection(cx);
-                                                this.agent_panel_drag = Some((
-                                                    f32::from(event.position.x),
-                                                    effective_agent_panel_width,
-                                                ));
-                                                cx.notify();
-                                            },
-                                        ),
-                                    ),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .h_full()
-                            .opacity(agent_panel_content_opacity)
-                            .child(self.agent_panel.clone()),
-                    ),
-            );
-        }
-
         // Top bar — compact titlebar for one tab, full strip for many
         let top_bar_height = if top_chrome_snap_guard_active {
             TOP_BAR_TABS_HEIGHT
@@ -1055,13 +872,6 @@ impl Render for VuWorkspace {
                     // `left_panel_open` state.
                     let win_w = f32::from(win.bounds().size.width);
                     let win_h = f32::from(win.bounds().size.height);
-                    let effective_agent_panel_width =
-                        this.agent_panel_width.min(max_agent_panel_width(win_w));
-                    let agent_panel_drag_width = if this.agent_panel_open {
-                        effective_agent_panel_width + 7.0
-                    } else {
-                        0.0
-                    };
                     let leading_panel_w = this.leading_panel_width_for_pane_resize(cx);
 
                     let pane_tree = &mut this.tabs[this.active_tab].pane_tree;
@@ -1071,14 +881,14 @@ impl Render for VuWorkspace {
                     }
 
                     // Estimate terminal area from window bounds minus fixed chrome
-                    // (tab bar ~38px, input bar ~40px, agent panel if open,
-                    // file tree panel on the leading edge if enabled).
+                    // (tab bar ~38px, input bar ~40px, and the file tree
+                    // panel on the leading edge if enabled).
                     let (current_pos, total_size) =
                         if let Some(dir) = pane_tree.dragging_direction() {
                             match dir {
                                 SplitDirection::Horizontal => (
                                     f32::from(event.position.x) - leading_panel_w,
-                                    win_w - agent_panel_drag_width - leading_panel_w,
+                                    win_w - leading_panel_w,
                                 ),
                                 SplitDirection::Vertical => (
                                     f32::from(event.position.y),
@@ -1117,7 +927,6 @@ impl Render for VuWorkspace {
             )
             .on_action(cx.listener(Self::quit))
             .on_action(cx.listener(Self::minimize))
-            .on_action(cx.listener(Self::toggle_agent_panel))
             .on_action(cx.listener(Self::toggle_input_bar))
             .on_action(cx.listener(Self::collapse_sidebar))
             .on_action(cx.listener(Self::toggle_settings))
@@ -1155,7 +964,6 @@ impl Render for VuWorkspace {
             .on_action(cx.listener(Self::rename_current_surface))
             .on_action(cx.listener(Self::close_surface))
             .on_action(cx.listener(Self::focus_input))
-            .on_action(cx.listener(Self::ask_ai))
             .on_action(cx.listener(Self::editor_move_left))
             .on_action(cx.listener(Self::editor_move_right))
             .on_action(cx.listener(Self::editor_move_up))
@@ -1179,7 +987,6 @@ impl Render for VuWorkspace {
             .on_action(cx.listener(Self::editor_cut))
             .on_action(cx.listener(Self::editor_paste))
             .on_action(cx.listener(Self::editor_select_all))
-            .on_action(cx.listener(Self::cycle_input_mode))
             .on_action(cx.listener(Self::toggle_pane_scope_picker))
             .on_action(cx.listener(Self::toggle_left_panel))
             .on_action(cx.listener(Self::focus_files_panel))
@@ -1382,7 +1189,7 @@ impl Render for VuWorkspace {
                     .absolute()
                     .top(px(TOP_BAR_COMPACT_HEIGHT))
                     .left(px(terminal_content_left))
-                    .right(px(agent_panel_outer_width))
+                    .right_0()
                     .h(px(TOP_BAR_TABS_HEIGHT - TOP_BAR_COMPACT_HEIGHT))
                     .bg(chrome_transition_seam_color),
             );
@@ -1406,7 +1213,7 @@ impl Render for VuWorkspace {
                     div()
                         .absolute()
                         .left(px(terminal_content_left))
-                        .right(px(agent_panel_outer_width))
+                        .right_0()
                         .bottom(self.input_bar.read(cx).rendered_height(cx))
                         .h(px(CHROME_MOTION_SEAM_OVERDRAW))
                         .bg(chrome_transition_seam_color),
@@ -1419,73 +1226,15 @@ impl Render for VuWorkspace {
                 div()
                     .absolute()
                     .left(px(terminal_content_left))
-                    .right(px(agent_panel_outer_width))
+                    .right_0()
                     .bottom_0()
                     .h(self.input_bar.read(cx).rendered_height(cx))
                     .bg(chrome_transition_seam_color),
             );
         }
 
-        if agent_panel_snap_guard_active {
-            if self.agent_panel_open {
-                let agent_panel_seam_right = (effective_agent_panel_width
-                    - (CHROME_MOTION_SEAM_OVERDRAW - CHROME_TRANSITION_SEAM_COVER))
-                    .max(0.0);
-                root = root.child(
-                    div()
-                        .absolute()
-                        .top(px(top_bar_height))
-                        .bottom_0()
-                        .right(px(agent_panel_seam_right))
-                        .w(px(CHROME_MOTION_SEAM_OVERDRAW))
-                        .bg(chrome_transition_seam_color),
-                );
-            }
-        }
-
-        if agent_panel_release_cover_active {
-            root = root.child(
-                div()
-                    .absolute()
-                    .top(px(top_bar_height))
-                    .bottom_0()
-                    .right_0()
-                    .w(px(effective_agent_panel_width + 1.0))
-                    .bg(chrome_transition_seam_color),
-            );
-        }
-
-        if self.agent_panel_drag.is_some() && self.agent_panel_open {
-            let agent_panel_seam_right = (effective_agent_panel_width
-                - (CHROME_MOTION_SEAM_OVERDRAW - CHROME_TRANSITION_SEAM_COVER))
-                .max(0.0);
-            root = root.child(
-                div()
-                    .absolute()
-                    .top(px(top_bar_height))
-                    .bottom_0()
-                    .right(px(agent_panel_seam_right))
-                    .w(px(CHROME_MOTION_SEAM_OVERDRAW))
-                    .bg(chrome_transition_seam_color),
-            );
-        }
-
-        #[cfg(not(target_os = "macos"))]
-        if agent_panel_transitioning && render_agent_panel {
-            root = root.child(
-                div()
-                    .absolute()
-                    .top(px(top_bar_height))
-                    .bottom_0()
-                    .right(px(animated_panel_width))
-                    .w(px(CHROME_TRANSITION_SEAM_COVER))
-                    .bg(chrome_transition_seam_color),
-            );
-        }
-
         if self.has_active_resize_drag() {
-            let resize_direction = if self.sidebar_drag.is_some() || self.agent_panel_drag.is_some()
-            {
+            let resize_direction = if self.sidebar_drag.is_some() {
                 SplitDirection::Horizontal
             } else {
                 self.tabs
@@ -1523,19 +1272,7 @@ impl Render for VuWorkspace {
         }
 
         // Workspace-level popups render above embedded terminal surfaces.
-        if has_skill_popup
-            && let Some(popup) = self.render_skill_popup(
-                terminal_content_left,
-                terminal_content_width,
-                elevated_ui_surface_opacity,
-                cx,
-            )
-        {
-            root = root.child(popup);
-        }
-
         if has_path_popup
-            && !has_skill_popup
             && let Some(popup) = self.render_path_popup(
                 terminal_content_left,
                 terminal_content_width,
@@ -1556,13 +1293,6 @@ impl Render for VuWorkspace {
             cx,
         ) {
             root = root.child(picker);
-        }
-
-        if has_inline_skill_popup
-            && let Some(popup) =
-                self.render_inline_skill_popup(elevated_ui_surface_opacity, window, cx)
-        {
-            root = root.child(popup);
         }
 
         let settings_visible = self.settings_panel.read(cx).is_overlay_visible();

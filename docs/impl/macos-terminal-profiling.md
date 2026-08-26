@@ -52,7 +52,7 @@ Equivalent manual form:
 
 ```bash
 VU_GHOSTTY_PROFILE=1 \
-RUST_LOG=vu::perf=info,vu_ghostty::perf=info,vu=warn,vu_core=warn,vu_agent=warn \
+RUST_LOG=vu::perf=info,vu_ghostty::perf=info,vu=warn,vu_core=warn \
 cargo run -p vu
 ```
 

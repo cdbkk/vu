@@ -77,7 +77,7 @@ What's still not complete after this PR (carry-over for phase 5/6):
 
 ## Visual verification on a Linux desktop session
 
-Verified on the cloud-agent VM's actual XFCE desktop session (not
+Verified on the cloud VM's actual XFCE desktop session (not
 just the headless `vu-cli` round-trip). The XFCE compositor,
 `xfwm4` window manager, and real `xfdesktop` panel are running on
 `:1`; vu joins as a regular client window with **client-side
@@ -89,7 +89,7 @@ shell. The Flexoki Dark terminal pane shows the live `~ $` bash
 prompt and a solid dark **block cursor** sitting after the `$`,
 rendered in **IoskeleyMono** (proper monospace cell grid). The vu
 top bar paints across the full window width, with the right-side
-caption cluster (sidebar / AI / settings + minimize / maximize /
+caption cluster (sidebar / settings + minimize / maximize /
 close) matching the Windows beta layout. No xfwm4 titlebar above
 the GPUI window.
 
@@ -220,7 +220,7 @@ Audit + implementation:
     surprised when "background blur" in settings doesn't paint
     on GNOME / X11.
 
-Verified visually on the cloud-agent VM's XFCE :1 session
+Verified visually on the cloud VM's XFCE :1 session
 (`screenshots/2026-04-23-rounded-transparent.png` is the new
 capture). The vu window is clearly translucent over the wallpaper
 and an `xterm` window behind it, the top corners chamfer against
@@ -291,7 +291,7 @@ testing:
      (~60 Hz) on the actual paint path.
 
 Measured impact (control-socket round-trip of a single keystroke
-echo on the cloud-agent VM, 5 runs each):
+echo on the cloud VM, 5 runs each):
 
 ```
 PRE-FIX:  33ms 33ms 32ms 32ms 33ms   (mean 32.6ms)
@@ -355,7 +355,7 @@ htop in `screenshots/2026-04-23-htop.png`.
 
 Note on the user's "2 sec" perception: the placeholder was making
 htop's launch *feel* much slower than it actually was. With the fix
-the cloud-agent VM (llvmpipe software Vulkan, XFCE on Xvfb-style
+the cloud VM (llvmpipe software Vulkan, XFCE on Xvfb-style
 display) renders htop fully ~200 ms after Enter. On hardware-
 accelerated Wayland / X11 desktops users should see ~80–150 ms.
 The remaining time is htop's own startup (`/proc` scan + ncurses

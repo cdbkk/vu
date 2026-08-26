@@ -25,14 +25,6 @@ one place, so the other docs can stay focused.
 
 <img alt="Vu Customize editor after applying a cyan foreground color" src="media/vu-05-palette-applied.png" />
 
-### AI routing and permissions
-
-<img alt="Vu AI settings for provider routing, tool approval, and command suggestions" src="media/vu-06-ai-routing.png" />
-
-### AI providers
-
-<img alt="Vu AI provider settings with model, OAuth, token override, and provider limits" src="media/vu-07-ai-providers.png" />
-
 ## Demo
 
 <a href="media/vu-demo.mp4">

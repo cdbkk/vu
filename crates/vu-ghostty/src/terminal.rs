@@ -226,6 +226,9 @@ impl GhosttyConfigPatch {
         s.push_str("shell-integration-features = ");
         s.push_str(VU_SHELL_INTEGRATION_FEATURES);
         s.push('\n');
+        // Ghostty defaults copy-on-select to true; vu keeps selection
+        // and clipboard separate.
+        s.push_str("copy-on-select = false\n");
         if let Some(background_image) = &self.background_image {
             s.push_str(&format!("background-image = {:?}\n", background_image));
             if let Some(background_image_opacity) = self.background_image_opacity {

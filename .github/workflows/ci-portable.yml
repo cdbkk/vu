@@ -5,7 +5,6 @@ name: ci-portable
 # workflow guards the Windows/Linux portability of:
 #   - vu-core  (control socket, named pipes, config, session)
 #   - vu-cli   (control client, Unix socket + named pipe transport)
-#   - vu-agent (tokio, rig)
 #   - vu-terminal (theme helpers)
 #   - vu-ghostty  (stub backend on non-macOS, libghostty wrapper on macOS)
 #   - vu          (the UI binary — stub terminal view on non-macOS)
@@ -93,12 +92,12 @@ jobs:
             throw "PowerShell parse errors in scripts/install.ps1"
           }
       - name: cargo check — portable crates
-        run: cargo check -p vu-core -p vu-cli -p vu-agent -p vu-terminal -p vu-ghostty
+        run: cargo check -p vu-core -p vu-cli -p vu-terminal -p vu-ghostty
       - name: cargo check — UI binary (stub terminal backend)
         # Exercise the retained `vu-app.exe` Windows release alias.
         run: cargo check -p vu --no-default-features --features vu/bin-vu-app
       - name: cargo test — portable crates
-        run: cargo test -p vu-core -p vu-cli -p vu-agent -p vu-terminal
+        run: cargo test -p vu-core -p vu-cli -p vu-terminal
 
   linux:
     name: check (ubuntu-latest)
@@ -155,8 +154,8 @@ jobs:
             libwayland-dev libvulkan-dev \
             libfreetype-dev libfontconfig1-dev
       - name: cargo check — portable crates
-        run: cargo check -p vu-core -p vu-cli -p vu-agent -p vu-terminal -p vu-ghostty
+        run: cargo check -p vu-core -p vu-cli -p vu-terminal -p vu-ghostty
       - name: cargo check — UI binary (stub terminal backend)
         run: cargo check -p vu
       - name: cargo test — portable crates
-        run: cargo test -p vu-core -p vu-cli -p vu-agent -p vu-terminal
+        run: cargo test -p vu-core -p vu-cli -p vu-terminal

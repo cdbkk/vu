@@ -428,8 +428,7 @@ mod tests {
         assert!(list.contains("__VU_TMUX_BEGIN_n__"));
         assert!(list.contains("__VU_TMUX_FIELD_n__"));
         assert!(
-            build_tmux_capture_command("n", Some("%3"), 80)
-                .contains("__VU_TMUX_CAPTURE_BEGIN_n__")
+            build_tmux_capture_command("n", Some("%3"), 80).contains("__VU_TMUX_CAPTURE_BEGIN_n__")
         );
         assert!(
             build_tmux_exec_command(

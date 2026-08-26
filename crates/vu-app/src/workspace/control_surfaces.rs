@@ -71,7 +71,7 @@ impl VuWorkspace {
         let mut created_any = false;
         for req in pending {
             if req.tab_idx >= self.tabs.len() {
-                let _ = req.response_tx.send(vu_agent::PaneResponse::Error(format!(
+                let _ = req.response_tx.send(vu_core::PaneResponse::Error(format!(
                     "Tab {} is no longer available.",
                     req.tab_idx + 1
                 )));
@@ -80,8 +80,8 @@ impl VuWorkspace {
 
             let terminal = self.create_terminal(req.cwd.as_deref(), window, cx);
             let direction = match req.location {
-                vu_agent::tools::PaneCreateLocation::Right => SplitDirection::Horizontal,
-                vu_agent::tools::PaneCreateLocation::Down => SplitDirection::Vertical,
+                vu_core::pane_request::PaneCreateLocation::Right => SplitDirection::Horizontal,
+                vu_core::pane_request::PaneCreateLocation::Down => SplitDirection::Vertical,
             };
             let was_zoomed = self.tabs[req.tab_idx].pane_tree.zoomed_pane_id().is_some();
             self.tabs[req.tab_idx]
@@ -115,7 +115,7 @@ impl VuWorkspace {
             self.record_runtime_event_for_terminal(
                 req.tab_idx,
                 &terminal,
-                vu_agent::context::PaneRuntimeEvent::PaneCreated {
+                vu_core::pane_context::PaneRuntimeEvent::PaneCreated {
                     startup_command: req.command.clone(),
                 },
             );
@@ -131,7 +131,7 @@ impl VuWorkspace {
             let pane_id = pane_tree
                 .pane_id_for_terminal(&terminal)
                 .unwrap_or(pane_index);
-            let _ = req.response_tx.send(vu_agent::PaneResponse::PaneCreated {
+            let _ = req.response_tx.send(vu_core::PaneResponse::PaneCreated {
                 pane_index,
                 pane_id,
                 surface_ready: terminal.surface_ready(cx),
@@ -263,8 +263,10 @@ impl VuWorkspace {
                     let cwd = resolved.terminal.current_dir(cx);
                     let terminal = self.create_terminal(cwd.as_deref(), window, cx);
                     let direction = match location {
-                        vu_agent::tools::PaneCreateLocation::Right => SplitDirection::Horizontal,
-                        vu_agent::tools::PaneCreateLocation::Down => SplitDirection::Vertical,
+                        vu_core::pane_request::PaneCreateLocation::Right => {
+                            SplitDirection::Horizontal
+                        }
+                        vu_core::pane_request::PaneCreateLocation::Down => SplitDirection::Vertical,
                     };
                     let was_zoomed = self.tabs[tab_idx].pane_tree.zoomed_pane_id().is_some();
                     let options = SurfaceCreateOptions {
@@ -445,7 +447,7 @@ impl VuWorkspace {
         self.record_runtime_event_for_terminal(
             tab_idx,
             &terminal,
-            vu_agent::context::PaneRuntimeEvent::PaneCreated {
+            vu_core::pane_context::PaneRuntimeEvent::PaneCreated {
                 startup_command: command.clone(),
             },
         );
@@ -479,8 +481,8 @@ impl VuWorkspace {
         recent_output_lines: usize,
         cx: &App,
     ) -> (
-        vu_agent::context::PaneObservationFrame,
-        vu_agent::context::PaneRuntimeState,
+        vu_core::pane_context::PaneObservationFrame,
+        vu_core::pane_context::PaneRuntimeState,
     ) {
         let pane_tree = &self.tabs[tab_idx].pane_tree;
         let pane_id = pane_tree
@@ -503,7 +505,7 @@ impl VuWorkspace {
         &self,
         tab_idx: usize,
         terminal: &TerminalPane,
-    ) -> Option<vu_agent::context::PaneRuntimeState> {
+    ) -> Option<vu_core::pane_context::PaneRuntimeState> {
         let pane_id = self.tabs[tab_idx]
             .pane_tree
             .pane_id_for_terminal(terminal)?;
@@ -518,7 +520,7 @@ impl VuWorkspace {
         &self,
         tab_idx: usize,
         terminal: &TerminalPane,
-        event: vu_agent::context::PaneRuntimeEvent,
+        event: vu_core::pane_context::PaneRuntimeEvent,
     ) {
         let pane_tree = &self.tabs[tab_idx].pane_tree;
         let pane_id = pane_tree
@@ -532,7 +534,7 @@ impl VuWorkspace {
     pub(super) fn resolve_pane_target_for_tab(
         &self,
         tab_idx: usize,
-        selector: vu_agent::tools::PaneSelector,
+        selector: vu_core::pane_request::PaneSelector,
     ) -> Result<ResolvedPaneTarget, String> {
         let pane_tree = &self.tabs[tab_idx].pane_tree;
         let all_terminals = pane_tree.all_terminals();
@@ -846,10 +848,10 @@ impl VuWorkspace {
         command: String,
         timeout_secs: u64,
         parse_response: F,
-        response_tx: crossbeam_channel::Sender<vu_agent::PaneResponse>,
+        response_tx: crossbeam_channel::Sender<vu_core::PaneResponse>,
         cx: &mut Context<Self>,
     ) where
-        F: Fn(Vec<String>) -> Result<vu_agent::PaneResponse, String> + Send + 'static,
+        F: Fn(Vec<String>) -> Result<vu_core::PaneResponse, String> + Send + 'static,
     {
         let _ = pane.take_command_finished(cx);
         pane.write(format!("{command}\n").as_bytes(), cx);
@@ -881,7 +883,7 @@ impl VuWorkspace {
                     let excerpt = this
                         .update(cx, |_, cx| pane.recent_lines(120, cx).join("\n"))
                         .unwrap_or_default();
-                    let _ = response_tx.send(vu_agent::PaneResponse::Error(format!(
+                    let _ = response_tx.send(vu_core::PaneResponse::Error(format!(
                         "Shell-anchor command timed out in pane {} after {}s.\nRecent output:\n{}",
                         pane_index, timeout_secs, excerpt
                     )));
@@ -903,7 +905,7 @@ impl VuWorkspace {
                 let parse_err = parse_response(lines).err().unwrap_or_else(|| {
                     "shell-anchor markers were not observed in pane output".to_string()
                 });
-                let _ = response_tx.send(vu_agent::PaneResponse::Error(format!(
+                let _ = response_tx.send(vu_core::PaneResponse::Error(format!(
                     "Shell-anchor command in pane {} could not be parsed: {}\nRecent output:\n{}",
                     pane_index, parse_err, excerpt
                 )));
@@ -919,10 +921,9 @@ impl VuWorkspace {
         }
 
         let observation = pane.observation_frame(40, cx);
-        let prompt_like = observation
-            .screen_hints
-            .iter()
-            .any(|hint| hint.kind == vu_agent::context::PaneObservationHintKind::PromptLikeInput);
+        let prompt_like = observation.screen_hints.iter().any(|hint| {
+            hint.kind == vu_core::pane_context::PaneObservationHintKind::PromptLikeInput
+        });
 
         if prompt_like {
             pane.recover_shell_prompt_state(cx);
@@ -945,113 +946,6 @@ impl VuWorkspace {
                     .1
                     .remote_host
             })
-    }
-
-    /// Build agent context from a tab's focused pane, including summaries of peer panes.
-    pub(super) fn build_agent_context_for_tab(
-        &self,
-        tab_idx: usize,
-        cx: &App,
-    ) -> vu_agent::TerminalContext {
-        self.reconcile_runtime_trackers_for_tab(tab_idx);
-        let pane_tree = &self.tabs[tab_idx].pane_tree;
-
-        // Determine focused pane's 1-based index and hostname
-        let all_terminals = pane_tree.all_terminals();
-        let focused_terminal = pane_tree.try_visible_focus_terminal();
-        let focused_pid = focused_terminal
-            .map(|(pane_id, _)| pane_id)
-            .unwrap_or_else(|| pane_tree.focused_pane_id());
-        let focused_pane_index = all_terminals
-            .iter()
-            .enumerate()
-            .find(|(_, t)| pane_tree.pane_id_for_terminal(t) == Some(focused_pid))
-            .map(|(i, _)| i + 1)
-            .unwrap_or(1);
-
-        // If there's no terminal pane (editor-only tab), return an empty context.
-        let Some((_, focused)) = focused_terminal else {
-            return self.harness.build_context_from_snapshot(
-                focused_pane_index,
-                focused_pid,
-                &Default::default(),
-                &Default::default(),
-                vec![],
-            );
-        };
-
-        let (focused_observation, focused_runtime) =
-            self.observe_terminal_runtime_for_tab(tab_idx, focused, 50, cx);
-
-        let mut other_pane_summaries = Vec::new();
-        if pane_tree.pane_count() > 1 {
-            for (idx, terminal) in all_terminals.iter().enumerate() {
-                if let Some(pid) = pane_tree.pane_id_for_terminal(terminal) {
-                    if pid == focused_pid {
-                        continue;
-                    }
-                    let (observation, runtime) = self.observe_terminal_runtime_for_tab(
-                        tab_idx,
-                        terminal,
-                        Self::SECONDARY_PANE_OBSERVATION_LINES,
-                        cx,
-                    );
-                    let control = vu_agent::control::PaneControlState::from_runtime(&runtime);
-                    let remote_workspace =
-                        vu_agent::context::remote_workspace_anchor(&runtime, &observation);
-                    let workspace_cwd_hint = vu_agent::context::workspace_cwd_hint(
-                        observation.cwd.as_deref(),
-                        &runtime.recent_actions,
-                    );
-                    other_pane_summaries.push(vu_agent::context::PaneSummary {
-                        pane_index: idx + 1,
-                        pane_id: pid,
-                        hostname: runtime.remote_host.clone(),
-                        hostname_confidence: runtime.remote_host_confidence,
-                        hostname_source: runtime.remote_host_source,
-                        remote_workspace,
-                        title: observation.title.clone(),
-                        front_state: runtime.front_state,
-                        mode: runtime.mode,
-                        has_shell_integration: observation.has_shell_integration,
-                        shell_metadata_fresh: runtime.shell_metadata_fresh,
-                        observation_support: observation.support.clone(),
-                        control,
-                        agent_cli: runtime.agent_cli.clone(),
-                        active_scope: runtime.active_scope.clone(),
-                        evidence: runtime.evidence.clone(),
-                        runtime_stack: runtime.scope_stack,
-                        last_verified_runtime_stack: runtime.last_verified_scope_stack,
-                        runtime_warnings: runtime.warnings,
-                        tmux_session: runtime.tmux_session,
-                        cwd: observation.cwd,
-                        workspace_cwd_hint,
-                        workspace_agent_cli_hint: vu_agent::context::workspace_agent_cli_hint(
-                            runtime.agent_cli.as_deref(),
-                            &runtime.recent_actions,
-                        ),
-                        screen_hints: observation.screen_hints,
-                        last_command: observation.last_command,
-                        last_exit_code: observation.last_exit_code,
-                        is_busy: observation.is_busy,
-                        recent_output: observation.recent_output,
-                    });
-                }
-            }
-        }
-
-        self.harness.build_context_from_snapshot(
-            focused_pane_index,
-            focused_pid,
-            &focused_observation,
-            &focused_runtime,
-            other_pane_summaries,
-        )
-    }
-
-    /// Build agent context from the active tab.
-    pub(super) fn build_agent_context(&self, cx: &App) -> vu_agent::TerminalContext {
-        self.build_agent_context_for_tab(self.active_tab, cx)
     }
 
     pub(super) fn resolve_control_tab_index(
@@ -1077,8 +971,8 @@ impl VuWorkspace {
 
     pub(super) fn pane_selector_from_target(
         target: vu_core::PaneTarget,
-    ) -> vu_agent::tools::PaneSelector {
-        vu_agent::tools::PaneSelector::new(target.pane_index, target.pane_id)
+    ) -> vu_core::pane_request::PaneSelector {
+        vu_core::pane_request::PaneSelector::new(target.pane_index, target.pane_id)
     }
 
     pub(super) fn send_control_result(
@@ -1090,39 +984,39 @@ impl VuWorkspace {
 
     pub(super) fn pane_response_to_control_result(
         tab_idx: usize,
-        response: vu_agent::PaneResponse,
+        response: vu_core::PaneResponse,
     ) -> ControlResult {
         match response {
-            vu_agent::PaneResponse::PaneList(panes) => Ok(json!({
+            vu_core::PaneResponse::PaneList(panes) => Ok(json!({
                 "tab_index": tab_idx + 1,
                 "panes": panes,
             })),
-            vu_agent::PaneResponse::Content(content) => Ok(json!({ "content": content })),
-            vu_agent::PaneResponse::KeysSent => Ok(json!({ "status": "sent" })),
-            vu_agent::PaneResponse::TmuxInfo(tmux) => Ok(json!({
+            vu_core::PaneResponse::Content(content) => Ok(json!({ "content": content })),
+            vu_core::PaneResponse::KeysSent => Ok(json!({ "status": "sent" })),
+            vu_core::PaneResponse::TmuxInfo(tmux) => Ok(json!({
                 "tab_index": tab_idx + 1,
                 "tmux": tmux,
             })),
-            vu_agent::PaneResponse::TmuxList(snapshot) => Ok(json!({
+            vu_core::PaneResponse::TmuxList(snapshot) => Ok(json!({
                 "tab_index": tab_idx + 1,
                 "snapshot": snapshot,
             })),
-            vu_agent::PaneResponse::TmuxCapture(capture) => Ok(json!({
+            vu_core::PaneResponse::TmuxCapture(capture) => Ok(json!({
                 "tab_index": tab_idx + 1,
                 "capture": capture,
             })),
-            vu_agent::PaneResponse::TmuxExec(exec) => Ok(json!({
+            vu_core::PaneResponse::TmuxExec(exec) => Ok(json!({
                 "tab_index": tab_idx + 1,
                 "exec": exec,
             })),
-            vu_agent::PaneResponse::ShellProbe(shell) => Ok(json!({
+            vu_core::PaneResponse::ShellProbe(shell) => Ok(json!({
                 "tab_index": tab_idx + 1,
                 "shell": shell,
             })),
-            vu_agent::PaneResponse::SearchResults(matches) => Ok(json!({
+            vu_core::PaneResponse::SearchResults(matches) => Ok(json!({
                 "matches": matches,
             })),
-            vu_agent::PaneResponse::BusyStatus {
+            vu_core::PaneResponse::BusyStatus {
                 surface_ready,
                 is_alive,
                 is_busy,
@@ -1133,11 +1027,11 @@ impl VuWorkspace {
                 "is_busy": is_busy,
                 "has_shell_integration": has_shell_integration,
             })),
-            vu_agent::PaneResponse::WaitComplete { status, output } => Ok(json!({
+            vu_core::PaneResponse::WaitComplete { status, output } => Ok(json!({
                 "status": status,
                 "output": output,
             })),
-            vu_agent::PaneResponse::PaneCreated {
+            vu_core::PaneResponse::PaneCreated {
                 pane_index,
                 pane_id,
                 surface_ready,
@@ -1151,7 +1045,7 @@ impl VuWorkspace {
                 "is_alive": is_alive,
                 "has_shell_integration": has_shell_integration,
             })),
-            vu_agent::PaneResponse::Error(err) => Err(ControlError::invalid_params(err)),
+            vu_core::PaneResponse::Error(err) => Err(ControlError::invalid_params(err)),
         }
     }
 
@@ -1167,33 +1061,26 @@ impl VuWorkspace {
     pub(super) fn spawn_control_pane_query(
         &mut self,
         tab_idx: usize,
-        query: vu_agent::PaneQuery,
+        query: vu_core::PaneQuery,
         response_tx: tokio::sync::oneshot::Sender<ControlResult>,
         cx: &mut Context<Self>,
     ) {
         let (pane_response_tx, pane_response_rx) = crossbeam_channel::bounded(1);
         self.handle_pane_request_for_tab(
             tab_idx,
-            vu_agent::PaneRequest {
+            vu_core::PaneRequest {
                 query,
                 response_tx: pane_response_tx,
             },
             cx,
         );
 
-        self.harness.spawn_detached(async move {
-            let result = match tokio::task::spawn_blocking(move || {
-                pane_response_rx.recv_timeout(std::time::Duration::from_secs(240))
-            })
-            .await
-            {
-                Ok(Ok(response)) => Self::pane_response_to_control_result(tab_idx, response),
-                Ok(Err(_)) => Err(ControlError::internal(
+        std::thread::spawn(move || {
+            let result = match pane_response_rx.recv_timeout(std::time::Duration::from_secs(240)) {
+                Ok(response) => Self::pane_response_to_control_result(tab_idx, response),
+                Err(_) => Err(ControlError::internal(
                     "Timed out waiting for the pane operation to finish",
                 )),
-                Err(err) => Err(ControlError::internal(format!(
-                    "Pane operation join failed: {err}"
-                ))),
             };
             Self::send_control_result(response_tx, result);
         });

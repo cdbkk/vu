@@ -11,9 +11,7 @@
 // checking `cfg(feature = "cargo-clippy")`.
 #![allow(unexpected_cfgs)]
 
-mod agent_panel;
 mod assets;
-mod chat_markdown;
 #[cfg(target_os = "macos")]
 mod cli_shim;
 mod command_palette;
@@ -21,8 +19,6 @@ mod command_palette;
 mod global_hotkey;
 #[cfg(target_os = "macos")]
 mod macos_windowing;
-#[cfg(target_os = "macos")]
-mod quick_terminal;
 
 // The terminal-view module is selected per platform:
 //   macOS   -> ghostty_view.rs (libghostty + child NSView)
@@ -60,7 +56,6 @@ mod editor_view;
 mod file_tree_view;
 mod input_bar;
 mod keycaps;
-mod model_registry;
 mod motion;
 mod pane_tree;
 mod settings_panel;
@@ -85,15 +80,15 @@ mod workspace;
 
 use std::any::TypeId;
 
+use gpui::*;
+use gpui_component::ActiveTheme;
+#[cfg(target_os = "macos")]
+use gpui_component::link::Link;
 use vu_core::config::KeybindingConfig;
 use vu_core::session::{
     GlobalHistoryState, PaneLayoutState, Session, SurfaceState, WORKSPACE_ERROR_SURFACE_OWNER,
 };
 use vu_core::workspace_layout::WorkspaceLayout;
-use gpui::*;
-use gpui_component::ActiveTheme;
-#[cfg(target_os = "macos")]
-use gpui_component::link::Link;
 use workspace::VuWorkspace;
 
 actions!(
@@ -117,8 +112,6 @@ actions!(
         NextWindow,
         PreviousWindow,
         ToggleSummon,
-        ToggleQuickTerminal,
-        ToggleAgentPanel,
         ToggleInputBar,
         CollapseSidebar,
         CloseTab,
@@ -141,8 +134,6 @@ actions!(
         RenameSurface,
         CloseSurface,
         FocusInput,
-        AskAi,
-        CycleInputMode,
         TogglePaneScopePicker,
         ToggleLeftPanel,
         FocusFiles,
@@ -588,40 +579,6 @@ fn default_window_options(config: &vu_core::Config, cx: &mut App) -> WindowOptio
     }
 }
 
-#[cfg(target_os = "macos")]
-fn quick_terminal_bounds(cx: &mut App) -> WindowBounds {
-    let fallback_display = Bounds::centered(None, size(px(1440.0), px(900.0)), cx);
-    let fallback_bounds = Bounds::new(
-        fallback_display.origin,
-        size(
-            fallback_display.size.width,
-            fallback_display.size.height / 2.0,
-        ),
-    );
-
-    let Some(visible) = quick_terminal::active_display_visible_bounds()
-        .or_else(|| cx.primary_display().map(|display| display.visible_bounds()))
-    else {
-        return WindowBounds::Windowed(fallback_bounds);
-    };
-
-    let bounds = Bounds::new(
-        visible.origin,
-        size(visible.size.width, visible.size.height / 2.0),
-    );
-    WindowBounds::Windowed(bounds)
-}
-
-#[cfg(target_os = "macos")]
-fn quick_terminal_options(config: &vu_core::Config, cx: &mut App) -> WindowOptions {
-    let mut options = default_window_options(config, cx);
-    options.window_bounds = Some(quick_terminal_bounds(cx));
-    // Avoid a transient GPUI titlebar before the AppKit trampoline
-    // normalizes the window to borderless.
-    options.titlebar = None;
-    options
-}
-
 fn default_window_background(
     config: &vu_core::Config,
     transparent: bool,
@@ -784,44 +741,6 @@ pub(crate) fn open_vu_window(
     .detach();
 }
 
-#[cfg(target_os = "macos")]
-pub(crate) fn open_quick_terminal(config: vu_core::Config, session: Session, cx: &mut App) {
-    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-
-    let window_options = quick_terminal_options(&config, cx);
-    cx.spawn(async move |cx| {
-        if let Err(err) = cx.open_window(window_options, |window, cx| {
-            let restored_session = session.clone();
-            let view = cx.new(|cx| {
-                let mut workspace =
-                    VuWorkspace::from_session(config.clone(), restored_session, window, cx);
-                workspace.mark_as_quick_terminal();
-                workspace
-            });
-
-            let raw_ptr = HasWindowHandle::window_handle(window)
-                .ok()
-                .and_then(|handle| match handle.as_raw() {
-                    RawWindowHandle::AppKit(handle) => Some(handle.ns_view.as_ptr().cast()),
-                    _ => None,
-                })
-                .and_then(crate::quick_terminal::window_from_view_ptr);
-            if let Some(raw_ptr) = raw_ptr {
-                crate::quick_terminal::store_window_ptr(raw_ptr);
-            } else {
-                crate::quick_terminal::opening_failed();
-                log::error!("Failed to resolve quick terminal native window");
-            }
-
-            cx.new(|cx| gpui_component::Root::new(view, window, cx).bg(cx.theme().transparent))
-        }) {
-            crate::quick_terminal::opening_failed();
-            log::error!("Failed to open quick terminal: {err}");
-        }
-    })
-    .detach();
-}
-
 pub(crate) fn fresh_window_session_with_history() -> Session {
     fresh_window_session_with_history_for_cwd(None)
 }
@@ -921,7 +840,7 @@ fn workspace_path_error_session(path: &std::path::Path, err: &anyhow::Error) -> 
                 surface_id: 0,
                 title: Some("Shell".to_string()),
                 // Synthetic Vu-owned diagnostic surface. Keep it out of
-                // human/subagent owner namespaces used by the orchestrator.
+                // owner namespaces used by external control clients.
                 owner: Some(WORKSPACE_ERROR_SURFACE_OWNER.to_string()),
                 cwd,
                 close_pane_when_last: false,
@@ -1321,7 +1240,7 @@ impl Render for AboutView {
                                     .line_height(relative(1.35))
                                     .text_align(TextAlign::Center)
                                     .text_color(quiet_text)
-                                    .child("A GPU-accelerated terminal with AI harness."),
+                                    .child("A GPU-accelerated terminal."),
                             ),
                     )
                     .child(
@@ -1511,7 +1430,6 @@ fn configurable_app_binding_specs(kb: &KeybindingConfig) -> Vec<BindingSpec> {
     push_global::<NewTab>(&mut specs, &kb.new_tab);
     push_global::<NextTab>(&mut specs, &kb.next_tab);
     push_global::<PreviousTab>(&mut specs, &kb.previous_tab);
-    push_global::<ToggleAgentPanel>(&mut specs, &kb.toggle_agent);
     push_global::<CloseTab>(&mut specs, &kb.close_tab);
     push_global::<ClosePane>(&mut specs, &kb.close_pane);
     push_global::<TogglePaneZoom>(&mut specs, &kb.toggle_pane_zoom);
@@ -1527,8 +1445,6 @@ fn configurable_app_binding_specs(kb: &KeybindingConfig) -> Vec<BindingSpec> {
     push_global::<RenameSurface>(&mut specs, &kb.rename_surface);
     push_global::<CloseSurface>(&mut specs, &kb.close_surface);
     push_global::<FocusInput>(&mut specs, &kb.focus_input);
-    push_global::<AskAi>(&mut specs, &kb.ask_ai);
-    push_global::<CycleInputMode>(&mut specs, &kb.cycle_input_mode);
     push_global::<ToggleInputBar>(&mut specs, &kb.toggle_input_bar);
     push_global::<TogglePaneScopePicker>(&mut specs, &kb.toggle_pane_scope);
     push_global::<ToggleLeftPanel>(&mut specs, &kb.toggle_left_panel);
@@ -1866,13 +1782,12 @@ fn payload_as_str(payload: &(dyn std::any::Any + Send)) -> Option<&str> {
 mod tests {
     use super::{
         BindingSpec, EditorDeleteBackward, EditorInsertNewline, EditorMoveLineEnd,
-        FileSidebarShortcutBindings, FocusFiles, FocusInput, NewTab, SearchFiles, SelectTab1,
-        ToggleAgentPanel, Undo, binding_specs, command_palette, keystroke_matches_single_binding,
-        push_app_override,
+        FileSidebarShortcutBindings, FocusFiles, FocusInput, NewTab, SearchFiles, SelectTab1, Undo,
+        binding_specs, command_palette, keystroke_matches_single_binding, push_app_override,
     };
-    use vu_core::config::KeybindingConfig;
     use gpui::Keystroke;
     use std::any::TypeId;
+    use vu_core::config::KeybindingConfig;
 
     fn default_specs() -> Vec<BindingSpec> {
         binding_specs(&KeybindingConfig::default())
@@ -2122,7 +2037,7 @@ mod tests {
     #[test]
     fn explicit_multi_context_override_can_be_represented() {
         let mut specs = Vec::new();
-        push_app_override::<ToggleAgentPanel>(&mut specs, "secondary-test");
+        push_app_override::<FocusFiles>(&mut specs, "secondary-test");
 
         let refs = specs.iter().collect::<Vec<_>>();
         assert_eq!(
@@ -2457,14 +2372,6 @@ fn main() {
     #[cfg(target_os = "windows")]
     install_seh_filter();
 
-    // Always capture backtraces unless the user already set a
-    // preference. `full` prints symbols + line numbers when debug info
-    // is present; harmless in release.
-    if std::env::var_os("RUST_BACKTRACE").is_none() {
-        // SAFETY: single-threaded during startup, standard env-var set.
-        unsafe { std::env::set_var("RUST_BACKTRACE", "full") };
-    }
-
     // Init the logger before inherit_shell_env so its log::info!/debug!
     // calls are visible when debugging proxy issues.
     let mut builder = env_logger::Builder::from_default_env();
@@ -2566,7 +2473,6 @@ fn main() {
         #[cfg(target_os = "macos")]
         global_hotkey::init(cx, &config.keybindings);
         #[cfg(target_os = "macos")]
-        quick_terminal::init(cx);
         #[cfg(target_os = "macos")]
         macos_windowing::install_window_cycle_shortcuts();
 
@@ -2576,10 +2482,6 @@ fn main() {
         });
         cx.on_action(|_: &ToggleSummon, cx: &mut App| {
             toggle_global_summon(cx);
-        });
-        #[cfg(target_os = "macos")]
-        cx.on_action(|_: &ToggleQuickTerminal, cx: &mut App| {
-            quick_terminal::toggle(cx);
         });
         #[cfg(target_os = "macos")]
         cx.on_action(|_: &NextWindow, _cx: &mut App| {
@@ -2696,14 +2598,10 @@ fn main() {
             Menu {
                 name: "View".into(),
                 items: vec![
-                    MenuItem::action("Toggle Agent Panel", ToggleAgentPanel),
                     MenuItem::action("Toggle Input Bar", ToggleInputBar),
-                    #[cfg(target_os = "macos")]
-                    MenuItem::action("Quick Terminal", ToggleQuickTerminal),
                     MenuItem::action("Command Palette", command_palette::ToggleCommandPalette),
                     MenuItem::separator(),
                     MenuItem::action("Toggle Input / Terminal", FocusInput),
-                    MenuItem::action("Cycle Input Mode", CycleInputMode),
                     MenuItem::separator(),
                     MenuItem::action("Focus Files", FocusFiles),
                     MenuItem::action("Search Files", SearchFiles),

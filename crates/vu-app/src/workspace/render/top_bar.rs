@@ -395,8 +395,6 @@ impl VuWorkspace {
                     };
                 let presentation = smart_tab_presentation(
                     tab.user_label.as_deref(),
-                    tab.ai_label.as_deref(),
-                    tab.ai_icon.map(|k| k.svg_path()),
                     hostname_for_tab.as_deref(),
                     title_for_tab.as_deref(),
                     dir_for_tab.as_deref(),
@@ -1298,54 +1296,6 @@ impl VuWorkspace {
                         .text_color(chrome_toggle_tone(
                             theme,
                             self.input_bar_visible,
-                            compact_titlebar_progress,
-                        )),
-                ),
-        );
-
-        // Agent panel toggle
-        let agent_panel_tooltip = if self.agent_panel_open {
-            "Hide agent panel"
-        } else {
-            "Show agent panel"
-        };
-        tab_controls = tab_controls.child(
-            div()
-                .id("toggle-agent-panel")
-                .flex()
-                .items_center()
-                .justify_center()
-                .size(icon_box_px(22.0, 12.0))
-                .rounded(px(5.0))
-                .cursor_pointer()
-                .occlude()
-                .bg(if self.agent_panel_open {
-                    chrome_active_bg
-                } else {
-                    theme.transparent
-                })
-                .hover(move |s| s.bg(chrome_hover_bg))
-                .tooltip(move |window, cx| {
-                    chrome_tooltip(
-                        agent_panel_tooltip,
-                        crate::keycaps::first_action_keystroke(&ToggleAgentPanel, window),
-                        window,
-                        cx,
-                    )
-                })
-                .on_mouse_down(MouseButton::Left, |_, _, cx| {
-                    cx.stop_propagation();
-                })
-                .on_click(cx.listener(|this, _, window, cx| {
-                    this.toggle_agent_panel(&ToggleAgentPanel, window, cx);
-                }))
-                .child(
-                    svg()
-                        .path("phosphor/square-half-fill.svg")
-                        .size(icon_px(12.0))
-                        .text_color(chrome_toggle_tone(
-                            theme,
-                            self.agent_panel_open,
                             compact_titlebar_progress,
                         )),
                 ),

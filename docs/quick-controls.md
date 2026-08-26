@@ -1,78 +1,21 @@
 # Quick controls
 
-vu keeps the terminal in front. The main controls help you move between the
-terminal, command input, and the agent panel without changing context.
+Vu keeps application shortcuts separate from terminal control keys.
 
-## Two-minute demo
-
-Watch the short flow once, then use the table below as a reference.
-
-<video controls muted playsinline preload="metadata" width="100%" aria-label="Two-minute vu quick controls demo" src="https://github.com/user-attachments/assets/2b6f6145-e400-4a74-a951-cd8221493a17"></video>
-
-## Shortcuts
-
-| Action | macOS | Windows / Linux |
+| Action | macOS | Windows and Linux |
 | --- | --- | --- |
-| Switch focus between terminal and input | <kbd>⌘</kbd> <kbd>I</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>I</kbd> |
-| Show or hide the bottom input bar | <kbd>⌃</kbd> <kbd>\`</kbd> | <kbd>⌃</kbd> <kbd>\`</kbd> |
-| Show or hide the agent panel | <kbd>⌘</kbd> <kbd>L</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>L</kbd> |
-| Show or hide vertical tabs | <kbd>⌘</kbd> <kbd>B</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>B</kbd> |
+| New tab | <kbd>⌘</kbd> <kbd>T</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>T</kbd> |
+| Close tab | <kbd>⌘</kbd> <kbd>W</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>W</kbd> |
+| Split right | <kbd>⌘</kbd> <kbd>D</kbd> | <kbd>Alt</kbd> <kbd>D</kbd> |
+| Split down | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>D</kbd> | <kbd>Alt</kbd> <kbd>⇧</kbd> <kbd>D</kbd> |
+| Toggle pane zoom | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>Enter</kbd> | <kbd>Alt</kbd> <kbd>⇧</kbd> <kbd>Enter</kbd> |
+| Focus input bar | <kbd>⌘</kbd> <kbd>I</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>I</kbd> |
+| Show or hide input bar | <kbd>⌃</kbd> <kbd>`</kbd> | <kbd>⌃</kbd> <kbd>`</kbd> |
+| Toggle left sidebar | <kbd>⌘</kbd> <kbd>B</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>B</kbd> |
 | Focus Files | <kbd>⌘</kbd> <kbd>⌥</kbd> <kbd>E</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>E</kbd> |
 | Search Files | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>F</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>F</kbd> |
-| Cycle bottom-bar mode | <kbd>⌘</kbd> <kbd>;</kbd> | <kbd>⌃</kbd> <kbd>;</kbd> |
-| Show or hide Quick Terminal | <kbd>⌘</kbd> <kbd>Backslash</kbd> after enabling | Not available |
+| Command Palette | <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>P</kbd> | <kbd>⌃</kbd> <kbd>⇧</kbd> <kbd>P</kbd> |
 
-## Input modes
+The input bar runs commands in the focused pane. In a multi-pane tab, use its pane picker to target the focused pane, all panes, or a selected set.
 
-### Smart
-
-Smart mode decides whether your text should run as a shell command or go to the
-agent. Use it when you want vu to choose the obvious path without making you
-switch surfaces first.
-
-### Command
-
-Command mode sends text to the shell. In a multi-pane workspace, the pane picker
-lets you choose the focused pane, all panes, or a selected set.
-
-### Agent
-
-Agent mode sends text to the built-in agent. Use it when you want explanation,
-planning, code help, or a careful change made with your approval.
-
-These modes are why the input bar exists. It is not a second terminal prompt and
-not a chat box glued to the side. It is a short path from what you are looking at
-to the next action.
-
-## Quick Terminal on macOS
-
-Quick Terminal is an optional macOS-only drop-down terminal. Enable it in
-Settings -> Keys, then use the shortcut to slide down a dedicated Vu window
-from the top of the active screen, even when another app is frontmost.
-
-While Vu is frontmost, you can also open Quick Terminal from the command
-palette or **View -> Quick Terminal** without enabling the global shortcut.
-
-It is separate from the main window. Hiding it keeps its live tabs, panes, cwd,
-and scrollback. Closing its last tab or exiting its last shell destroys it, and
-the next shortcut creates a fresh one.
-
-For setup, behavior, and the difference from Summon / Hide Vu, see
-[Quick Terminal](quick-terminal.md).
-
-## A good default flow
-
-1. Work normally in the terminal.
-2. Open the input bar when you need a command or a request.
-3. Use Command mode for direct shell work.
-4. Use Agent mode when you want vu to reason over the visible pane and nearby
-   context.
-5. Review tool actions before approving them.
-
-## Next
-
-When you want to tune providers, suggestions, themes, skills, or shortcuts, open
-[Settings](settings.md).
-
-For tabs, panes, broadcast, links, and pane-local surfaces, see
-[Terminal workflows](terminal-workflows.md).
+Change shortcuts under Settings > Keys. The global Summon / Hide Vu shortcut is optional and disabled by default.

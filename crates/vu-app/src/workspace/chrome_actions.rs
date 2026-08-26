@@ -1,42 +1,6 @@
 use super::*;
 
 impl VuWorkspace {
-    pub(super) fn toggle_agent_panel(
-        &mut self,
-        _: &ToggleAgentPanel,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.agent_panel_open = !self.agent_panel_open;
-        let duration = Self::terminal_adjacent_chrome_duration(self.agent_panel_open, 290, 220);
-        #[cfg(target_os = "macos")]
-        if !duration.is_zero() {
-            self.arm_chrome_transition_underlay(duration + Duration::from_millis(80));
-        }
-        #[cfg(target_os = "macos")]
-        if duration.is_zero() {
-            self.arm_agent_panel_snap_guard(cx);
-        }
-        self.agent_panel_motion
-            .set_target(if self.agent_panel_open { 1.0 } else { 0.0 }, duration);
-        if self.agent_panel_open {
-            if self.input_bar_visible {
-                self.input_bar.focus_handle(cx).focus(window, cx);
-            } else {
-                let focused_inline = self
-                    .agent_panel
-                    .update(cx, |panel, cx| panel.focus_inline_input(window, cx));
-                if !focused_inline {
-                    self.focus_agent_inline_input_next_frame(window, cx);
-                }
-            }
-        } else {
-            self.focus_terminal(window, cx);
-        }
-        self.save_session(cx);
-        cx.notify();
-    }
-
     pub(super) fn toggle_input_bar(
         &mut self,
         _: &crate::ToggleInputBar,
@@ -60,13 +24,6 @@ impl VuWorkspace {
             .set_target(if self.input_bar_visible { 1.0 } else { 0.0 }, duration);
         if self.input_bar_visible {
             self.input_bar.focus_handle(cx).focus(window, cx);
-        } else if self.agent_panel_open {
-            let focused_inline = self
-                .agent_panel
-                .update(cx, |panel, cx| panel.focus_inline_input(window, cx));
-            if !focused_inline {
-                self.focus_agent_inline_input_next_frame(window, cx);
-            }
         } else {
             if let Some(t) = self.try_active_terminal() {
                 t.focus(window, cx);
@@ -152,9 +109,7 @@ impl VuWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.input_bar.read(cx).mode() == InputMode::Agent
-            || self.input_bar.read(cx).pane_infos().len() <= 1
-        {
+        if self.input_bar.read(cx).pane_infos().len() <= 1 {
             return;
         }
 
@@ -313,7 +268,7 @@ impl VuWorkspace {
         }
 
         let detail = format!(
-            "{}\n\nThe file contains layout intent only: tabs, panes, surfaces, cwd, and agent defaults. It does not include terminal text, command history, conversations, credentials, or commands to run.",
+            "{}\n\nThe file contains layout intent only: tabs, panes, surfaces, and cwd. It does not include terminal text, command history, credentials, or commands to run.",
             path.display()
         );
         Self::show_layout_profile_info(window, cx, "Layout profile saved", detail);
@@ -392,19 +347,9 @@ impl VuWorkspace {
                 tab_state.title.clone()
             },
             user_label: tab_state.user_label.clone(),
-            ai_label: None,
-            ai_icon: None,
             color: tab_state.color,
             summary_id,
-            summary_epoch: 0,
             needs_attention: false,
-            session: AgentSession::new(),
-            agent_routing: if tab_state.agent_routing.is_empty() {
-                Self::default_agent_routing(self.harness.config())
-            } else {
-                tab_state.agent_routing.clone()
-            },
-            panel_state: PanelState::new(),
             runtime_trackers: RefCell::new(HashMap::new()),
             runtime_cache: RefCell::new(HashMap::new()),
             shell_history: Self::restore_shell_history(tab_state),
@@ -421,7 +366,6 @@ impl VuWorkspace {
             return;
         }
 
-        let old_active = self.active_tab;
         let first_new = self.tabs.len();
         let imported_active = session.active_tab.min(session.tabs.len().saturating_sub(1));
 
@@ -436,17 +380,6 @@ impl VuWorkspace {
         }
 
         self.active_tab = first_new + imported_active;
-        let incoming = std::mem::replace(
-            &mut self.tabs[self.active_tab].panel_state,
-            PanelState::new(),
-        );
-        let outgoing = self
-            .agent_panel
-            .update(cx, |panel, cx| panel.swap_state(incoming, cx));
-        if old_active < self.tabs.len() {
-            self.tabs[old_active].panel_state = outgoing;
-        }
-
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
             if tab_idx == self.active_tab {
                 continue;
@@ -466,7 +399,6 @@ impl VuWorkspace {
         }
         self.sync_active_terminal_focus_states(cx);
         self.sync_sidebar(cx);
-        self.request_tab_summaries(cx);
         self.save_session(cx);
         cx.notify();
     }

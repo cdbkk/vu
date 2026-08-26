@@ -40,18 +40,6 @@ impl MotionValue {
         };
     }
 
-    pub fn restart(&mut self, from: f32, target: f32, duration: Duration) {
-        self.current = from;
-        self.from = from;
-        self.target = target;
-        self.duration = duration;
-        self.started_at = if (from - target).abs() > 0.001 {
-            Some(Instant::now())
-        } else {
-            None
-        };
-    }
-
     pub fn current(&self) -> f32 {
         let Some(started_at) = self.started_at else {
             return self.target;

@@ -1,7 +1,7 @@
-use vu_core::config::{MAX_ICON_SCALE, MAX_UI_FONT_SIZE, MIN_ICON_SCALE, MIN_UI_FONT_SIZE};
 use gpui::{Pixels, px};
 use gpui_component::Theme;
 use std::sync::atomic::{AtomicU32, Ordering};
+use vu_core::config::{MAX_ICON_SCALE, MAX_UI_FONT_SIZE, MIN_ICON_SCALE, MIN_UI_FONT_SIZE};
 
 const DEFAULT_UI_FONT_SIZE: f32 = 16.0;
 const DEFAULT_MONO_FONT_SIZE: f32 = 13.0;
@@ -73,10 +73,6 @@ pub(crate) fn ui_px(theme: &Theme, base_px: f32) -> Pixels {
 
 pub(crate) fn mono_px(theme: &Theme, base_px: f32) -> Pixels {
     px(base_px * mono_font_scale(theme))
-}
-
-pub(crate) fn ui_space_px(theme: &Theme, base_px: f32) -> Pixels {
-    px(base_px * ui_density_scale(theme))
 }
 
 pub(crate) fn mono_space_px(theme: &Theme, base_px: f32) -> Pixels {

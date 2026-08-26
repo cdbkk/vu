@@ -10,15 +10,14 @@ Read these first:
 
 ## Workspace Map
 
-Terminal crates do not depend on the UI. The agent crate does not depend on a specific terminal backend.
+Terminal crates do not depend on the UI.
 
 | Crate | Role |
 |-------|------|
-| `vu` | GPUI shell: windows, tabs, panes, agent UI, settings, command surfaces |
-| `vu-core` | Config, sessions, shared app logic, harness wiring |
+| `vu` | GPUI shell: windows, tabs, panes, settings, command surfaces |
+| `vu-core` | Config, sessions, shared app logic, and control-plane types |
 | `vu-terminal` | Theme + palette helpers shared across backends |
 | `vu-ghostty` | Per-platform terminal backends: macOS embedded libghostty + Metal, Windows libghostty-vt + ConPTY + D3D11/DirectWrite, Linux Unix PTY + libghostty-vt + GPUI-owned `StyledText` paint |
-| `vu-agent` | Rig integration, tools, hooks, conversation, skills |
 | `vu-cli` | CLI + socket client for the live local control plane |
 
 Each platform exposes the same `GhosttyApp` / `GhosttyTerminal` /
@@ -26,15 +25,6 @@ Each platform exposes the same `GhosttyApp` / `GhosttyTerminal` /
 workspace consumes the backend without per-call-site `cfg` gates.
 See `docs/impl/{linux,windows}-port.md` for the per-platform plans
 and the path to the long-term GPU-accelerated grid renderer.
-
-## Agent Model
-
-- Shared Tokio runtime per window
-- Per-tab agent sessions
-- Tool and model events flow to the UI over channels
-- Rig `PromptHook` drives streaming, approvals, and lifecycle events
-
-For the full breakdown, see `docs/impl/agent-harness.md`.
 
 ## Prerequisites
 
@@ -120,17 +110,11 @@ cargo run -p vu
 cargo wrun -p vu
 ```
 
-With optional arguments:
-
-```bash
-RUST_LOG=vu_agent::flow=info,vu_agent=warn,vu_core=warn,vu::suggestions=debug,vu_core::suggestions=debug cargo run -p vu
-```
-
 ## Test
 
 ```bash
 cargo test --workspace            # macOS / Linux
-cargo wtest -p vu-core -p vu-cli -p vu-agent -p vu-terminal   # Windows (portable crates only)
+cargo wtest -p vu-core -p vu-cli -p vu-terminal   # Windows (portable crates only)
 ```
 
 ## Release Build
@@ -151,8 +135,7 @@ For signed macOS release artifacts, use:
 The macOS app bundle contains both `Contents/MacOS/vu` and
 `Contents/MacOS/vu-cli`; the release verifier fails if the CLI is
 missing. The Homebrew cask and Unix installer expose that bundled
-`vu-cli` on PATH so orchestrators such as `pi-interactive-subagents`
-do not need a separate source checkout.
+`vu-cli` on PATH so control clients do not need a separate source checkout.
 
 Release CI also has a final promotion gate. Platform jobs verify the
 artifact shape before upload, and `release-finalize.yml` keeps the
@@ -183,7 +166,6 @@ that the in-app notify-only updater polls.
 
 - `crates/vu-app/src` — app shell and GPUI surfaces; the Cargo package and default binary are named `vu` (`cargo run -p vu`)
 - `crates/vu-core/src` — shared app logic
-- `crates/vu-agent/src` — agent provider, hooks, tools, skills
 - `docs/design` — design handoff set
 - `docs/impl` — implementation notes
 - `postmortem` — issue writeups and lessons learned

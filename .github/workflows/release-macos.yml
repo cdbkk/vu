@@ -458,7 +458,7 @@ jobs:
             end
 
             name "${app_name}"
-            desc "GPU-accelerated terminal emulator with built-in AI agent"
+            desc "GPU-accelerated terminal emulator"
             homepage "https://github.com/nowledge-co/con-terminal"
 
             livecheck do

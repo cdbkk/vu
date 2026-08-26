@@ -21,83 +21,15 @@ impl VuWorkspace {
             cx,
         );
 
-        self.harness.spawn_detached(async move {
-            let result = match tokio::task::spawn_blocking(move || {
-                exec_response_rx.recv_timeout(std::time::Duration::from_secs(240))
-            })
-            .await
-            {
-                Ok(Ok(response)) => Self::terminal_exec_response_to_control_result(response),
-                Ok(Err(_)) => Err(ControlError::internal(
+        std::thread::spawn(move || {
+            let result = match exec_response_rx.recv_timeout(std::time::Duration::from_secs(240)) {
+                Ok(response) => Self::terminal_exec_response_to_control_result(response),
+                Err(_) => Err(ControlError::internal(
                     "Timed out waiting for the visible shell command to finish",
                 )),
-                Err(err) => Err(ControlError::internal(format!(
-                    "Visible shell join failed: {err}"
-                ))),
             };
             Self::send_control_result(response_tx, result);
         });
-    }
-
-    pub(super) fn handle_pending_control_agent_event(
-        &mut self,
-        tab_idx: usize,
-        event: &HarnessEvent,
-    ) -> bool {
-        let auto_approve = self
-            .pending_control_agent_requests
-            .get(&tab_idx)
-            .map(|pending| pending.auto_approve_tools)
-            .unwrap_or(false);
-
-        if auto_approve {
-            if let HarnessEvent::ToolApprovalNeeded {
-                call_id,
-                approval_tx,
-                ..
-            } = event
-            {
-                let _ = approval_tx.send(vu_agent::ToolApprovalDecision {
-                    call_id: call_id.clone(),
-                    allowed: true,
-                    reason: Some("auto-approved by vu-cli".to_string()),
-                });
-                return true;
-            }
-        }
-
-        match event {
-            HarnessEvent::ResponseComplete(message) => {
-                if let Some(pending) = self.pending_control_agent_requests.remove(&tab_idx) {
-                    let result = serde_json::to_value(AgentAskResult {
-                        tab_index: tab_idx + 1,
-                        conversation_id: self.tabs[tab_idx].session.conversation_id(),
-                        prompt: pending.prompt,
-                        message: message.clone(),
-                    })
-                    .map_err(|err| {
-                        ControlError::internal(format!(
-                            "Failed to serialize agent response for control output: {err}"
-                        ))
-                    });
-                    Self::send_control_result(pending.response_tx, result);
-                }
-            }
-            HarnessEvent::Error(err) => {
-                if err.starts_with("Retrying (") {
-                    return false;
-                }
-                if let Some(pending) = self.pending_control_agent_requests.remove(&tab_idx) {
-                    Self::send_control_result(
-                        pending.response_tx,
-                        Err(ControlError::internal(err.clone())),
-                    );
-                }
-            }
-            _ => {}
-        }
-
-        false
     }
 
     pub(super) fn handle_control_request(
@@ -149,7 +81,6 @@ impl VuWorkspace {
                         pane_count: tab.pane_tree.pane_count(),
                         focused_pane_id: tab.pane_tree.focused_pane_id(),
                         needs_attention: tab.needs_attention,
-                        conversation_id: tab.session.conversation_id(),
                     })
                     .collect::<Vec<_>>();
                 Self::send_control_result(
@@ -184,7 +115,7 @@ impl VuWorkspace {
                     Ok(tab_idx) => {
                         self.spawn_control_pane_query(
                             tab_idx,
-                            vu_agent::PaneQuery::List,
+                            vu_core::PaneQuery::List,
                             response_tx,
                             cx,
                         );
@@ -199,7 +130,7 @@ impl VuWorkspace {
             } => match self.resolve_control_tab_index(tab_index) {
                 Ok(tab_idx) => self.spawn_control_pane_query(
                     tab_idx,
-                    vu_agent::PaneQuery::ReadContent {
+                    vu_core::PaneQuery::ReadContent {
                         target: Self::pane_selector_from_target(target),
                         lines,
                     },
@@ -225,7 +156,7 @@ impl VuWorkspace {
             } => match self.resolve_control_tab_index(tab_index) {
                 Ok(tab_idx) => self.spawn_control_pane_query(
                     tab_idx,
-                    vu_agent::PaneQuery::SendKeys {
+                    vu_core::PaneQuery::SendKeys {
                         target: Self::pane_selector_from_target(target),
                         keys,
                     },
@@ -241,7 +172,7 @@ impl VuWorkspace {
             } => match self.resolve_control_tab_index(tab_index) {
                 Ok(tab_idx) => self.spawn_control_pane_query(
                     tab_idx,
-                    vu_agent::PaneQuery::CreatePane { command, location },
+                    vu_core::PaneQuery::CreatePane { command, location },
                     response_tx,
                     cx,
                 ),
@@ -255,7 +186,7 @@ impl VuWorkspace {
             } => match self.resolve_control_tab_index(tab_index) {
                 Ok(tab_idx) => self.spawn_control_pane_query(
                     tab_idx,
-                    vu_agent::PaneQuery::WaitFor {
+                    vu_core::PaneQuery::WaitFor {
                         target: Self::pane_selector_from_target(target),
                         timeout_secs,
                         pattern,
@@ -269,7 +200,7 @@ impl VuWorkspace {
                 match self.resolve_control_tab_index(tab_index) {
                     Ok(tab_idx) => self.spawn_control_pane_query(
                         tab_idx,
-                        vu_agent::PaneQuery::ProbeShellContext {
+                        vu_core::PaneQuery::ProbeShellContext {
                             target: Self::pane_selector_from_target(target),
                         },
                         response_tx,
@@ -549,7 +480,7 @@ impl VuWorkspace {
                         self.record_runtime_event_for_terminal(
                             tab_idx,
                             &resolved.terminal,
-                            vu_agent::context::PaneRuntimeEvent::RawInput {
+                            vu_core::pane_context::PaneRuntimeEvent::RawInput {
                                 keys: text,
                                 input_generation: resolved.terminal.input_generation(cx),
                             },
@@ -580,7 +511,7 @@ impl VuWorkspace {
                             self.record_runtime_event_for_terminal(
                                 tab_idx,
                                 &resolved.terminal,
-                                vu_agent::context::PaneRuntimeEvent::RawInput {
+                                vu_core::pane_context::PaneRuntimeEvent::RawInput {
                                     keys: key,
                                     input_generation: resolved.terminal.input_generation(cx),
                                 },
@@ -683,7 +614,7 @@ impl VuWorkspace {
                 match self.resolve_control_tab_index(tab_index) {
                     Ok(tab_idx) => self.spawn_control_pane_query(
                         tab_idx,
-                        vu_agent::PaneQuery::InspectTmux {
+                        vu_core::PaneQuery::InspectTmux {
                             target: Self::pane_selector_from_target(target),
                         },
                         response_tx,
@@ -696,7 +627,7 @@ impl VuWorkspace {
                 match self.resolve_control_tab_index(tab_index) {
                     Ok(tab_idx) => self.spawn_control_pane_query(
                         tab_idx,
-                        vu_agent::PaneQuery::TmuxList {
+                        vu_core::PaneQuery::TmuxList {
                             pane: Self::pane_selector_from_target(target),
                         },
                         response_tx,
@@ -713,7 +644,7 @@ impl VuWorkspace {
             } => match self.resolve_control_tab_index(tab_index) {
                 Ok(tab_idx) => self.spawn_control_pane_query(
                     tab_idx,
-                    vu_agent::PaneQuery::TmuxCapture {
+                    vu_core::PaneQuery::TmuxCapture {
                         pane: Self::pane_selector_from_target(pane),
                         target,
                         lines,
@@ -733,7 +664,7 @@ impl VuWorkspace {
             } => match self.resolve_control_tab_index(tab_index) {
                 Ok(tab_idx) => self.spawn_control_pane_query(
                     tab_idx,
-                    vu_agent::PaneQuery::TmuxSendKeys {
+                    vu_core::PaneQuery::TmuxSendKeys {
                         pane: Self::pane_selector_from_target(pane),
                         target,
                         literal_text,
@@ -757,7 +688,7 @@ impl VuWorkspace {
             } => match self.resolve_control_tab_index(tab_index) {
                 Ok(tab_idx) => self.spawn_control_pane_query(
                     tab_idx,
-                    vu_agent::PaneQuery::TmuxRunCommand {
+                    vu_core::PaneQuery::TmuxRunCommand {
                         pane: Self::pane_selector_from_target(pane),
                         target,
                         location,
@@ -771,181 +702,6 @@ impl VuWorkspace {
                 ),
                 Err(err) => Self::send_control_result(response_tx, Err(err)),
             },
-            ControlCommand::AgentNewConversation { tab_index } => {
-                match self.resolve_control_tab_index(tab_index) {
-                    Ok(tab_idx) => {
-                        self.tabs[tab_idx].session.new_conversation();
-                        if tab_idx == self.active_tab {
-                            self.agent_panel.update(cx, |panel, cx| {
-                                panel.clear_messages(cx);
-                            });
-                        } else {
-                            self.tabs[tab_idx].panel_state.clear();
-                        }
-                        self.save_session(cx);
-                        Self::send_control_result(
-                            response_tx,
-                            Ok(json!({
-                                "tab_index": tab_idx + 1,
-                                "conversation_id": self.tabs[tab_idx].session.conversation_id(),
-                            })),
-                        );
-                    }
-                    Err(err) => Self::send_control_result(response_tx, Err(err)),
-                }
-            }
-            ControlCommand::AgentAsk {
-                tab_index,
-                prompt,
-                auto_approve_tools,
-                timeout_secs,
-            } => match self.resolve_control_tab_index(tab_index) {
-                Ok(tab_idx) => {
-                    if prompt.trim().is_empty() {
-                        Self::send_control_result(
-                            response_tx,
-                            Err(ControlError::invalid_params(
-                                "agent.ask requires a non-empty prompt",
-                            )),
-                        );
-                        return;
-                    }
-                    if self.pending_control_agent_requests.contains_key(&tab_idx) {
-                        Self::send_control_result(
-                            response_tx,
-                            Err(ControlError::invalid_params(format!(
-                                "Tab {} already has a pending vu-cli agent request",
-                                tab_idx + 1
-                            ))),
-                        );
-                        return;
-                    }
-
-                    if tab_idx == self.active_tab {
-                        self.agent_panel.update(cx, |panel, cx| {
-                            panel.add_message("user", &prompt, cx);
-                        });
-                    } else {
-                        self.tabs[tab_idx].panel_state.add_message("user", &prompt);
-                    }
-
-                    let context = self.build_agent_context_for_tab(tab_idx, cx);
-                    let session = &self.tabs[tab_idx].session;
-                    let agent_config = self.tab_agent_config(tab_idx);
-                    let request_id = self.next_control_agent_request_id;
-                    self.next_control_agent_request_id =
-                        self.next_control_agent_request_id.wrapping_add(1);
-                    self.pending_control_agent_requests.insert(
-                        tab_idx,
-                        PendingControlAgentRequest {
-                            request_id,
-                            prompt: prompt.clone(),
-                            auto_approve_tools,
-                            response_tx,
-                        },
-                    );
-                    if let Some(timeout_secs) = timeout_secs.map(|secs| secs.clamp(5, 600)) {
-                        self.spawn_control_agent_request_timeout(
-                            tab_idx,
-                            request_id,
-                            timeout_secs,
-                            cx,
-                        );
-                    }
-                    self.harness
-                        .send_message(session, agent_config, prompt, context);
-                }
-                Err(err) => Self::send_control_result(response_tx, Err(err)),
-            },
-            ControlCommand::AgentOpenPanelForRequest { tab_index } => {
-                match self.resolve_control_tab_index(tab_index) {
-                    Ok(tab_idx) => {
-                        if tab_idx == self.active_tab {
-                            if let Some(target) =
-                                super::chrome::agent_panel_motion_target_for_agent_request(
-                                    self.agent_panel_open,
-                                )
-                            {
-                                self.agent_panel_open = true;
-                                let duration =
-                                    Self::terminal_adjacent_chrome_duration(true, 290, 220);
-                                self.agent_panel_motion.set_target(target, duration);
-                                cx.notify();
-                            }
-                        }
-                        let open = if tab_idx == self.active_tab {
-                            self.agent_panel_open
-                        } else {
-                            false
-                        };
-                        Self::send_control_result(
-                            response_tx,
-                            Ok(json!({
-                                "agent_panel": {
-                                    "open": open,
-                                    "content_visible": open,
-                                }
-                            })),
-                        );
-                    }
-                    Err(err) => Self::send_control_result(response_tx, Err(err)),
-                }
-            }
-            ControlCommand::AgentPanelState { tab_index } => {
-                match self.resolve_control_tab_index(tab_index) {
-                    Ok(tab_idx) => {
-                        let open = if tab_idx == self.active_tab {
-                            self.agent_panel_open
-                        } else {
-                            false
-                        };
-                        Self::send_control_result(
-                            response_tx,
-                            Ok(json!({
-                                "agent_panel": {
-                                    "open": open,
-                                    "content_visible": open,
-                                }
-                            })),
-                        );
-                    }
-                    Err(err) => Self::send_control_result(response_tx, Err(err)),
-                }
-            }
         }
-    }
-
-    pub(super) fn spawn_control_agent_request_timeout(
-        &self,
-        _tab_idx: usize,
-        request_id: u64,
-        timeout_secs: u64,
-        cx: &mut Context<Self>,
-    ) {
-        cx.spawn(async move |this, cx| {
-            cx.background_executor()
-                .timer(std::time::Duration::from_secs(timeout_secs))
-                .await;
-
-            let _ = this.update(cx, |workspace, _| {
-                let current_tab_idx = workspace
-                    .pending_control_agent_requests
-                    .iter()
-                    .find_map(|(idx, pending)| (pending.request_id == request_id).then_some(*idx));
-                if let Some(current_tab_idx) = current_tab_idx {
-                    let pending = workspace
-                        .pending_control_agent_requests
-                        .remove(&current_tab_idx)
-                        .expect("pending request must exist");
-                    Self::send_control_result(
-                        pending.response_tx,
-                        Err(ControlError::internal(format!(
-                            "agent.ask timed out after {timeout_secs}s"
-                        ))),
-                    );
-                }
-            });
-        })
-        .detach();
     }
 }

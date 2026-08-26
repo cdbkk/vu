@@ -1,22 +1,14 @@
-use vu_agent::provider::{AgentPurpose, ProviderTransport};
-use vu_agent::{
-    OAuthDevicePrompt, ProviderConfig, ProviderKind, SuggestionModelConfig,
-    authorize_oauth_provider, oauth_token_dir, read_synced_chatgpt_oauth_access_token,
-};
+use gpui::*;
 use vu_core::{
     Config,
     config::{
         AppearanceConfig, DEFAULT_TERMINAL_FONT_FAMILY, MAX_ICON_SCALE, MAX_UI_FONT_SIZE,
-        TerminalTweaks,
-        MIN_ICON_SCALE, MIN_UI_FONT_SIZE, TabsOrientation, is_gpui_pseudo_font_family,
-        sanitize_terminal_font_family,
+        MIN_ICON_SCALE, MIN_UI_FONT_SIZE, TabsOrientation, TerminalTweaks,
+        is_gpui_pseudo_font_family, sanitize_terminal_font_family,
     },
 };
-use futures::{FutureExt, StreamExt};
-use gpui::*;
 
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
-use gpui_component::clipboard::Clipboard;
 use gpui_component::collapsible::Collapsible;
 use gpui_component::color_picker::{ColorPicker, ColorPickerEvent, ColorPickerState};
 use gpui_component::input::InputState;
@@ -25,11 +17,9 @@ use gpui_component::slider::{Slider, SliderEvent, SliderState};
 use gpui_component::switch::Switch;
 use gpui_component::{ActiveTheme, Disableable, Icon, IndexPath, Sizable as _, input::Input};
 
-use crate::model_registry::ModelRegistry;
 use crate::motion::{MotionValue, vertical_reveal_offset};
 use crate::ui_scale::ui_density_scale;
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::collections::HashSet;
 use url::Url;
 
 actions!(settings, [ToggleSettings, SaveSettings, DismissSettings]);
@@ -44,105 +34,13 @@ pub struct ThemePreview(pub String);
 pub struct ThemeLivePreview(pub vu_terminal::TerminalTheme);
 
 /// Emitted for lightweight appearance changes that should be visible
-/// immediately but should not persist/rebuild the full agent config.
+/// immediately but should not persist/rebuild the full config.
 pub struct AppearancePreview;
-
-#[derive(Debug, Clone, Default)]
-struct ProviderOAuthState {
-    in_progress: bool,
-    connected: bool,
-    prompt: Option<OAuthDevicePrompt>,
-    status_message: Option<String>,
-    error_message: Option<String>,
-}
-
-fn provider_connection_status(
-    provider_has_oauth: bool,
-    oauth_ready: bool,
-    oauth_state: Option<&ProviderOAuthState>,
-    oauth_cache_present: bool,
-    has_key_override: bool,
-) -> (bool, &'static str) {
-    let connection_ready = if provider_has_oauth {
-        oauth_ready || has_key_override
-    } else {
-        has_key_override
-    };
-    let connection_label = if provider_has_oauth {
-        match oauth_state {
-            Some(state) if state.in_progress => "Signing In",
-            Some(state) if state.connected => "Signed In",
-            _ if oauth_cache_present => "Signed In",
-            _ if has_key_override => "Ready",
-            _ => "OAuth",
-        }
-    } else if has_key_override {
-        "Ready"
-    } else {
-        "No key"
-    };
-
-    (connection_ready, connection_label)
-}
-
-enum ProviderModelFetchRequest {
-    OpenAICompatible {
-        base_url: String,
-        api_key: Option<String>,
-    },
-    ChatGPT {
-        access_token: String,
-        base_url: Option<String>,
-    },
-}
-
-impl ProviderModelFetchRequest {
-    async fn fetch(self) -> anyhow::Result<ProviderModelFetchResult> {
-        match self {
-            Self::OpenAICompatible { base_url, api_key } => {
-                let models =
-                    ModelRegistry::fetch_openai_compatible_models(&base_url, api_key.as_deref())
-                        .await?;
-                Ok(ProviderModelFetchResult::OpenAICompatible { base_url, models })
-            }
-            Self::ChatGPT {
-                access_token,
-                base_url,
-            } => {
-                let models = ModelRegistry::fetch_chatgpt_subscription_models(
-                    &access_token,
-                    base_url.as_deref(),
-                )
-                .await?;
-                Ok(ProviderModelFetchResult::ChatGPT { models })
-            }
-        }
-    }
-}
-
-enum ProviderModelFetchResult {
-    OpenAICompatible {
-        base_url: String,
-        models: Vec<String>,
-    },
-    ChatGPT {
-        models: Vec<String>,
-    },
-}
-
-impl ProviderModelFetchResult {
-    fn models(&self) -> &[String] {
-        match self {
-            Self::OpenAICompatible { models, .. } | Self::ChatGPT { models } => models,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum SettingsSection {
     General,
     Appearance,
-    Ai,
     Keys,
 }
 
@@ -151,7 +49,6 @@ impl SettingsSection {
         match self {
             Self::General => "General",
             Self::Appearance => "Appearance",
-            Self::Ai => "AI",
             Self::Keys => "Keys",
         }
     }
@@ -160,7 +57,6 @@ impl SettingsSection {
         match self {
             Self::General => "phosphor/sliders.svg",
             Self::Appearance => "phosphor/sun.svg",
-            Self::Ai => "phosphor/robot.svg",
             Self::Keys => "phosphor/keyboard.svg",
         }
     }
@@ -169,42 +65,19 @@ impl SettingsSection {
 const ALL_SECTIONS: &[SettingsSection] = &[
     SettingsSection::General,
     SettingsSection::Appearance,
-    SettingsSection::Ai,
     SettingsSection::Keys,
 ];
 
 pub struct SettingsPanel {
     visible: bool,
+    // ponytail: theme list cached here; all_available() hits disk and render runs per scroll tick
+    all_themes: Vec<vu_terminal::TerminalTheme>,
     standalone: bool,
     config: Config,
     preview_snapshot: Option<Config>,
-    registry: ModelRegistry,
-    oauth_runtime: Arc<tokio::runtime::Runtime>,
     focus_handle: FocusHandle,
     active_section: SettingsSection,
     overlay_motion: MotionValue,
-
-    selected_provider: ProviderKind,
-    active_provider_select: Entity<SelectState<SearchableVec<String>>>,
-    active_model_select: Entity<SelectState<SearchableVec<String>>>,
-    model_input: Entity<InputState>,
-    model_select: Entity<SelectState<SearchableVec<String>>>,
-    endpoint_preset_select: Entity<SelectState<Vec<String>>>,
-    api_key_input: Entity<InputState>,
-    base_url_input: Entity<InputState>,
-    max_tokens_input: Entity<InputState>,
-    max_turns_input: Entity<InputState>,
-    temperature_input: Entity<InputState>,
-    auto_approve: bool,
-    ai_purpose_select: Entity<SelectState<Vec<String>>>,
-
-    suggestion_enabled: bool,
-    suggestion_provider_select: Entity<SelectState<SearchableVec<String>>>,
-    suggestion_model_select: Entity<SelectState<SearchableVec<String>>>,
-    oauth_states: HashMap<ProviderKind, ProviderOAuthState>,
-    provider_model_fetching: bool,
-    provider_model_status: Option<String>,
-    provider_model_status_error: bool,
 
     terminal_font_select: Entity<SelectState<SearchableVec<FontChoice>>>,
     ui_font_select: Entity<SelectState<SearchableVec<FontChoice>>>,
@@ -273,27 +146,6 @@ enum SettingsSaveErrorKind {
     Other,
 }
 
-const SIDEBAR_PROVIDERS: &[ProviderKind] = &[
-    ProviderKind::Anthropic,
-    ProviderKind::OpenAI,
-    ProviderKind::ChatGPT,
-    ProviderKind::GitHubCopilot,
-    ProviderKind::OpenAICompatible,
-    ProviderKind::MiniMax,
-    ProviderKind::Moonshot,
-    ProviderKind::ZAI,
-    ProviderKind::DeepSeek,
-    ProviderKind::Groq,
-    ProviderKind::Gemini,
-    ProviderKind::Ollama,
-    ProviderKind::OpenRouter,
-    ProviderKind::Mistral,
-    ProviderKind::Together,
-    ProviderKind::Cohere,
-    ProviderKind::Perplexity,
-    ProviderKind::XAI,
-];
-
 const BACKGROUND_IMAGE_POSITIONS: &[&str] = &[
     "top-left",
     "top-center",
@@ -307,18 +159,6 @@ const BACKGROUND_IMAGE_POSITIONS: &[&str] = &[
 ];
 
 const BACKGROUND_IMAGE_FITS: &[&str] = &["contain", "cover", "stretch", "none"];
-const ENDPOINT_DEFAULT_LABEL: &str = "Provider Default";
-const ENDPOINT_CUSTOM_LABEL: &str = "Custom";
-const KIMI_CODING_ENDPOINT: EndpointPreset = EndpointPreset {
-    label: "Kimi Coding",
-    base_url: "https://api.kimi.com/coding/v1",
-};
-
-#[derive(Clone, Copy)]
-struct EndpointPreset {
-    label: &'static str,
-    base_url: &'static str,
-}
 
 impl SettingsPanel {
     fn clamp_ui_font_size(value: f32) -> f32 {
@@ -513,673 +353,6 @@ impl SettingsPanel {
         preferred
     }
 
-    fn provider_api_key_placeholder(provider: &ProviderKind) -> &'static str {
-        match provider {
-            ProviderKind::ChatGPT | ProviderKind::GitHubCopilot => "Override for advanced setups",
-            ProviderKind::OpenAICompatible => "Optional, or OPENAI_API_KEY",
-            _ => "sk-.. or OPENAI_API_KEY",
-        }
-    }
-
-    fn provider_api_key_label(provider: &ProviderKind) -> &'static str {
-        match provider {
-            ProviderKind::ChatGPT => "Access Token Override",
-            ProviderKind::GitHubCopilot => "API Key Override",
-            _ => "API Key",
-        }
-    }
-
-    fn provider_api_key_hint(provider: &ProviderKind) -> &'static str {
-        match provider {
-            ProviderKind::ChatGPT => "Leave blank for ChatGPT OAuth.",
-            ProviderKind::GitHubCopilot => "Leave blank for GitHub OAuth.",
-            ProviderKind::OpenAICompatible => {
-                "Optional for local endpoints; use a key or env var when required."
-            }
-            _ => "Key or env var name",
-        }
-    }
-
-    fn provider_has_oauth(provider: &ProviderKind) -> bool {
-        matches!(
-            provider,
-            ProviderKind::ChatGPT | ProviderKind::GitHubCopilot
-        )
-    }
-
-    fn provider_oauth_label(provider: &ProviderKind) -> Option<&'static str> {
-        match provider {
-            ProviderKind::ChatGPT => Some("ChatGPT Subscription"),
-            ProviderKind::GitHubCopilot => Some("GitHub Copilot"),
-            _ => None,
-        }
-    }
-
-    fn provider_oauth_button_label(provider: &ProviderKind) -> Option<&'static str> {
-        match provider {
-            ProviderKind::ChatGPT => Some("Auth ChatGPT"),
-            ProviderKind::GitHubCopilot => Some("Auth GitHub"),
-            _ => None,
-        }
-    }
-
-    fn sidebar_provider_kind(provider: &ProviderKind) -> ProviderKind {
-        match provider {
-            ProviderKind::MiniMaxAnthropic => ProviderKind::MiniMax,
-            ProviderKind::MoonshotAnthropic => ProviderKind::Moonshot,
-            ProviderKind::ZAIAnthropic => ProviderKind::ZAI,
-            _ => provider.clone(),
-        }
-    }
-
-    fn protocol_pair(provider: &ProviderKind) -> Option<(ProviderKind, ProviderKind)> {
-        match Self::sidebar_provider_kind(provider) {
-            ProviderKind::MiniMax => Some((ProviderKind::MiniMax, ProviderKind::MiniMaxAnthropic)),
-            ProviderKind::Moonshot => {
-                Some((ProviderKind::Moonshot, ProviderKind::MoonshotAnthropic))
-            }
-            ProviderKind::ZAI => Some((ProviderKind::ZAI, ProviderKind::ZAIAnthropic)),
-            _ => None,
-        }
-    }
-
-    fn uses_anthropic_protocol(provider: &ProviderKind) -> bool {
-        matches!(
-            provider,
-            ProviderKind::MiniMaxAnthropic
-                | ProviderKind::MoonshotAnthropic
-                | ProviderKind::ZAIAnthropic
-        )
-    }
-
-    fn protocol_switch_label(provider: &ProviderKind) -> Option<&'static str> {
-        Self::protocol_pair(provider).map(|_| "Anthropic API")
-    }
-
-    fn protocol_switch_hint(provider: &ProviderKind) -> Option<&'static str> {
-        Self::protocol_pair(provider).map(|_| "OpenAI- or Anthropic-compatible API")
-    }
-
-    fn provider_icon_path(provider: &ProviderKind) -> &'static str {
-        match Self::sidebar_provider_kind(provider) {
-            ProviderKind::Anthropic => "providers/anthropic.svg",
-            ProviderKind::OpenAI => "providers/openai.svg",
-            ProviderKind::ChatGPT => "providers/openai.svg",
-            ProviderKind::GitHubCopilot => "providers/githubcopilot.svg",
-            ProviderKind::OpenAICompatible => "phosphor/plugs-connected.svg",
-            ProviderKind::MiniMax => "providers/minimax.svg",
-            ProviderKind::Moonshot => "providers/moonshot.svg",
-            ProviderKind::ZAI => "providers/zai.svg",
-            ProviderKind::DeepSeek => "providers/deepseek.svg",
-            ProviderKind::Groq => "providers/groq.svg",
-            ProviderKind::Gemini => "providers/gemini.svg",
-            ProviderKind::Ollama => "providers/ollama.svg",
-            ProviderKind::OpenRouter => "providers/openrouter.svg",
-            ProviderKind::Mistral => "providers/mistral.svg",
-            ProviderKind::Together => "providers/together.svg",
-            ProviderKind::Cohere => "providers/cohere.svg",
-            ProviderKind::Perplexity => "providers/perplexity.svg",
-            ProviderKind::XAI => "providers/xai.svg",
-            _ => "phosphor/plugs-connected.svg",
-        }
-    }
-
-    fn provider_config_has_auth_signal(provider: &ProviderKind, config: &ProviderConfig) -> bool {
-        let has_api_key = config
-            .api_key
-            .as_ref()
-            .is_some_and(|v| !v.trim().is_empty())
-            || config
-                .api_key_env
-                .as_ref()
-                .is_some_and(|v| !v.trim().is_empty());
-        if has_api_key {
-            return true;
-        }
-
-        *provider == ProviderKind::OpenAICompatible
-            && config
-                .base_url
-                .as_ref()
-                .is_some_and(|v| !v.trim().is_empty())
-    }
-
-    fn provider_is_configured(&self, provider: &ProviderKind, cx: &App) -> bool {
-        let sidebar_provider = Self::sidebar_provider_kind(provider);
-        if Self::provider_oauth_cache_present(&sidebar_provider) {
-            return true;
-        }
-        if self
-            .oauth_state(&sidebar_provider)
-            .is_some_and(|state| state.connected || state.in_progress)
-        {
-            return true;
-        }
-
-        let has_config = |kind: &ProviderKind| {
-            if *kind == self.selected_provider {
-                let current = self.read_provider_inputs(cx);
-                return Self::provider_config_has_auth_signal(kind, &current);
-            }
-            self.config
-                .agent
-                .providers
-                .get(kind)
-                .is_some_and(|config| Self::provider_config_has_auth_signal(kind, config))
-        };
-
-        has_config(&sidebar_provider)
-            || match sidebar_provider {
-                ProviderKind::MiniMax => has_config(&ProviderKind::MiniMaxAnthropic),
-                ProviderKind::Moonshot => has_config(&ProviderKind::MoonshotAnthropic),
-                ProviderKind::ZAI => has_config(&ProviderKind::ZAIAnthropic),
-                _ => false,
-            }
-    }
-
-    fn provider_oauth_cache_present(provider: &ProviderKind) -> bool {
-        let Some(dir) = oauth_token_dir(provider) else {
-            return false;
-        };
-        match provider {
-            ProviderKind::ChatGPT => dir.join("auth.json").is_file(),
-            ProviderKind::GitHubCopilot => {
-                dir.join("access-token").is_file() || dir.join("api-key.json").is_file()
-            }
-            _ => false,
-        }
-    }
-
-    fn provider_oauth_ready(&self, provider: &ProviderKind) -> bool {
-        let sidebar_provider = Self::sidebar_provider_kind(provider);
-        Self::provider_oauth_cache_present(&sidebar_provider)
-            || self
-                .oauth_state(&sidebar_provider)
-                .is_some_and(|state| state.connected || state.in_progress)
-    }
-
-    fn sidebar_selection_target(
-        clicked_provider: &ProviderKind,
-        current_selected: &ProviderKind,
-    ) -> ProviderKind {
-        if Self::sidebar_provider_kind(current_selected) == *clicked_provider
-            && Self::uses_anthropic_protocol(current_selected)
-        {
-            current_selected.clone()
-        } else {
-            clicked_provider.clone()
-        }
-    }
-
-    fn protocol_toggled_provider(
-        provider: &ProviderKind,
-        use_anthropic: bool,
-    ) -> Option<ProviderKind> {
-        Self::protocol_pair(provider).map(|(openai_kind, anthropic_kind)| {
-            if use_anthropic {
-                anthropic_kind
-            } else {
-                openai_kind
-            }
-        })
-    }
-
-    fn provider_for_transport(
-        provider: &ProviderKind,
-        transport: ProviderTransport,
-    ) -> Option<ProviderKind> {
-        Self::protocol_pair(provider).map(|(openai_kind, anthropic_kind)| match transport {
-            ProviderTransport::OpenAI => openai_kind,
-            ProviderTransport::Anthropic => anthropic_kind,
-        })
-    }
-
-    fn preferred_sidebar_provider(
-        config: &Config,
-        clicked_provider: &ProviderKind,
-    ) -> ProviderKind {
-        let sidebar_provider = Self::sidebar_provider_kind(clicked_provider);
-        let transport = config.agent.provider_transport_for(&sidebar_provider);
-        Self::provider_for_transport(
-            &sidebar_provider,
-            transport.unwrap_or(ProviderTransport::OpenAI),
-        )
-        .unwrap_or(sidebar_provider)
-    }
-
-    fn provider_for_saved_transport(config: &Config, provider: &ProviderKind) -> ProviderKind {
-        let sidebar_provider = Self::sidebar_provider_kind(provider);
-        let Some(transport) = config.agent.provider_transport_for(&sidebar_provider) else {
-            return provider.clone();
-        };
-
-        Self::provider_for_transport(&sidebar_provider, transport).unwrap_or(provider.clone())
-    }
-
-    fn normalize_active_provider_for_saved_transport(&mut self) {
-        self.config.agent.provider =
-            Self::provider_for_saved_transport(&self.config, &self.config.agent.provider);
-    }
-
-    fn set_active_provider_if_tracking(
-        &mut self,
-        source_provider: &ProviderKind,
-        target_provider: &ProviderKind,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if Self::sidebar_provider_kind(&self.config.agent.provider)
-            != Self::sidebar_provider_kind(source_provider)
-        {
-            return;
-        }
-
-        self.config.agent.select_provider(target_provider.clone());
-        self.active_model_select =
-            Self::make_active_model_select(&self.config, &self.registry, window, cx);
-    }
-
-    fn oauth_state(&self, provider: &ProviderKind) -> Option<&ProviderOAuthState> {
-        self.oauth_states.get(provider)
-    }
-
-    fn oauth_state_mut(&mut self, provider: &ProviderKind) -> &mut ProviderOAuthState {
-        self.oauth_states.entry(provider.clone()).or_default()
-    }
-
-    fn start_provider_oauth(
-        &mut self,
-        provider: ProviderKind,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let state = self.oauth_state_mut(&provider);
-        state.in_progress = true;
-        state.connected = false;
-        state.prompt = None;
-        state.status_message = Some("Waiting for device authorization…".to_string());
-        state.error_message = None;
-        cx.notify();
-
-        let runtime = self.oauth_runtime.clone();
-        cx.spawn_in(window, async move |this, window| {
-            let (prompt_tx, prompt_rx) = futures::channel::mpsc::unbounded::<OAuthDevicePrompt>();
-            let (result_tx, result_rx) = futures::channel::oneshot::channel::<Result<(), String>>();
-
-            runtime.spawn({
-                let provider = provider.clone();
-                async move {
-                    let result = authorize_oauth_provider(provider, move |prompt| {
-                        let _ = prompt_tx.unbounded_send(prompt);
-                    })
-                    .await
-                    .map_err(|err| err.to_string());
-
-                    let _ = result_tx.send(result);
-                }
-            });
-
-            let mut prompt_rx = prompt_rx.fuse();
-            let mut result_rx = result_rx.fuse();
-
-            loop {
-                futures::select! {
-                    maybe_prompt = prompt_rx.next() => {
-                        let Some(prompt) = maybe_prompt else {
-                            continue;
-                        };
-                        let verification_uri = prompt.verification_uri.clone();
-                        let _ = window.update(|window, cx| {
-                            let _ = this.update(cx, |panel, cx| {
-                                let state = panel.oauth_state_mut(&provider);
-                                state.prompt = Some(prompt);
-                                state.status_message = Some("Finish sign-in in your browser. Vu will continue automatically.".to_string());
-                                state.error_message = None;
-                                cx.open_url(&verification_uri);
-                                cx.notify();
-                            });
-                            let _ = window;
-                        });
-                    }
-                    result = result_rx => {
-                        let _ = window.update(|window, cx| {
-                            let _ = this.update(cx, |panel, cx| {
-                                let state = panel.oauth_state_mut(&provider);
-                                state.in_progress = false;
-                                match result {
-                                    Ok(Ok(())) => {
-                                        state.connected = true;
-                                        state.prompt = None;
-                                        state.status_message = Some("Authorized and stored in Vu’s auth cache.".to_string());
-                                        state.error_message = None;
-                                    }
-                                    Ok(Err(err)) => {
-                                        state.connected = false;
-                                        state.error_message = Some(err);
-                                        state.status_message = None;
-                                    }
-                                    Err(_) => {
-                                        state.connected = false;
-                                        state.error_message = Some("OAuth flow ended unexpectedly.".to_string());
-                                        state.status_message = None;
-                                    }
-                                }
-                                cx.notify();
-                            });
-                            let _ = window;
-                        });
-                        break;
-                    }
-                }
-            }
-        })
-        .detach();
-    }
-
-    fn provider_base_url_hint(provider: &ProviderKind) -> &'static str {
-        if Self::provider_endpoint_presets(provider).is_empty() {
-            "Blank for the default"
-        } else {
-            "Blank for provider default"
-        }
-    }
-
-    fn provider_endpoint_presets(provider: &ProviderKind) -> &'static [EndpointPreset] {
-        match provider {
-            ProviderKind::MiniMax => &[
-                EndpointPreset {
-                    label: "Global",
-                    base_url: "https://api.minimax.io/v1",
-                },
-                EndpointPreset {
-                    label: "China",
-                    base_url: "https://api.minimaxi.com/v1",
-                },
-            ],
-            ProviderKind::MiniMaxAnthropic => &[
-                EndpointPreset {
-                    label: "Global",
-                    base_url: "https://api.minimax.io/anthropic",
-                },
-                EndpointPreset {
-                    label: "China",
-                    base_url: "https://api.minimaxi.com/anthropic",
-                },
-            ],
-            ProviderKind::Moonshot => &[
-                EndpointPreset {
-                    label: "Global",
-                    base_url: "https://api.moonshot.ai/v1",
-                },
-                EndpointPreset {
-                    label: "China",
-                    base_url: "https://api.moonshot.cn/v1",
-                },
-                KIMI_CODING_ENDPOINT,
-            ],
-            ProviderKind::MoonshotAnthropic => &[EndpointPreset {
-                label: "Global",
-                base_url: "https://api.moonshot.ai/anthropic",
-            }],
-            ProviderKind::ZAI => &[
-                EndpointPreset {
-                    label: "General",
-                    base_url: "https://api.z.ai/api/paas/v4",
-                },
-                EndpointPreset {
-                    label: "Coding",
-                    base_url: "https://api.z.ai/api/coding/paas/v4",
-                },
-            ],
-            ProviderKind::ZAIAnthropic => &[EndpointPreset {
-                label: "Anthropic",
-                base_url: "https://api.z.ai/api/anthropic",
-            }],
-            _ => &[],
-        }
-    }
-
-    fn extra_endpoint_presets(provider: &ProviderKind) -> &'static [EndpointPreset] {
-        match provider {
-            // Kimi Coding is OpenAI-compatible only. Show it while the Moonshot
-            // card is in Anthropic mode and switch back to OpenAI when selected.
-            ProviderKind::MoonshotAnthropic => &[KIMI_CODING_ENDPOINT],
-            _ => &[],
-        }
-    }
-
-    fn endpoint_options(provider: &ProviderKind) -> Vec<String> {
-        let presets = Self::provider_endpoint_presets(provider);
-        let extra_presets = Self::extra_endpoint_presets(provider);
-        if presets.is_empty() && extra_presets.is_empty() {
-            return vec![ENDPOINT_DEFAULT_LABEL.to_string()];
-        }
-
-        let mut options = Vec::with_capacity(presets.len() + extra_presets.len() + 2);
-        options.push(ENDPOINT_DEFAULT_LABEL.to_string());
-        options.extend(presets.iter().map(|preset| preset.label.to_string()));
-        for preset in extra_presets {
-            if !options.iter().any(|option| option == preset.label) {
-                options.push(preset.label.to_string());
-            }
-        }
-        options.push(ENDPOINT_CUSTOM_LABEL.to_string());
-        options
-    }
-
-    fn endpoint_preset_for_label(
-        provider: &ProviderKind,
-        label: &str,
-    ) -> Option<(ProviderKind, EndpointPreset)> {
-        if let Some(preset) = Self::provider_endpoint_presets(provider)
-            .iter()
-            .copied()
-            .find(|preset| preset.label == label)
-        {
-            return Some((provider.clone(), preset));
-        }
-
-        Self::extra_endpoint_presets(provider)
-            .iter()
-            .copied()
-            .find(|preset| preset.label == label)
-            .and_then(|preset| match provider {
-                ProviderKind::MoonshotAnthropic => Some((ProviderKind::Moonshot, preset)),
-                _ => None,
-            })
-    }
-
-    fn endpoint_label_for_base_url(
-        provider: &ProviderKind,
-        base_url: Option<&str>,
-    ) -> &'static str {
-        let Some(base_url) = base_url.map(str::trim).filter(|value| !value.is_empty()) else {
-            return ENDPOINT_DEFAULT_LABEL;
-        };
-
-        for preset in Self::provider_endpoint_presets(provider) {
-            if preset.base_url == base_url {
-                return preset.label;
-            }
-        }
-        for preset in Self::extra_endpoint_presets(provider) {
-            if preset.base_url == base_url {
-                return preset.label;
-            }
-        }
-
-        ENDPOINT_CUSTOM_LABEL
-    }
-
-    fn mapped_protocol_base_url(
-        source_provider: &ProviderKind,
-        target_provider: &ProviderKind,
-        source_base_url: Option<&str>,
-    ) -> Option<String> {
-        let source_label = Self::endpoint_label_for_base_url(source_provider, source_base_url);
-        if matches!(source_label, ENDPOINT_DEFAULT_LABEL | ENDPOINT_CUSTOM_LABEL) {
-            let target_presets = Self::provider_endpoint_presets(target_provider);
-            return (target_presets.len() == 1).then(|| target_presets[0].base_url.to_string());
-        }
-
-        if let Some(preset) = Self::provider_endpoint_presets(target_provider)
-            .iter()
-            .find(|preset| preset.label == source_label)
-        {
-            return Some(preset.base_url.to_string());
-        }
-
-        let target_presets = Self::provider_endpoint_presets(target_provider);
-        (target_presets.len() == 1).then(|| target_presets[0].base_url.to_string())
-    }
-
-    fn source_endpoint_is_named_preset(
-        source_provider: &ProviderKind,
-        source_base_url: Option<&str>,
-    ) -> bool {
-        !matches!(
-            Self::endpoint_label_for_base_url(source_provider, source_base_url),
-            ENDPOINT_DEFAULT_LABEL | ENDPOINT_CUSTOM_LABEL
-        )
-    }
-
-    fn seed_protocol_variant_config(
-        source_provider: &ProviderKind,
-        target_provider: &ProviderKind,
-        source: &ProviderConfig,
-        target: &ProviderConfig,
-    ) -> ProviderConfig {
-        let mut seeded = target.clone();
-
-        if seeded.model.is_none() {
-            seeded.model = source.model.clone();
-        }
-        if seeded.api_key.is_none() {
-            seeded.api_key = source.api_key.clone();
-        }
-        if seeded.api_key_env.is_none() {
-            seeded.api_key_env = source.api_key_env.clone();
-        }
-        if seeded.max_tokens.is_none() {
-            seeded.max_tokens = source.max_tokens;
-        }
-        let target_base_url_is_empty = seeded
-            .base_url
-            .as_deref()
-            .is_none_or(|value| value.trim().is_empty());
-        let mapped_base_url = Self::mapped_protocol_base_url(
-            source_provider,
-            target_provider,
-            source.base_url.as_deref(),
-        );
-        if let Some(mapped_base_url) = mapped_base_url
-            && (target_base_url_is_empty
-                || Self::source_endpoint_is_named_preset(
-                    source_provider,
-                    source.base_url.as_deref(),
-                ))
-        {
-            seeded.base_url = Some(mapped_base_url);
-        }
-
-        seeded
-    }
-
-    fn make_endpoint_preset_select(
-        provider: &ProviderKind,
-        current_base_url: &Option<String>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Entity<SelectState<Vec<String>>> {
-        let options = Self::endpoint_options(provider);
-        let selected_index = options
-            .iter()
-            .position(|item| {
-                item == Self::endpoint_label_for_base_url(provider, current_base_url.as_deref())
-            })
-            .map(IndexPath::new);
-        let entity = cx.new(|cx| SelectState::new(options, selected_index, window, cx));
-        cx.subscribe_in(
-            &entity,
-            window,
-            |this, _, ev: &SelectEvent<Vec<String>>, window, cx| {
-                let SelectEvent::Confirm(Some(value)) = ev else {
-                    return;
-                };
-
-                match value.as_str() {
-                    ENDPOINT_DEFAULT_LABEL => {
-                        this.base_url_input
-                            .update(cx, |input, cx| input.set_value("", window, cx));
-                    }
-                    ENDPOINT_CUSTOM_LABEL => {}
-                    _ => {
-                        if let Some((target_provider, preset)) =
-                            Self::endpoint_preset_for_label(&this.selected_provider, value.as_str())
-                        {
-                            if target_provider != this.selected_provider {
-                                let source_provider = this.selected_provider.clone();
-                                let source_config = this.read_provider_inputs(cx);
-                                this.config
-                                    .agent
-                                    .providers
-                                    .set(&source_provider, source_config.clone());
-
-                                let target_config =
-                                    this.config.agent.providers.get_or_default(&target_provider);
-                                let mut seeded_target = Self::seed_protocol_variant_config(
-                                    &source_provider,
-                                    &target_provider,
-                                    &source_config,
-                                    &target_config,
-                                );
-                                seeded_target.base_url = Some(preset.base_url.to_string());
-                                this.config
-                                    .agent
-                                    .providers
-                                    .set(&target_provider, seeded_target);
-                                this.config.agent.set_provider_transport(
-                                    &target_provider,
-                                    Some(ProviderTransport::OpenAI),
-                                );
-                                this.set_active_provider_if_tracking(
-                                    &source_provider,
-                                    &target_provider,
-                                    window,
-                                    cx,
-                                );
-                                this.transition_provider(target_provider, window, cx);
-                                return;
-                            }
-
-                            this.base_url_input.update(cx, |input, cx| {
-                                input.set_value(preset.base_url, window, cx);
-                            });
-                        }
-                    }
-                }
-
-                cx.notify();
-            },
-        )
-        .detach();
-        entity
-    }
-
-    fn sync_provider_placeholders(
-        &self,
-        provider: &ProviderKind,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.api_key_input.update(cx, |input, cx| {
-            input.set_placeholder(Self::provider_api_key_placeholder(provider), window, cx);
-        });
-        self.base_url_input.update(cx, |input, cx| {
-            input.set_placeholder("Default endpoint", window, cx);
-        });
-    }
-
     fn make_font_select(
         options: &[String],
         current_value: &str,
@@ -1194,200 +367,21 @@ impl SettingsPanel {
         cx.new(|cx| SelectState::new(items, selected_index, window, cx).searchable(true))
     }
 
-    fn make_searchable_string_select(
-        options: &[String],
-        current_value: &str,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Entity<SelectState<SearchableVec<String>>> {
-        let items = SearchableVec::new(options.to_vec());
-        let selected_index = options
-            .iter()
-            .position(|item| item == current_value)
-            .map(IndexPath::new);
-        cx.new(|cx| SelectState::new(items, selected_index, window, cx).searchable(true))
-    }
-
-    fn suggestion_provider_options() -> Vec<String> {
-        let mut options = vec!["Same as active provider".to_string()];
-        options.extend(
-            SIDEBAR_PROVIDERS
-                .iter()
-                .map(|provider| provider_label(provider).to_string()),
-        );
-        options
-    }
-
-    fn suggestion_provider_label(provider: Option<&ProviderKind>) -> String {
-        provider
-            .map(|provider| provider_label(&Self::sidebar_provider_kind(provider)))
-            .unwrap_or("Same as active provider")
-            .to_string()
-    }
-
-    fn suggestion_provider_from_label(label: &str) -> Option<ProviderKind> {
-        if label == "Same as active provider" {
-            return None;
-        }
-
-        SIDEBAR_PROVIDERS
-            .iter()
-            .find(|provider| provider_label(provider) == label)
-            .cloned()
-    }
-
-    fn effective_suggestion_provider(config: &Config) -> ProviderKind {
-        let provider = config
-            .agent
-            .suggestion_model
-            .provider
-            .clone()
-            .unwrap_or_else(|| config.agent.provider.clone());
-        Self::provider_for_saved_transport(config, &provider)
-    }
-
-    fn provider_options() -> Vec<String> {
-        SIDEBAR_PROVIDERS
-            .iter()
-            .map(|provider| provider_label(provider).to_string())
-            .collect()
-    }
-
-    fn ai_purpose_options() -> &'static [&'static str] {
-        &["Build", "Explain", "Operate"]
-    }
-
-    fn ai_purpose_label(purpose: AgentPurpose) -> &'static str {
-        match purpose {
-            AgentPurpose::Build => "Build",
-            AgentPurpose::Explain => "Explain",
-            AgentPurpose::Operate => "Operate",
-        }
-    }
-
-    fn ai_purpose_from_label(label: &str) -> AgentPurpose {
-        match label {
-            "Explain" => AgentPurpose::Explain,
-            "Operate" => AgentPurpose::Operate,
-            _ => AgentPurpose::Build,
-        }
-    }
-
     fn card_opacity(&self) -> f32 {
         0.74
     }
 
-    pub fn new(
-        config: &Config,
-        registry: ModelRegistry,
-        oauth_runtime: Arc<tokio::runtime::Runtime>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Self {
+    pub fn new(config: &Config, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut config = config.clone();
         config.appearance.terminal_blur =
             Self::effective_terminal_blur(config.appearance.terminal_blur);
-        let active_provider = Self::provider_for_saved_transport(&config, &config.agent.provider);
-        config.agent.provider = active_provider;
-        let agent = &config.agent;
-        let selected_provider = Self::provider_for_saved_transport(&config, &agent.provider);
-        let pc = agent.providers.get_or_default(&selected_provider);
-        let active_provider_select = Self::make_searchable_string_select(
-            &Self::provider_options(),
-            provider_label(&Self::sidebar_provider_kind(&agent.provider)),
-            window,
-            cx,
-        );
-        let active_model_select = Self::make_active_model_select(&config, &registry, window, cx);
-
-        let model_input = cx.new(|cx| {
-            let mut s = InputState::new(window, cx);
-            s.set_placeholder("Provider default or custom model ID", window, cx);
-            s.set_value(&pc.model.clone().unwrap_or_default(), window, cx);
-            s
-        });
-        let model_select = Self::make_model_select(
-            &selected_provider,
-            &pc.model,
-            pc.base_url.as_deref(),
-            &registry,
-            window,
-            cx,
-        );
-        let endpoint_preset_select =
-            Self::make_endpoint_preset_select(&selected_provider, &pc.base_url, window, cx);
-        let api_key_input = cx.new(|cx| {
-            let mut s = InputState::new(window, cx);
-            s.set_placeholder(
-                Self::provider_api_key_placeholder(&selected_provider),
-                window,
-                cx,
-            );
-            let val = pc
-                .api_key
-                .clone()
-                .or_else(|| pc.api_key_env.clone())
-                .unwrap_or_default();
-            s.set_value(&val, window, cx);
-            s
-        });
-        let base_url_input = cx.new(|cx| {
-            let mut s = InputState::new(window, cx);
-            s.set_placeholder("Default endpoint", window, cx);
-            s.set_value(&pc.base_url.clone().unwrap_or_default(), window, cx);
-            s
-        });
-        let max_tokens_input = cx.new(|cx| {
-            let mut s = InputState::new(window, cx);
-            s.set_placeholder("Provider default", window, cx);
-            s.set_value(
-                &pc.max_tokens.map(|t| t.to_string()).unwrap_or_default(),
-                window,
-                cx,
-            );
-            s
-        });
-        let max_turns_input = cx.new(|cx| {
-            let mut s = InputState::new(window, cx);
-            s.set_placeholder("10", window, cx);
-            s.set_value(&agent.max_turns.to_string(), window, cx);
-            s
-        });
-        let temperature_input = cx.new(|cx| {
-            let mut s = InputState::new(window, cx);
-            s.set_placeholder("Provider default", window, cx);
-            s.set_value(
-                &agent.temperature.map(|t| t.to_string()).unwrap_or_default(),
-                window,
-                cx,
-            );
-            s
-        });
-        let ai_purpose_select = Self::make_string_select(
-            Self::ai_purpose_options(),
-            Self::ai_purpose_label(agent.purpose),
-            window,
-            cx,
-        );
-        let suggestion_provider_select = Self::make_searchable_string_select(
-            &Self::suggestion_provider_options(),
-            &Self::suggestion_provider_label(agent.suggestion_model.provider.as_ref()),
-            window,
-            cx,
-        );
-        let suggestion_model_select =
-            Self::make_suggestion_model_select(&config, &registry, window, cx);
         let all_font_families = cx.text_system().all_font_names();
         let terminal_font_families =
             Self::prepare_terminal_font_families(&config, all_font_families.clone());
         let ui_font_families = Self::prepare_ui_font_families(&config, all_font_families);
         let terminal_font_family = sanitize_terminal_font_family(&config.terminal.font_family);
-        let terminal_font_select = Self::make_font_select(
-            &terminal_font_families,
-            &terminal_font_family,
-            window,
-            cx,
-        );
+        let terminal_font_select =
+            Self::make_font_select(&terminal_font_families, &terminal_font_family, window, cx);
         let ui_font_select = Self::make_font_select(
             &ui_font_families,
             &config.appearance.ui_font_family,
@@ -1632,16 +626,19 @@ impl SettingsPanel {
         tweak_slider!(letter_spacing_slider, letter_spacing_percent);
         tweak_slider!(minimum_contrast_slider, minimum_contrast);
         tweak_slider!(unfocused_split_slider, unfocused_split_opacity);
-        cx.subscribe(&window_padding_slider, |this, _, event: &SliderEvent, cx| {
-            let SliderEvent::Change(value) = event;
-            // One control drives both axes; separate x/y padding is a config-file
-            // level knob, not something worth two sliders in the panel.
-            this.config.terminal.tweaks.window_padding_x = value.end();
-            this.config.terminal.tweaks.window_padding_y = value.end();
-            this.config.terminal.tweaks.normalize();
-            cx.emit(AppearancePreview);
-            cx.notify();
-        })
+        cx.subscribe(
+            &window_padding_slider,
+            |this, _, event: &SliderEvent, cx| {
+                let SliderEvent::Change(value) = event;
+                // One control drives both axes; separate x/y padding is a config-file
+                // level knob, not something worth two sliders in the panel.
+                this.config.terminal.tweaks.window_padding_x = value.end();
+                this.config.terminal.tweaks.window_padding_y = value.end();
+                this.config.terminal.tweaks.normalize();
+                cx.emit(AppearancePreview);
+                cx.notify();
+            },
+        )
         .detach();
         cx.subscribe(&icon_scale_slider, |this, _, event: &SliderEvent, cx| {
             match event {
@@ -1734,8 +731,7 @@ impl SettingsPanel {
             &tab_close_size_slider,
             |this, _, event: &SliderEvent, cx| match event {
                 SliderEvent::Change(value) => {
-                    this.config.appearance.tab_close_size =
-                        Self::clamp_tab_close_size(value.end());
+                    this.config.appearance.tab_close_size = Self::clamp_tab_close_size(value.end());
                     cx.emit(AppearancePreview);
                     cx.notify();
                 }
@@ -1749,55 +745,6 @@ impl SettingsPanel {
                     this.config.appearance.background_image_opacity =
                         Self::clamp_background_image_opacity(value.end());
                     cx.emit(AppearancePreview);
-                    cx.notify();
-                }
-            },
-        )
-        .detach();
-        cx.subscribe_in(
-            &active_provider_select,
-            window,
-            |this, _, ev: &SelectEvent<SearchableVec<String>>, window, cx| {
-                if let SelectEvent::Confirm(Some(value)) = ev {
-                    if let Some(provider) = Self::suggestion_provider_from_label(value) {
-                        let provider = Self::provider_for_saved_transport(&this.config, &provider);
-                        this.config.agent.select_provider(provider);
-                        this.active_model_select = Self::make_active_model_select(
-                            &this.config,
-                            &this.registry,
-                            window,
-                            cx,
-                        );
-                        cx.notify();
-                    }
-                }
-            },
-        )
-        .detach();
-        cx.subscribe_in(
-            &suggestion_provider_select,
-            window,
-            |this, _, ev: &SelectEvent<SearchableVec<String>>, window, cx| {
-                if let SelectEvent::Confirm(Some(value)) = ev {
-                    this.config.agent.suggestion_model.provider =
-                        Self::suggestion_provider_from_label(value);
-                    this.suggestion_model_select = Self::make_suggestion_model_select(
-                        &this.config,
-                        &this.registry,
-                        window,
-                        cx,
-                    );
-                    cx.notify();
-                }
-            },
-        )
-        .detach();
-        cx.subscribe_in(
-            &ai_purpose_select,
-            window,
-            |this, _, ev: &SelectEvent<Vec<String>>, _, cx| {
-                if let SelectEvent::Confirm(Some(value)) = ev {
-                    this.config.agent.purpose = Self::ai_purpose_from_label(value);
                     cx.notify();
                 }
             },
@@ -1867,34 +814,13 @@ impl SettingsPanel {
 
         Self {
             visible: false,
+            all_themes: vu_terminal::TerminalTheme::all_available(),
             standalone: false,
             config: config.clone(),
             preview_snapshot: None,
-            registry,
-            oauth_runtime,
             focus_handle: cx.focus_handle(),
             active_section: SettingsSection::General,
             overlay_motion: MotionValue::new(0.0),
-            selected_provider,
-            active_provider_select,
-            active_model_select,
-            model_input,
-            model_select,
-            endpoint_preset_select,
-            api_key_input,
-            base_url_input,
-            max_tokens_input,
-            max_turns_input,
-            temperature_input,
-            auto_approve: config.agent.auto_approve_tools,
-            ai_purpose_select,
-            suggestion_enabled: config.agent.suggestion_model.enabled,
-            suggestion_provider_select,
-            suggestion_model_select,
-            oauth_states: HashMap::new(),
-            provider_model_fetching: false,
-            provider_model_status: None,
-            provider_model_status_error: false,
             terminal_font_select,
             ui_font_select,
             cursor_style_select,
@@ -1953,12 +879,14 @@ impl SettingsPanel {
             std::time::Duration::from_millis(if self.visible { 220 } else { 180 }),
         );
         if self.visible {
+            self.all_themes = vu_terminal::TerminalTheme::all_available();
             self.refresh_controls_from_config(window, cx);
         } else {
             // Ensure hotkeys are always re-enabled when the panel closes,
             // even if recording was active when the user dismissed it.
             self.set_recording_key(None);
         }
+        cx.emit(VisibilityChanged);
         cx.notify();
     }
 
@@ -1970,6 +898,7 @@ impl SettingsPanel {
         self.overlay_motion
             .set_target(1.0, std::time::Duration::ZERO);
         self.refresh_controls_from_config(window, cx);
+        cx.emit(VisibilityChanged);
         cx.notify();
     }
 
@@ -1987,60 +916,6 @@ impl SettingsPanel {
     }
 
     fn refresh_controls_from_config(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.normalize_active_provider_for_saved_transport();
-        self.selected_provider =
-            Self::provider_for_saved_transport(&self.config, &self.selected_provider);
-        let agent = &self.config.agent;
-        let pc = agent.providers.get_or_default(&self.selected_provider);
-        self.load_provider_inputs(&pc, window, cx);
-        self.sync_provider_placeholders(&self.selected_provider, window, cx);
-        self.max_turns_input.update(cx, |s, cx| {
-            s.set_value(&agent.max_turns.to_string(), window, cx)
-        });
-        self.temperature_input.update(cx, |s, cx| {
-            s.set_value(
-                &agent.temperature.map(|t| t.to_string()).unwrap_or_default(),
-                window,
-                cx,
-            )
-        });
-        self.active_provider_select.update(cx, |select, cx| {
-            select.set_selected_value(
-                &provider_label(&Self::sidebar_provider_kind(&agent.provider)).to_string(),
-                window,
-                cx,
-            );
-        });
-        self.active_model_select =
-            Self::make_active_model_select(&self.config, &self.registry, window, cx);
-        self.ai_purpose_select.update(cx, |select, cx| {
-            select.set_selected_value(
-                &Self::ai_purpose_label(agent.purpose).to_string(),
-                window,
-                cx,
-            );
-        });
-        self.suggestion_enabled = agent.suggestion_model.enabled;
-        self.suggestion_provider_select.update(cx, |select, cx| {
-            select.set_selected_value(
-                &Self::suggestion_provider_label(agent.suggestion_model.provider.as_ref()),
-                window,
-                cx,
-            );
-        });
-        self.suggestion_model_select =
-            Self::make_suggestion_model_select(&self.config, &self.registry, window, cx);
-        self.auto_approve = agent.auto_approve_tools;
-        self.model_select = Self::make_model_select(
-            &self.selected_provider,
-            &pc.model,
-            pc.base_url.as_deref(),
-            &self.registry,
-            window,
-            cx,
-        );
-        self.endpoint_preset_select =
-            Self::make_endpoint_preset_select(&self.selected_provider, &pc.base_url, window, cx);
         self.terminal_font_select.update(cx, |select, cx| {
             select.set_selected_value(
                 &sanitize_terminal_font_family(&self.config.terminal.font_family),
@@ -2164,9 +1039,6 @@ impl SettingsPanel {
         });
         self.background_image_repeat = self.config.appearance.background_image_repeat;
         self.hide_pane_title_bar = self.config.appearance.hide_pane_title_bar;
-        self.provider_model_fetching = false;
-        self.provider_model_status = None;
-        self.provider_model_status_error = false;
         self.set_recording_key(None);
         // Network / proxy — repopulate so reopening the panel shows current values.
         self.http_proxy_input.update(cx, |s, cx| {
@@ -2184,171 +1056,6 @@ impl SettingsPanel {
             )
         });
         self.focus_handle.focus(window, cx);
-    }
-
-    /// Load a provider's config into the per-provider input fields.
-    fn load_provider_inputs(
-        &self,
-        pc: &ProviderConfig,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.model_input.update(cx, |s, cx| {
-            s.set_value(&pc.model.clone().unwrap_or_default(), window, cx)
-        });
-        let key_val = pc
-            .api_key
-            .clone()
-            .or_else(|| pc.api_key_env.clone())
-            .unwrap_or_default();
-        self.api_key_input
-            .update(cx, |s, cx| s.set_value(&key_val, window, cx));
-        self.base_url_input.update(cx, |s, cx| {
-            s.set_value(&pc.base_url.clone().unwrap_or_default(), window, cx)
-        });
-        let endpoint_label =
-            Self::endpoint_label_for_base_url(&self.selected_provider, pc.base_url.as_deref())
-                .to_string();
-        self.endpoint_preset_select.update(cx, |select, cx| {
-            select.set_selected_value(&endpoint_label, window, cx);
-        });
-        self.max_tokens_input.update(cx, |s, cx| {
-            s.set_value(
-                &pc.max_tokens.map(|t| t.to_string()).unwrap_or_default(),
-                window,
-                cx,
-            )
-        });
-    }
-
-    /// Build a model select entity for the given provider.
-    fn provider_base_url<'a>(config: &'a Config, provider: &ProviderKind) -> Option<&'a str> {
-        config
-            .agent
-            .providers
-            .get(provider)
-            .and_then(|pc| pc.base_url.as_deref())
-    }
-
-    fn make_model_select_state(
-        provider: &ProviderKind,
-        current_model: &Option<String>,
-        base_url: Option<&str>,
-        registry: &ModelRegistry,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Entity<SelectState<SearchableVec<String>>> {
-        let mut models: Vec<String> = registry.models_for_base_url(provider, base_url);
-        if let Some(model) = current_model
-            .as_ref()
-            .map(|model| model.trim())
-            .filter(|model| !model.is_empty())
-        {
-            if !models.iter().any(|item| item == model) {
-                models.insert(0, model.to_string());
-            }
-        }
-        let selected_index = current_model
-            .as_ref()
-            .and_then(|m| models.iter().position(|item| item == m).map(IndexPath::new));
-        let entity = cx.new(|cx| {
-            SelectState::new(SearchableVec::new(models), selected_index, window, cx)
-                .searchable(true)
-        });
-        entity
-    }
-
-    fn make_model_select(
-        provider: &ProviderKind,
-        current_model: &Option<String>,
-        base_url: Option<&str>,
-        registry: &ModelRegistry,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Entity<SelectState<SearchableVec<String>>> {
-        let entity =
-            Self::make_model_select_state(provider, current_model, base_url, registry, window, cx);
-        cx.subscribe_in(
-            &entity,
-            window,
-            |this, _, ev: &SelectEvent<SearchableVec<String>>, window, cx| {
-                if let SelectEvent::Confirm(Some(value)) = ev {
-                    this.model_input.update(cx, |s, cx| {
-                        s.set_value(value, window, cx);
-                    });
-                    cx.notify();
-                }
-            },
-        )
-        .detach();
-        entity
-    }
-
-    fn make_active_model_select(
-        config: &Config,
-        registry: &ModelRegistry,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Entity<SelectState<SearchableVec<String>>> {
-        let provider = config.agent.provider.clone();
-        let current_model = config
-            .agent
-            .providers
-            .get(&provider)
-            .and_then(|pc| pc.model.clone());
-        let entity = Self::make_model_select_state(
-            &provider,
-            &current_model,
-            Self::provider_base_url(config, &provider),
-            registry,
-            window,
-            cx,
-        );
-        cx.subscribe_in(
-            &entity,
-            window,
-            |this, _, ev: &SelectEvent<SearchableVec<String>>, _, cx| {
-                if let SelectEvent::Confirm(Some(value)) = ev {
-                    let provider = this.config.agent.provider.clone();
-                    let mut pc = this.config.agent.providers.get_or_default(&provider);
-                    pc.model = Some(value.clone());
-                    this.config.agent.providers.set(&provider, pc);
-                    cx.notify();
-                }
-            },
-        )
-        .detach();
-        entity
-    }
-
-    fn make_suggestion_model_select(
-        config: &Config,
-        registry: &ModelRegistry,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Entity<SelectState<SearchableVec<String>>> {
-        let provider = Self::effective_suggestion_provider(config);
-        let current_model = config.agent.suggestion_model.model.clone();
-        let entity = Self::make_model_select_state(
-            &provider,
-            &current_model,
-            Self::provider_base_url(config, &provider),
-            registry,
-            window,
-            cx,
-        );
-        cx.subscribe_in(
-            &entity,
-            window,
-            |this, _, ev: &SelectEvent<SearchableVec<String>>, _, cx| {
-                if let SelectEvent::Confirm(Some(value)) = ev {
-                    this.config.agent.suggestion_model.model = Some(value.clone());
-                    cx.notify();
-                }
-            },
-        )
-        .detach();
-        entity
     }
 
     /// Parse a ghostty config from clipboard and show a live preview.
@@ -2481,17 +1188,18 @@ impl SettingsPanel {
                     .child(label.to_string()),
             );
 
-        div()
-            .flex()
-            .flex_col()
-            .gap(px(8.0))
-            .child(Collapsible::new().open(open).child(heading).content(content))
+        div().flex().flex_col().gap(px(8.0)).child(
+            Collapsible::new()
+                .open(open)
+                .child(heading)
+                .content(content),
+        )
     }
 
     /// Seed the palette editor from whichever theme is currently active.
     fn open_theme_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let base = vu_terminal::TerminalTheme::by_name(&self.config.terminal.theme)
-            .unwrap_or_default();
+        let base =
+            vu_terminal::TerminalTheme::by_name(&self.config.terminal.theme).unwrap_or_default();
         self.load_theme_into_editor(base, window, cx);
     }
 
@@ -2645,6 +1353,7 @@ impl SettingsPanel {
         }
 
         self.config.terminal.theme = name.clone();
+        self.all_themes = vu_terminal::TerminalTheme::all_available();
         cx.emit(ThemePreview(name.clone()));
         self.theme_editor_status = Some(format!("Saved and applied: {name}"));
         cx.notify();
@@ -2695,256 +1404,6 @@ impl SettingsPanel {
         cx.notify();
     }
 
-    /// Read current per-provider input fields into a ProviderConfig.
-    fn read_provider_inputs(&self, cx: &App) -> ProviderConfig {
-        let key_text = self.api_key_input.read(cx).value().to_string();
-        let is_env_var = !key_text.is_empty()
-            && key_text
-                .chars()
-                .all(|c| c.is_ascii_uppercase() || c == '_' || c.is_ascii_digit());
-
-        let (api_key, api_key_env) = if key_text.is_empty() {
-            (None, None)
-        } else if is_env_var {
-            (None, Some(key_text))
-        } else {
-            (Some(key_text), None)
-        };
-
-        let model_text = self.model_input.read(cx).value().to_string();
-        let base_url_text = self.base_url_input.read(cx).value().to_string();
-        let max_tokens_text = self.max_tokens_input.read(cx).value().to_string();
-
-        ProviderConfig {
-            model: if model_text.is_empty() {
-                None
-            } else {
-                Some(model_text)
-            },
-            api_key,
-            api_key_env,
-            base_url: if base_url_text.is_empty() {
-                None
-            } else {
-                Some(base_url_text)
-            },
-            max_tokens: if max_tokens_text.is_empty() {
-                None
-            } else {
-                max_tokens_text.parse().ok()
-            },
-        }
-    }
-
-    fn resolve_provider_api_key(config: &ProviderConfig) -> Result<Option<String>, String> {
-        if let Some(key) = config
-            .api_key
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            return Ok(Some(key.to_string()));
-        }
-
-        if let Some(env_name) = config
-            .api_key_env
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            return std::env::var(env_name)
-                .map(|value| value.trim().to_string())
-                .map_err(|_| format!("Environment variable {env_name} is not set."))
-                .and_then(|value| {
-                    if value.is_empty() {
-                        Err(format!("Environment variable {env_name} is empty."))
-                    } else {
-                        Ok(Some(value))
-                    }
-                });
-        }
-
-        Ok(None)
-    }
-
-    fn fetch_selected_provider_models(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !matches!(
-            self.selected_provider,
-            ProviderKind::OpenAICompatible | ProviderKind::ChatGPT
-        ) || self.provider_model_fetching
-        {
-            return;
-        }
-
-        let provider = self.selected_provider.clone();
-        let provider_config = self.read_provider_inputs(cx);
-        self.config
-            .agent
-            .providers
-            .set(&provider, provider_config.clone());
-
-        let fetch_request = match provider {
-            ProviderKind::OpenAICompatible => {
-                let Some(base_url) = provider_config
-                    .base_url
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(ToOwned::to_owned)
-                else {
-                    self.provider_model_status =
-                        Some("Enter the provider Base URL, usually ending in /v1.".to_string());
-                    self.provider_model_status_error = true;
-                    cx.notify();
-                    return;
-                };
-
-                let api_key = match Self::resolve_provider_api_key(&provider_config) {
-                    Ok(api_key) => api_key,
-                    Err(message) => {
-                        self.provider_model_status = Some(message);
-                        self.provider_model_status_error = true;
-                        cx.notify();
-                        return;
-                    }
-                };
-                ProviderModelFetchRequest::OpenAICompatible { base_url, api_key }
-            }
-            ProviderKind::ChatGPT => {
-                let Some(auth_file) =
-                    oauth_token_dir(&ProviderKind::ChatGPT).map(|dir| dir.join("auth.json"))
-                else {
-                    self.provider_model_status =
-                        Some("ChatGPT OAuth token storage is unavailable.".to_string());
-                    self.provider_model_status_error = true;
-                    cx.notify();
-                    return;
-                };
-                let access_token = match read_synced_chatgpt_oauth_access_token(&auth_file) {
-                    Ok(Some(token)) => token,
-                    Ok(None) => {
-                        self.provider_model_status =
-                            Some("Sign in with ChatGPT OAuth before fetching models.".to_string());
-                        self.provider_model_status_error = true;
-                        cx.notify();
-                        return;
-                    }
-                    Err(err) => {
-                        self.provider_model_status =
-                            Some(format!("Could not refresh ChatGPT OAuth cache: {err}"));
-                        self.provider_model_status_error = true;
-                        cx.notify();
-                        return;
-                    }
-                };
-                let base_url = provider_config
-                    .base_url
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(ToOwned::to_owned);
-                ProviderModelFetchRequest::ChatGPT {
-                    access_token,
-                    base_url,
-                }
-            }
-            _ => return,
-        };
-
-        self.provider_model_fetching = true;
-        self.provider_model_status = Some("Fetching models from the provider…".to_string());
-        self.provider_model_status_error = false;
-        cx.notify();
-
-        let registry = self.registry.clone();
-        let runtime = self.oauth_runtime.clone();
-        cx.spawn_in(window, async move |this, window| {
-            let result = runtime
-                .spawn(async move { fetch_request.fetch().await })
-                .await
-                .map_err(|err| anyhow::anyhow!("Model fetch task failed: {err}"))
-                .and_then(|result| result);
-
-            let _ = window.update(|window, cx| {
-                let _ = this.update(cx, |panel, cx| {
-                    panel.provider_model_fetching = false;
-                    match result {
-                        Ok(result) if result.models().is_empty() => {
-                            panel.provider_model_status = Some(
-                                "The endpoint responded, but returned no models. Type the model ID manually."
-                                    .to_string(),
-                            );
-                            panel.provider_model_status_error = true;
-                        }
-                        Ok(result) => {
-                            let count = result.models().len();
-                            match result {
-                                ProviderModelFetchResult::OpenAICompatible { base_url, models } => {
-                                    if let Err(err) = registry.set_provider_models_for_base_url(
-                                        ProviderKind::OpenAICompatible,
-                                        &base_url,
-                                        models,
-                                    ) {
-                                        panel.provider_model_status = Some(err.to_string());
-                                        panel.provider_model_status_error = true;
-                                        cx.notify();
-                                        return;
-                                    }
-                                }
-                                ProviderModelFetchResult::ChatGPT { models } => {
-                                    registry.set_provider_models(ProviderKind::ChatGPT, models);
-                                }
-                            }
-                            if panel.selected_provider == provider {
-                                let current_model =
-                                    panel.model_input.read(cx).value().trim().to_string();
-                                let current_model =
-                                    (!current_model.is_empty()).then_some(current_model);
-                                panel.model_select = Self::make_model_select(
-                                    &provider,
-                                    &current_model,
-                                    Self::provider_base_url(&panel.config, &provider),
-                                    &registry,
-                                    window,
-                                    cx,
-                                );
-                            }
-                            if panel.config.agent.provider == provider {
-                                panel.active_model_select = Self::make_active_model_select(
-                                    &panel.config,
-                                    &registry,
-                                    window,
-                                    cx,
-                                );
-                            }
-                            if Self::effective_suggestion_provider(&panel.config) == provider {
-                                panel.suggestion_model_select = Self::make_suggestion_model_select(
-                                    &panel.config,
-                                    &registry,
-                                    window,
-                                    cx,
-                                );
-                            }
-                            panel.provider_model_status = Some(format!(
-                                "Fetched {count} model{}.",
-                                if count == 1 { "" } else { "s" }
-                            ));
-                            panel.provider_model_status_error = false;
-                        }
-                        Err(err) => {
-                            panel.provider_model_status = Some(format!(
-                                "Could not fetch models: {err}. Type the model ID manually."
-                            ));
-                            panel.provider_model_status_error = true;
-                        }
-                    }
-                    cx.notify();
-                });
-            });
-        })
-        .detach();
-    }
-
     pub fn is_visible(&self) -> bool {
         self.visible || self.overlay_motion.is_animating()
     }
@@ -2954,47 +1413,9 @@ impl SettingsPanel {
     }
 
     fn sync_config_from_controls(&mut self, cx: &mut Context<Self>) -> Result<(), String> {
-        let max_turns_text = self.max_turns_input.read(cx).value().to_string();
-        let temperature_text = self.temperature_input.read(cx).value().to_string();
-        let suggestion_provider_label = self
-            .suggestion_provider_select
-            .read(cx)
-            .selected_value()
-            .cloned()
-            .unwrap_or_else(|| "Same as active provider".to_string());
-        let suggestion_model_text = self
-            .suggestion_model_select
-            .read(cx)
-            .selected_value()
-            .cloned()
-            .unwrap_or_default();
         let font_size_text = self.font_size_input.read(cx).value().to_string();
         let ui_font_size_text = self.ui_font_size_input.read(cx).value().trim().to_string();
 
-        // Save current provider's per-provider fields into the map
-        let pc = self.read_provider_inputs(cx);
-        self.config.agent.providers.set(&self.selected_provider, pc);
-        self.normalize_active_provider_for_saved_transport();
-
-        // Update global fields
-        self.config.agent.max_turns = max_turns_text.parse().unwrap_or(10);
-        self.config.agent.temperature = if temperature_text.is_empty() {
-            None
-        } else {
-            temperature_text.parse().ok()
-        };
-        self.config.agent.auto_approve_tools = self.auto_approve;
-        let suggestion_provider = Self::suggestion_provider_from_label(&suggestion_provider_label)
-            .map(|provider| Self::provider_for_saved_transport(&self.config, &provider));
-        self.config.agent.suggestion_model = SuggestionModelConfig {
-            enabled: self.suggestion_enabled,
-            provider: suggestion_provider,
-            model: if suggestion_model_text.is_empty() {
-                None
-            } else {
-                Some(suggestion_model_text)
-            },
-        };
         self.config.terminal.font_family =
             sanitize_terminal_font_family(&self.config.terminal.font_family);
         self.config.terminal.font_size = font_size_text.parse().unwrap_or(14.0);
@@ -3029,8 +1450,9 @@ impl SettingsPanel {
                     .end(),
                 self.config.appearance.tab_accent_inactive_alpha,
             );
-        self.config.appearance.tab_inactive_opacity =
-            Self::clamp_tab_inactive_opacity(self.tab_inactive_opacity_slider.read(cx).value().end());
+        self.config.appearance.tab_inactive_opacity = Self::clamp_tab_inactive_opacity(
+            self.tab_inactive_opacity_slider.read(cx).value().end(),
+        );
         self.config.appearance.tab_close_size =
             Self::clamp_tab_close_size(self.tab_close_size_slider.read(cx).value().end());
         let background_image_text = self
@@ -3069,19 +1491,16 @@ impl SettingsPanel {
     }
 
     fn config_matches(a: &Config, b: &Config) -> bool {
-        match (toml::to_string_pretty(a), toml::to_string_pretty(b)) {
-            (Ok(a), Ok(b)) => a == b,
-            _ => false,
-        }
+        a == b
     }
 
     fn has_unsaved_changes(&mut self, cx: &mut Context<Self>) -> bool {
-        let Some(snapshot) = self.preview_snapshot.clone() else {
+        if self.preview_snapshot.is_none() {
             return false;
-        };
+        }
 
         match self.sync_config_from_controls(cx) {
-            Ok(()) => !Self::config_matches(&snapshot, &self.config),
+            Ok(()) => !Self::config_matches(self.preview_snapshot.as_ref().unwrap(), &self.config),
             Err(_) => true,
         }
     }
@@ -3150,6 +1569,7 @@ impl SettingsPanel {
                     self.visible = false;
                     self.overlay_motion
                         .set_target(0.0, std::time::Duration::from_millis(180));
+                    cx.emit(VisibilityChanged);
                 }
                 cx.emit(SaveSettings);
             }
@@ -3221,7 +1641,6 @@ impl SettingsPanel {
         // Write directly into config
         match field.as_str() {
             "global_summon" => self.config.keybindings.global_summon = binding,
-            "quick_terminal" => self.config.keybindings.quick_terminal = binding,
             "new_window" => self.config.keybindings.new_window = binding,
             "new_tab" => self.config.keybindings.new_tab = binding,
             "close_tab" => self.config.keybindings.close_tab = binding,
@@ -3231,11 +1650,8 @@ impl SettingsPanel {
             "previous_tab" => self.config.keybindings.previous_tab = binding,
             "settings" => self.config.keybindings.settings = binding,
             "command_palette" => self.config.keybindings.command_palette = binding,
-            "toggle_agent" => self.config.keybindings.toggle_agent = binding,
             "toggle_input_bar" => self.config.keybindings.toggle_input_bar = binding,
             "focus_input" => self.config.keybindings.focus_input = binding,
-            "ask_ai" => self.config.keybindings.ask_ai = binding,
-            "cycle_input_mode" => self.config.keybindings.cycle_input_mode = binding,
             "split_right" => self.config.keybindings.split_right = binding,
             "split_down" => self.config.keybindings.split_down = binding,
             "toggle_pane_scope" => self.config.keybindings.toggle_pane_scope = binding,
@@ -3266,7 +1682,6 @@ impl SettingsPanel {
     fn binding_value(&self, field: &str) -> &str {
         match field {
             "global_summon" => &self.config.keybindings.global_summon,
-            "quick_terminal" => &self.config.keybindings.quick_terminal,
             "new_window" => &self.config.keybindings.new_window,
             "new_tab" => &self.config.keybindings.new_tab,
             "close_tab" => &self.config.keybindings.close_tab,
@@ -3276,11 +1691,8 @@ impl SettingsPanel {
             "previous_tab" => &self.config.keybindings.previous_tab,
             "settings" => &self.config.keybindings.settings,
             "command_palette" => &self.config.keybindings.command_palette,
-            "toggle_agent" => &self.config.keybindings.toggle_agent,
             "toggle_input_bar" => &self.config.keybindings.toggle_input_bar,
             "focus_input" => &self.config.keybindings.focus_input,
-            "ask_ai" => &self.config.keybindings.ask_ai,
-            "cycle_input_mode" => &self.config.keybindings.cycle_input_mode,
             "split_right" => &self.config.keybindings.split_right,
             "split_down" => &self.config.keybindings.split_down,
             "toggle_pane_scope" => &self.config.keybindings.toggle_pane_scope,
@@ -3335,135 +1747,10 @@ impl SettingsPanel {
         self.config.save()
     }
 
-    fn select_provider(
-        &mut self,
-        provider: ProviderKind,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let provider = if Self::protocol_pair(&provider).is_some() {
-            if Self::sidebar_provider_kind(&self.selected_provider)
-                == Self::sidebar_provider_kind(&provider)
-            {
-                self.selected_provider.clone()
-            } else {
-                Self::preferred_sidebar_provider(&self.config, &provider)
-            }
-        } else {
-            Self::sidebar_selection_target(&provider, &self.selected_provider)
-        };
-        self.transition_provider(provider, window, cx);
-    }
-
-    fn transition_provider(
-        &mut self,
-        provider: ProviderKind,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let current_pc = self.read_provider_inputs(cx);
-        self.config
-            .agent
-            .providers
-            .set(&self.selected_provider, current_pc);
-
-        if provider == self.selected_provider {
-            cx.notify();
-            return;
-        }
-
-        self.selected_provider = provider.clone();
-        self.provider_model_fetching = false;
-        self.provider_model_status = None;
-        self.provider_model_status_error = false;
-
-        let pc = self.config.agent.providers.get_or_default(&provider);
-        self.load_provider_inputs(&pc, window, cx);
-        self.sync_provider_placeholders(&provider, window, cx);
-
-        self.model_select = Self::make_model_select(
-            &provider,
-            &pc.model,
-            pc.base_url.as_deref(),
-            &self.registry,
-            window,
-            cx,
-        );
-        self.endpoint_preset_select =
-            Self::make_endpoint_preset_select(&provider, &pc.base_url, window, cx);
-        cx.notify();
-    }
-
-    fn toggle_selected_provider_protocol(
-        &mut self,
-        use_anthropic: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let source_provider = self.selected_provider.clone();
-        let source_config = self.read_provider_inputs(cx);
-        self.config
-            .agent
-            .providers
-            .set(&source_provider, source_config.clone());
-
-        let Some(provider) =
-            Self::protocol_toggled_provider(&self.selected_provider, use_anthropic)
-        else {
-            return;
-        };
-        self.config.agent.set_provider_transport(
-            &self.selected_provider,
-            Some(if use_anthropic {
-                ProviderTransport::Anthropic
-            } else {
-                ProviderTransport::OpenAI
-            }),
-        );
-        let target_config = self.config.agent.providers.get_or_default(&provider);
-        let seeded_target = Self::seed_protocol_variant_config(
-            &source_provider,
-            &provider,
-            &source_config,
-            &target_config,
-        );
-        self.config.agent.providers.set(&provider, seeded_target);
-        self.set_active_provider_if_tracking(&source_provider, &provider, window, cx);
-        self.transition_provider(provider, window, cx);
-    }
-
     // ── Section content ──────────────────────────────────────────
 
     fn render_general(&mut self, cx: &mut Context<Self>) -> Div {
         let card_opacity = self.card_opacity();
-
-        // --- Skills path chips (must render before borrowing theme) ---
-        let project_paths = self.config.skills.project_paths.clone();
-        let global_paths = self.config.skills.global_paths.clone();
-
-        let project_chips = self.render_path_chips("project", &project_paths, cx);
-        let global_chips = self.render_path_chips("global", &global_paths, cx);
-
-        let project_presets = self.render_path_presets(
-            "project",
-            &project_paths,
-            &[
-                ("skills", "vu"),
-                (".vu/skills", "vu local"),
-                (".agents/skills", "Agents"),
-            ],
-            cx,
-        );
-        let vu_global_skills = vu_paths::default_global_skills_path();
-        let global_presets = self.render_path_presets(
-            "global",
-            &global_paths,
-            &[
-                (vu_global_skills.as_str(), "vu"),
-                ("~/.agents/skills", "Agents"),
-            ],
-            cx,
-        );
 
         // Owned clone: self.group() needs &mut cx, which a live cx.theme()
         // borrow would block.
@@ -3717,275 +2004,41 @@ impl SettingsPanel {
         }
 
         container
-        // Continuity
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(8.0))
-                .child(self.group("continuity", "Continuity", card(theme, card_opacity).child(toggle_row(
-                    "Restore Terminal Text",
-                    "Keep terminal text on restart continuity.",
-                    Switch::new("restore-terminal-text-toggle")
-                        .checked(self.config.appearance.restore_terminal_text)
-                        .small()
-                        .on_click(cx.listener(|this, checked: &bool, _, cx| {
-                            this.set_restore_terminal_text(*checked, cx);
-                        })),
-                    theme,
-                )), cx)),
-        )
-        // Skills paths
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(8.0))
-                .child(self.group("skills", "Skills", card(theme, card_opacity)
-                        .child(
-                            div()
-                                .px(px(16.0))
-                                .py(px(13.0))
-                                .flex()
-                                .flex_col()
-                                .gap(px(3.0))
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .font_weight(FontWeight::MEDIUM)
-                                        .child("Skill Sources"),
-                                )
-                                .child(
-                                    div()
-                                        .max_w(px(500.0))
-                                        .whitespace_normal()
-                                        .text_size(px(13.0))
-                                        .line_height(px(19.0))
-                                        .text_color(theme.muted_foreground.opacity(0.82))
-                                        .child("Vu scans these folders for slash-command skills. Project paths follow the active working directory; global paths are always available."),
-                                ),
-                        )
-                        .child(row_separator(theme))
-                        // Project paths row
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap(px(6.0))
-                                .px(px(16.0))
-                                .py(px(12.0))
-                                .child(
-                                    div()
-                                        .flex()
-                                        .items_center()
-                                        .justify_between()
-                                        .child(div().text_sm().child("Project paths"))
-                                        .child(
-                                            div()
-                                                .text_size(px(11.5))
-                                                .text_color(theme.muted_foreground.opacity(0.75))
-                                                .child("relative to cwd"),
-                                        ),
-                                )
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_wrap()
-                                        .gap(px(4.0))
-                                        .children(project_chips)
-                                        .children(project_presets),
-                                ),
-                        )
-                        .child(row_separator(theme))
-                        // Global paths row
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap(px(6.0))
-                                .px(px(16.0))
-                                .py(px(12.0))
-                                .child(
-                                    div()
-                                        .flex()
-                                        .items_center()
-                                        .justify_between()
-                                        .child(div().text_sm().child("Global paths"))
-                                        .child(
-                                            div()
-                                                .text_size(px(11.5))
-                                                .text_color(theme.muted_foreground.opacity(0.75))
-                                                .child("~ expanded to home"),
-                                        ),
-                                )
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_wrap()
-                                        .gap(px(4.0))
-                                        .children(global_chips)
-                                        .children(global_presets),
-                                ),
-                        ), cx)),
-        )
-        // Network / proxy
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(8.0))
-                .child(self.group("network", "Network", card(theme, card_opacity)
-                        .child(row_field("HTTP Proxy", &self.http_proxy_input))
-                        .child(row_separator(theme))
-                        .child(row_field("HTTPS Proxy", &self.https_proxy_input)), cx)),
-        )
-    }
-
-    /// Render removable path chips for a given path list.
-    fn render_path_chips(
-        &self,
-        kind: &str,
-        paths: &[String],
-        cx: &mut Context<Self>,
-    ) -> Vec<AnyElement> {
-        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
-        // borrow would block.
-        let theme_owned = cx.theme().clone();
-        let theme = &theme_owned;
-        let chip_bg = theme.muted.opacity(0.06);
-        let chip_hover_bg = theme.muted.opacity(0.10);
-        let fg = theme.foreground;
-        let muted = theme.muted_foreground.opacity(0.5);
-        let danger = theme.danger;
-
-        paths
-            .iter()
-            .enumerate()
-            .map(|(idx, path)| {
-                let kind = kind.to_string();
-                let path_display = path.clone();
-
-                div()
-                    .id(SharedString::from(format!("skill-{kind}-{idx}")))
-                    .flex()
-                    .items_center()
-                    .gap(px(4.0))
-                    .h(px(24.0))
-                    .px(px(7.0))
-                    .rounded(px(5.0))
-                    .bg(chip_bg)
-                    .hover(move |s| s.bg(chip_hover_bg))
-                    .child(
-                        div()
-                            .text_size(px(12.5))
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(fg)
-                            .child(path_display),
-                    )
-                    .child(
-                        div()
-                            .id(SharedString::from(format!("skill-rm-{kind}-{idx}")))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .size(px(14.0))
-                            .rounded(px(3.0))
-                            .cursor_pointer()
-                            .text_color(muted)
-                            .hover(|s| s.bg(danger.opacity(0.10)).text_color(danger))
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(move |this, _, _, cx| {
-                                    this.remove_skill_path(&kind, idx);
-                                    cx.notify();
-                                }),
-                            )
-                            .child(
-                                svg()
-                                    .path("phosphor/x.svg")
-                                    .size(px(10.0))
-                                    .text_color(muted),
-                            ),
-                    )
-                    .into_any_element()
-            })
-            .collect()
-    }
-
-    /// Render preset quick-add buttons for paths not yet in the list.
-    fn render_path_presets(
-        &self,
-        kind: &str,
-        current_paths: &[String],
-        presets: &[(&str, &str)],
-        cx: &mut Context<Self>,
-    ) -> Vec<AnyElement> {
-        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
-        // borrow would block.
-        let theme_owned = cx.theme().clone();
-        let theme = &theme_owned;
-        let muted_fg = theme.muted_foreground.opacity(0.4);
-        let hover_bg = theme.muted.opacity(0.08);
-        let hover_fg = theme.foreground;
-
-        presets
-            .iter()
-            .filter(|(path, _)| !current_paths.iter().any(|p| p == path))
-            .map(|(path, label)| {
-                let kind = kind.to_string();
-                let path = path.to_string();
-                let label = label.to_string();
-
-                div()
-                    .id(SharedString::from(format!("skill-add-{kind}-{label}")))
-                    .flex()
-                    .items_center()
-                    .gap(px(3.0))
-                    .h(px(24.0))
-                    .px(px(8.0))
-                    .rounded(px(5.0))
-                    .cursor_pointer()
-                    .text_color(muted_fg)
-                    .hover(|s| s.bg(hover_bg).text_color(hover_fg))
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(move |this, _, _, cx| {
-                            this.add_skill_path(&kind, &path);
-                            cx.notify();
-                        }),
-                    )
-                    .child(
-                        svg()
-                            .path("phosphor/plus.svg")
-                            .size(px(10.0))
-                            .text_color(muted_fg),
-                    )
-                    .child(div().text_size(px(11.5)).child(label))
-                    .into_any_element()
-            })
-            .collect()
-    }
-
-    fn add_skill_path(&mut self, kind: &str, path: &str) {
-        let paths = match kind {
-            "project" => &mut self.config.skills.project_paths,
-            "global" => &mut self.config.skills.global_paths,
-            _ => return,
-        };
-        if !paths.iter().any(|p| p == path) {
-            paths.push(path.to_string());
-        }
-    }
-
-    fn remove_skill_path(&mut self, kind: &str, idx: usize) {
-        let paths = match kind {
-            "project" => &mut self.config.skills.project_paths,
-            "global" => &mut self.config.skills.global_paths,
-            _ => return,
-        };
-        if idx < paths.len() {
-            paths.remove(idx);
-        }
+            // Continuity
+            .child(
+                div().flex().flex_col().gap(px(8.0)).child(
+                    self.group(
+                        "continuity",
+                        "Continuity",
+                        card(theme, card_opacity).child(toggle_row(
+                            "Restore Terminal Text",
+                            "Keep terminal text on restart continuity.",
+                            Switch::new("restore-terminal-text-toggle")
+                                .checked(self.config.appearance.restore_terminal_text)
+                                .small()
+                                .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                                    this.set_restore_terminal_text(*checked, cx);
+                                })),
+                            theme,
+                        )),
+                        cx,
+                    ),
+                ),
+            )
+            // Network / proxy
+            .child(
+                div().flex().flex_col().gap(px(8.0)).child(
+                    self.group(
+                        "network",
+                        "Network",
+                        card(theme, card_opacity)
+                            .child(row_field("HTTP Proxy", &self.http_proxy_input))
+                            .child(row_separator(theme))
+                            .child(row_field("HTTPS Proxy", &self.https_proxy_input)),
+                        cx,
+                    ),
+                ),
+            )
     }
 
     fn render_appearance(&self, cx: &mut Context<Self>) -> Div {
@@ -4024,7 +2077,7 @@ impl SettingsPanel {
                 cx.emit(AppearancePreview);
                 cx.notify();
             }));
-        let all_themes = vu_terminal::TerminalTheme::all_available();
+        let all_themes = &self.all_themes;
 
         // Split into built-in and user themes
         let builtin_names: Vec<&str> = vu_terminal::TerminalTheme::available().to_vec();
@@ -4069,11 +2122,7 @@ impl SettingsPanel {
             }));
         let editor_open = self.theme_editor.is_some();
         let customize_btn = Button::new("theme-customize")
-            .label(if editor_open {
-                "Editing"
-            } else {
-                "Customize"
-            })
+            .label(if editor_open { "Editing" } else { "Customize" })
             .icon(Icon::default().path("phosphor/palette.svg"))
             .small()
             .ghost()
@@ -4298,11 +2347,11 @@ impl SettingsPanel {
         content = content.child(card(theme, card_opacity).child(theme_card_inner));
 
         content = content.child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(8.0))
-                .child(self.group("fonts", "Fonts & Icons", card(theme, card_opacity)
+            div().flex().flex_col().gap(px(8.0)).child(
+                self.group(
+                    "fonts",
+                    "Fonts & Icons",
+                    card(theme, card_opacity)
                         .child(searchable_select_row(
                             "Terminal Font",
                             "Terminal and mono UI like code blocks.",
@@ -4329,7 +2378,10 @@ impl SettingsPanel {
                             &icon_scale_slider,
                             icon_scale,
                             theme,
-                        )), cx)),
+                        )),
+                    cx,
+                ),
+            ),
         );
 
         let tw = self.config.terminal.tweaks.clone();
@@ -4464,18 +2516,17 @@ impl SettingsPanel {
                 )),
         );
 
-        content = content.child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(8.0))
-                .child(self.group("cursor", "Cursor", card(theme, card_opacity).child(div().px(px(16.0)).child(select_row(
-                        "Cursor Style",
-                        "Choose how the terminal insertion point is drawn.",
-                        &self.cursor_style_select,
-                        theme,
-                    ))), cx)),
-        );
+        content = content.child(div().flex().flex_col().gap(px(8.0)).child(self.group(
+            "cursor",
+            "Cursor",
+            card(theme, card_opacity).child(div().px(px(16.0)).child(select_row(
+                "Cursor Style",
+                "Choose how the terminal insertion point is drawn.",
+                &self.cursor_style_select,
+                theme,
+            ))),
+            cx,
+        )));
 
         content = content.child(
             div()
@@ -4829,8 +2880,8 @@ impl SettingsPanel {
         )
     }
 
-    /// Live preview of the working palette, shaped like a real agent session so
-    /// each slot is shown doing the job its hint describes.
+    /// Live preview of the working palette, shaped like terminal output so each
+    /// slot is shown doing the job its hint describes.
     fn render_theme_editor_preview(
         &self,
         term_theme: &vu_terminal::TerminalTheme,
@@ -4848,29 +2899,18 @@ impl SettingsPanel {
         // (indent, [(text, slot)]) — one screen line each.
         let lines: Vec<(f32, Vec<(&str, usize)>)> = vec![
             (0.0, vec![("~/code/vu", dim), ("  main", dim)]),
-            (0.0, vec![("> ", green), ("fix the palette mapping", fg)]),
+            (0.0, vec![("$ ", green), ("cargo test -p vu-terminal", fg)]),
             (0.0, vec![("", fg)]),
-            (
-                0.0,
-                vec![("● ", cyan), ("I'll update the ANSI slots first.", fg)],
-            ),
+            (0.0, vec![("Compiling ", cyan), ("vu-terminal", fg)]),
             (0.0, vec![("", fg)]),
             (
                 2.0,
-                vec![
-                    ("Bash", cyan),
-                    ("(", dim),
-                    ("cargo test -p vu-terminal", yellow),
-                    (")", dim),
-                ],
+                vec![("test ", cyan), ("palette::mapping ", yellow), ("...", dim)],
             ),
             (2.0, vec![("⎿  running 1 test", dim)]),
             (5.0, vec![("test result: ok. 1 passed", green)]),
             (0.0, vec![("", fg)]),
-            (
-                2.0,
-                vec![("Update", cyan), ("(", dim), ("src/theme.rs", blue), (")", dim)],
-            ),
+            (2.0, vec![("diff --git ", cyan), ("src/theme.rs", blue)]),
             (2.0, vec![("⎿  + pub fn to_ghostty_format(&self)", green)]),
             (5.0, vec![("- pub fn legacy_format(&self)", red)]),
             (0.0, vec![("", fg)]),
@@ -4917,7 +2957,9 @@ impl SettingsPanel {
                     span = span.bg(theme.foreground.opacity(0.16));
                 }
                 if !is_blank {
-                    span = span.cursor_pointer().hover(|d| d.bg(theme.foreground.opacity(0.10)));
+                    span = span
+                        .cursor_pointer()
+                        .hover(|d| d.bg(theme.foreground.opacity(0.10)));
                     span = span.on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, window, cx| {
@@ -5073,18 +3115,23 @@ impl SettingsPanel {
                             .flex_row()
                             .items_center()
                             .gap(px(6.0))
-                            .children(THEME_SLOTS.iter().take(idx).position(|other| {
-                                other.read(term_theme) == color
-                            }).and_then(|dupe| THEME_SLOTS.get(dupe)).map(|dupe| {
-                                div()
-                                    .text_size(px(11.0))
-                                    .px(px(5.0))
-                                    .py(px(1.0))
-                                    .rounded(px(3.0))
-                                    .bg(theme.muted.opacity(0.35))
-                                    .text_color(theme.muted_foreground)
-                                    .child(format!("= {}", dupe.label))
-                            }))
+                            .children(
+                                THEME_SLOTS
+                                    .iter()
+                                    .take(idx)
+                                    .position(|other| other.read(term_theme) == color)
+                                    .and_then(|dupe| THEME_SLOTS.get(dupe))
+                                    .map(|dupe| {
+                                        div()
+                                            .text_size(px(11.0))
+                                            .px(px(5.0))
+                                            .py(px(1.0))
+                                            .rounded(px(3.0))
+                                            .bg(theme.muted.opacity(0.35))
+                                            .text_color(theme.muted_foreground)
+                                            .child(format!("= {}", dupe.label))
+                                    }),
+                            )
                             .child(
                                 div()
                                     .text_size(px(12.0))
@@ -5261,750 +3308,6 @@ impl SettingsPanel {
             )
     }
 
-    fn render_ai(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
-        // Providers used to be its own tab, but picking a model and holding the
-        // credential that model needs is one task; splitting them meant bouncing
-        // between tabs to finish it.
-        let providers = self.render_providers_body(window, cx);
-        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
-        // borrow would block.
-        let theme_owned = cx.theme().clone();
-        let theme = &theme_owned;
-        let card_opacity = self.card_opacity();
-        let max_turns_input = self.max_turns_input.clone();
-        let temperature_input = self.temperature_input.clone();
-        let ai_purpose_select = self.ai_purpose_select.clone();
-        let active_provider_select = self.active_provider_select.clone();
-        let active_model_select = self.active_model_select.clone();
-        let suggestion_provider_select = self.suggestion_provider_select.clone();
-        let suggestion_model_select = self.suggestion_model_select.clone();
-        let routing_card = card(theme, card_opacity)
-            .child(
-                div()
-                    .px(px(16.0))
-                    .py(px(13.0))
-                    .flex()
-                    .flex_col()
-                    .gap(px(3.0))
-                    .child(
-                        div()
-                            .text_sm()
-                            .font_weight(FontWeight::MEDIUM)
-                            .child("Routing"),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(13.0))
-                            .line_height(px(19.0))
-                            .text_color(theme.muted_foreground.opacity(0.82))
-                            .child("Choose a default model for agent and the fast path for inline command suggestions."),
-                    ),
-            )
-            .child(row_separator(theme))
-            .child(select_row(
-                "Purpose",
-                "Operating stance for the built-in agent.",
-                &ai_purpose_select,
-                theme,
-            ))
-            .child(searchable_select_row(
-                    "Active Provider",
-                    "Default provider for the agent panel, command palette actions, and AI fallback suggestions.",
-                    &active_provider_select,
-                    "Select a provider…",
-                    theme,
-                ))
-            .child(searchable_select_row(
-                    "Active Model",
-                    "Model override for the currently active provider.",
-                    &active_model_select,
-                    "Select a model…",
-                    theme,
-                ))
-            .child(toggle_row(
-                    "Auto-Approve Tools",
-                    "Allow the agent to run tools without per-action approval.",
-                    Switch::new("auto-approve-toggle")
-                        .checked(self.auto_approve)
-                        .small()
-                        .on_click(cx.listener(|this, checked: &bool, _, cx| {
-                            this.auto_approve = *checked;
-                            cx.notify();
-                        })),
-                    theme,
-                ))
-            .child(toggle_row(
-                    "AI Command Suggestions",
-                    "Use the suggestion provider only when local command history has no strong match.",
-                    Switch::new("ai-suggestion-toggle")
-                        .checked(self.suggestion_enabled)
-                        .small()
-                        .on_click(cx.listener(|this, checked: &bool, _, cx| {
-                            this.suggestion_enabled = *checked;
-                            cx.notify();
-                        })),
-                    theme,
-                ))
-            .child(
-                    div()
-                        .opacity(if self.suggestion_enabled { 1.0 } else { 0.55 })
-                        .child(searchable_select_row(
-                            "Suggestions Provider",
-                            "Route inline command completion to the active provider or a faster secondary host.",
-                            &suggestion_provider_select,
-                            "Select a provider…",
-                            theme,
-                        )),
-                )
-            .child(
-                    div()
-                        .opacity(if self.suggestion_enabled { 1.0 } else { 0.55 })
-                        .child(searchable_select_row(
-                            "Suggestions Model",
-                            "Choose a faster or cheaper model for command completion when history has no strong match.",
-                            &suggestion_model_select,
-                            "Select a suggestion model…",
-                            theme,
-                        )),
-                );
-
-        let behavior_card = card(theme, card_opacity).child(
-            div()
-                .px(px(14.0))
-                .py(px(12.0))
-                .flex()
-                .flex_col()
-                .gap(px(12.0))
-                .child(
-                    div()
-                        .text_sm()
-                        .font_weight(FontWeight::MEDIUM)
-                        .child("Behavior"),
-                )
-                .child(stacked_input_field(
-                    "Max Turns",
-                    "Tool-use turns before the session is forced to stop.",
-                    &max_turns_input,
-                    theme,
-                ))
-                .child(stacked_input_field(
-                    "Temperature",
-                    "Blank for provider default.",
-                    &temperature_input,
-                    theme,
-                )),
-        );
-
-        let ai_layout = div()
-            .flex()
-            .flex_col()
-            .flex_1()
-            .gap(px(12.0))
-            .child(routing_card)
-            .child(behavior_card)
-            .child(providers);
-
-        section_content(
-            "AI",
-            "Models, providers, credentials, and harness behavior.",
-            theme,
-        )
-        .child(ai_layout)
-    }
-
-    fn render_providers_body(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
-        // Owned clone: self.group() needs &mut cx, which a live cx.theme()
-        // borrow would block.
-        let theme_owned = cx.theme().clone();
-        let theme = &theme_owned;
-        let card_opacity = self.card_opacity();
-        let viewport_w = window.viewport_size().width.as_f32();
-        let compact = viewport_w < 980.0;
-        let narrow = viewport_w < 840.0;
-        let settings_sidebar_w = if narrow {
-            48.0
-        } else if compact {
-            144.0
-        } else {
-            160.0
-        };
-        let settings_content_pad = if narrow {
-            14.0
-        } else if compact {
-            18.0
-        } else {
-            24.0
-        };
-        let settings_surface_w = if self.standalone {
-            viewport_w
-        } else {
-            ((viewport_w * 0.76).clamp(680.0, 980.0)).min((viewport_w - 32.0).max(320.0))
-        };
-        let provider_content_w =
-            (settings_surface_w - settings_sidebar_w - settings_content_pad * 2.0).max(0.0);
-        let provider_sidebar_w = if provider_content_w < 600.0 {
-            px(148.0)
-        } else {
-            px(180.0)
-        };
-        let model_input = self.model_input.clone();
-        let api_key_input = self.api_key_input.clone();
-        let base_url_input = self.base_url_input.clone();
-        let max_tokens_input = self.max_tokens_input.clone();
-        let models = self.registry.models_for_base_url(
-            &self.selected_provider,
-            Self::provider_base_url(&self.config, &self.selected_provider),
-        );
-        let model_select = self.model_select.clone();
-        let endpoint_preset_select = self.endpoint_preset_select.clone();
-        let endpoint_presets = Self::provider_endpoint_presets(&self.selected_provider);
-        let can_fetch_models = matches!(
-            self.selected_provider,
-            ProviderKind::OpenAICompatible | ProviderKind::ChatGPT
-        );
-        let protocol_switch_label = Self::protocol_switch_label(&self.selected_provider);
-        let protocol_switch_hint = Self::protocol_switch_hint(&self.selected_provider);
-        let anthropic_protocol_enabled = Self::uses_anthropic_protocol(&self.selected_provider);
-
-        let mut provider_list = div().flex().flex_col();
-        let active_sidebar_provider = Self::sidebar_provider_kind(&self.selected_provider);
-        for provider in SIDEBAR_PROVIDERS.iter() {
-            let is_selected = *provider == active_sidebar_provider;
-            let is_configured = self.provider_is_configured(provider, cx);
-            let label = provider_label(provider);
-            let icon_path = Self::provider_icon_path(provider);
-            let icon_color = if is_selected {
-                theme.primary
-            } else if is_configured {
-                theme.foreground.opacity(0.76)
-            } else {
-                theme.muted_foreground.opacity(0.38)
-            };
-            let label_color = if is_selected {
-                theme.foreground
-            } else if is_configured {
-                theme.foreground.opacity(0.74)
-            } else {
-                theme.muted_foreground.opacity(0.52)
-            };
-            let status_color = if is_configured {
-                theme.success.opacity(if is_selected { 0.92 } else { 0.74 })
-            } else {
-                theme.muted_foreground.opacity(0.18)
-            };
-            let provider_clone = provider.clone();
-
-            provider_list = provider_list.child(
-                div()
-                    .id(SharedString::from(format!("prov-{label}")))
-                    .h(px(34.0))
-                    .px(px(8.0))
-                    .flex()
-                    .items_center()
-                    .gap(px(7.0))
-                    .rounded(px(8.0))
-                    .cursor_pointer()
-                    .bg(if is_selected {
-                        theme.primary.opacity(0.08)
-                    } else {
-                        theme.transparent
-                    })
-                    .hover(|s| {
-                        if is_selected {
-                            s
-                        } else {
-                            s.bg(theme.muted.opacity(0.06))
-                        }
-                    })
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(move |this, _, window, cx| {
-                            this.select_provider(provider_clone.clone(), window, cx);
-                        }),
-                    )
-                    .child(
-                        div()
-                            .w(px(2.0))
-                            .h(px(16.0))
-                            .rounded(px(1.0))
-                            .bg(if is_selected {
-                                theme.primary
-                            } else {
-                                theme.transparent
-                            }),
-                    )
-                    .child(
-                        div()
-                            .size(px(22.0))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded(px(6.0))
-                            .bg(if is_selected {
-                                theme.primary.opacity(0.11)
-                            } else if is_configured {
-                                theme.muted.opacity(0.08)
-                            } else {
-                                theme.transparent
-                            })
-                            .child(svg().path(icon_path).size(px(13.0)).text_color(icon_color)),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .text_size(px(13.5))
-                            .line_height(px(15.5))
-                            .font_weight(if is_selected {
-                                FontWeight::MEDIUM
-                            } else {
-                                FontWeight::NORMAL
-                            })
-                            .text_color(label_color)
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .child(label),
-                    )
-                    .child(div().size(px(6.0)).rounded_full().bg(status_color)),
-            );
-        }
-
-        let oauth_state = self.oauth_state(&self.selected_provider).cloned();
-        let has_key_override = !self.api_key_input.read(cx).value().is_empty();
-        let oauth_cache_present = Self::provider_oauth_cache_present(&Self::sidebar_provider_kind(
-            &self.selected_provider,
-        ));
-        let provider_has_oauth = Self::provider_has_oauth(&self.selected_provider);
-        let oauth_ready = provider_has_oauth && self.provider_oauth_ready(&self.selected_provider);
-        let (connection_ready, connection_label) = provider_connection_status(
-            provider_has_oauth,
-            oauth_ready,
-            oauth_state.as_ref(),
-            oauth_cache_present,
-            has_key_override,
-        );
-
-        let model_card_content = card(theme, card_opacity).child(
-            div()
-                .px(px(14.0))
-                .py(px(12.0))
-                .flex()
-                .flex_col()
-                .gap(px(8.0))
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .gap(px(12.0))
-                        .child(
-                            div()
-                                .text_sm()
-                                .font_weight(FontWeight::MEDIUM)
-                                .child("Provider Default Model"),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap(px(6.0))
-                                .child(div().size(px(6.0)).rounded_full().bg(if connection_ready {
-                                    theme.success
-                                } else {
-                                    theme.muted_foreground.opacity(0.2)
-                                }))
-                                .child(
-                                    div()
-                                        .text_size(px(11.5))
-                                        .text_color(theme.muted_foreground.opacity(0.45))
-                                        .child(connection_label),
-                                ),
-                        ),
-                )
-                .child(if models.is_empty() {
-                    div()
-                        .w_full()
-                        .min_w_0()
-                        .child(Input::new(&model_input).small())
-                } else {
-                    div()
-                        .w_full()
-                        .min_w_0()
-                        .flex()
-                        .flex_col()
-                        .gap(px(8.0))
-                        .child(
-                            div().w_full().min_w_0().child(
-                                Select::new(&model_select)
-                                    .placeholder("Select a known model…")
-                                    .small(),
-                            ),
-                        )
-                        .child(
-                            div()
-                                .w_full()
-                                .min_w_0()
-                                .child(Input::new(&model_input).small()),
-                        )
-                })
-                .children(can_fetch_models.then(|| {
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .items_center()
-                        .justify_between()
-                        .gap(px(10.0))
-                        .pt(px(2.0))
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w(px(220.0))
-                                .text_size(px(12.5))
-                                .line_height(px(18.0))
-                                .text_color(if self.provider_model_status_error {
-                                    theme.danger
-                                } else {
-                                    theme.muted_foreground.opacity(0.62)
-                                })
-                                .child(
-                                    self.provider_model_status.clone().unwrap_or_else(|| {
-                                        if self.selected_provider == ProviderKind::ChatGPT {
-                                            "Fetch the current ChatGPT Subscription model list after OAuth sign-in. Or enter the model ID.".to_string()
-                                        } else {
-                                            "Fetch /models when the provider exposes a model list. Or enter the model ID.".to_string()
-                                        }
-                                    }),
-                                ),
-                        )
-                        .child(
-                            div().flex_shrink_0().child(
-                                Button::new("fetch-openai-compatible-models")
-                                    .small()
-                                    .ghost()
-                                    .label("Fetch Models")
-                                    .loading(self.provider_model_fetching)
-                                    .disabled(self.provider_model_fetching)
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.fetch_selected_provider_models(window, cx);
-                                    })),
-                            ),
-                        )
-                })),
-        );
-
-        let right_col = div()
-            .flex()
-            .flex_col()
-            .flex_1()
-            .min_w_0()
-            .gap(px(12.0))
-            .child(model_card_content)
-            .child(
-                card(theme, card_opacity).child(
-                    div()
-                        .px(px(14.0))
-                        .py(px(12.0))
-                        .flex()
-                        .flex_col()
-                        .gap(px(12.0))
-                        .child(
-                            div()
-                                .text_sm()
-                                .font_weight(FontWeight::MEDIUM)
-                                .child("Connection"),
-                        )
-                        .children(protocol_switch_label.map(|switch_label| {
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap(px(8.0))
-                                .child(
-                                    div()
-                                        .flex()
-                                        .items_center()
-                                        .justify_between()
-                                        .gap(px(12.0))
-                                        .child(
-                                            div()
-                                                .flex()
-                                                .flex_col()
-                                                .gap(px(2.0))
-                                                .child(div().text_sm().child("Protocol"))
-                                                .child(
-                                                    div()
-                                                        .text_size(px(12.5))
-                                                        .text_color(theme.muted_foreground)
-                                                        .child(protocol_switch_hint.unwrap_or(
-                                                            "Choose the provider transport.",
-                                                        )),
-                                                ),
-                                        )
-                                        .child(
-                                            Switch::new(format!(
-                                                "provider-protocol-{}",
-                                                provider_label(&Self::sidebar_provider_kind(
-                                                    &self.selected_provider
-                                                ))
-                                            ))
-                                            .checked(anthropic_protocol_enabled)
-                                            .label(switch_label)
-                                            .on_click(cx.listener(
-                                                |this, checked: &bool, window, cx| {
-                                                    this.toggle_selected_provider_protocol(
-                                                        *checked, window, cx,
-                                                    );
-                                                },
-                                            )),
-                                        ),
-                                )
-                                .into_any_element()
-                        }))
-                        .children(if protocol_switch_label.is_some() {
-                            Some(div().child(row_separator(theme)))
-                        } else {
-                            None
-                        })
-                        .children(Self::provider_oauth_label(&self.selected_provider).map(
-                            |provider_name| {
-                                let oauth = oauth_state.clone().unwrap_or_default();
-                                let oauth_ready =
-                                    self.provider_oauth_ready(&self.selected_provider);
-                                let provider_for_click = self.selected_provider.clone();
-                                let prompt = oauth.prompt.clone();
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap(px(10.0))
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .items_center()
-                                            .justify_between()
-                                            .gap(px(12.0))
-                                            .child(
-                                                div()
-                                                    .flex()
-                                                    .flex_col()
-                                                    .gap(px(2.0))
-                                                    .child(
-                                                        div().text_sm().child(format!(
-                                                            "{provider_name} OAuth"
-                                                        )),
-                                                    )
-                                                    .child(
-                                                        div()
-                                                            .text_size(px(12.5))
-                                                            .text_color(theme.muted_foreground)
-                                                            .child("Device login"),
-                                                    ),
-                                            )
-                                            .child(
-                                                Button::new(format!(
-                                                    "oauth-connect-{}",
-                                                    provider_label(&self.selected_provider)
-                                                ))
-                                                .label(if oauth_ready && !oauth.in_progress {
-                                                    "Reconnect"
-                                                } else {
-                                                    Self::provider_oauth_button_label(
-                                                        &self.selected_provider,
-                                                    )
-                                                    .unwrap_or("Sign In")
-                                                })
-                                                .small()
-                                                .primary()
-                                                .loading(oauth.in_progress)
-                                                .disabled(oauth.in_progress)
-                                                .on_click(cx.listener(
-                                                    move |this, _, window, cx| {
-                                                        this.start_provider_oauth(
-                                                            provider_for_click.clone(),
-                                                            window,
-                                                            cx,
-                                                        );
-                                                    },
-                                                )),
-                                            ),
-                                    )
-                                    .children(oauth.status_message.as_ref().map(|message| {
-                                        div()
-                                            .text_size(px(12.5))
-                                            .text_color(theme.muted_foreground)
-                                            .child(message.clone())
-                                    }))
-                                    .children(oauth.error_message.as_ref().map(|message| {
-                                        div()
-                                            .text_size(px(12.5))
-                                            .text_color(theme.danger)
-                                            .child(message.clone())
-                                    }))
-                                    .children(prompt.map(|prompt| {
-                                        div()
-                                            .flex()
-                                            .flex_col()
-                                            .gap(px(8.0))
-                                            .p(px(10.0))
-                                            .rounded(px(8.0))
-                                            .bg(theme.muted.opacity(0.05))
-                                            .child(
-                                                div()
-                                                    .text_size(px(12.5))
-                                                    .text_color(theme.muted_foreground)
-                                                    .child("Browser authorization"),
-                                            )
-                                            .child(
-                                                div()
-                                                    .flex()
-                                                    .items_center()
-                                                    .justify_between()
-                                                    .gap(px(8.0))
-                                                    .child(
-                                                        div()
-                                                            .flex()
-                                                            .flex_col()
-                                                            .gap(px(2.0))
-                                                            .child(
-                                                                div()
-                                                                    .text_size(px(12.5))
-                                                                    .text_color(
-                                                                        theme.muted_foreground,
-                                                                    )
-                                                                    .child("Code"),
-                                                            )
-                                                            .child(
-                                                                div()
-                                                                    .font_weight(
-                                                                        FontWeight::SEMIBOLD,
-                                                                    )
-                                                                    .child(
-                                                                        prompt.user_code.clone(),
-                                                                    ),
-                                                            ),
-                                                    )
-                                                    .child(
-                                                        Clipboard::new(format!(
-                                                            "oauth-code-{}",
-                                                            provider_label(&self.selected_provider)
-                                                        ))
-                                                        .value(SharedString::from(
-                                                            prompt.user_code.clone(),
-                                                        )),
-                                                    ),
-                                            )
-                                            .child(
-                                                div()
-                                                    .flex()
-                                                    .items_center()
-                                                    .justify_between()
-                                                    .gap(px(8.0))
-                                                    .child(
-                                                        div()
-                                                            .flex_1()
-                                                            .text_size(px(12.5))
-                                                            .text_color(theme.muted_foreground)
-                                                            .child(prompt.verification_uri.clone()),
-                                                    )
-                                                    .child(
-                                                        Button::new(format!(
-                                                            "oauth-open-{}",
-                                                            provider_label(&self.selected_provider)
-                                                        ))
-                                                        .label("Open Browser")
-                                                        .small()
-                                                        .ghost()
-                                                        .on_click(move |_, _, cx| {
-                                                            cx.open_url(&prompt.verification_uri);
-                                                        }),
-                                                    ),
-                                            )
-                                    }))
-                                    .into_any_element()
-                            },
-                        ))
-                        .children(if Self::provider_has_oauth(&self.selected_provider) {
-                            Some(div().child(row_separator(theme)))
-                        } else {
-                            None
-                        })
-                        .child(stacked_input_field(
-                            Self::provider_api_key_label(&self.selected_provider),
-                            Self::provider_api_key_hint(&self.selected_provider),
-                            &api_key_input,
-                            theme,
-                        ))
-                        .child(stacked_input_field(
-                            "Base URL",
-                            Self::provider_base_url_hint(&self.selected_provider),
-                            &base_url_input,
-                            theme,
-                        ))
-                        .children(if endpoint_presets.is_empty() {
-                            None
-                        } else {
-                            Some(div().child(select_row(
-                                "Endpoint Preset",
-                                "Switch region or protocol",
-                                &endpoint_preset_select,
-                                theme,
-                            )))
-                        }),
-                ),
-            )
-            .child(
-                card(theme, card_opacity).child(
-                    div()
-                        .px(px(14.0))
-                        .py(px(12.0))
-                        .flex()
-                        .flex_col()
-                        .gap(px(12.0))
-                        .child(
-                            div()
-                                .text_sm()
-                                .font_weight(FontWeight::MEDIUM)
-                                .child("Provider Limits"),
-                        )
-                        .child(stacked_input_field(
-                            "Max Tokens",
-                            "Per-provider token ceiling.",
-                            &max_tokens_input,
-                            theme,
-                        )),
-                ),
-            );
-
-        let provider_column = div()
-            .flex()
-            .flex_col()
-            .gap(px(6.0))
-            .w(provider_sidebar_w)
-            .flex_shrink_0()
-            .child(
-                card(theme, card_opacity).child(div().px(px(4.0)).py(px(4.0)).child(provider_list)),
-            );
-
-        card(theme, card_opacity)
-            .flex()
-            .flex_col()
-            .gap(px(12.0))
-            .p(px(16.0))
-            .child(
-                div()
-                    .text_sm()
-                    .font_weight(FontWeight::MEDIUM)
-                    .child("Providers"),
-            )
-            .child(
-                div()
-                    .flex()
-                    .min_w_0()
-                    .gap(px(16.0))
-                    .child(provider_column)
-                    .child(right_col),
-            )
-    }
-
     fn render_keys(&mut self, cx: &mut Context<Self>) -> Div {
         let recording = self.recording_key.clone();
         let card_opacity = self.card_opacity();
@@ -6018,11 +3321,8 @@ impl SettingsPanel {
             ("Close Tab", "close_tab"),
             ("Settings", "settings"),
             ("Command Palette", "command_palette"),
-            ("Toggle Agent", "toggle_agent"),
             ("Toggle Input Bar", "toggle_input_bar"),
             ("Toggle Input / Terminal", "focus_input"),
-            ("Ask AI About Selection", "ask_ai"),
-            ("Cycle Input Mode", "cycle_input_mode"),
             ("Toggle Pane Scope", "toggle_pane_scope"),
             ("Toggle Left Sidebar", "toggle_left_panel"),
             ("Focus Files", "focus_files"),
@@ -6054,9 +3354,9 @@ impl SettingsPanel {
                           cx: &mut Context<Self>|
          -> Div {
             // Owned clone: self.group() needs &mut cx, which a live cx.theme()
-        // borrow would block.
-        let theme_owned = cx.theme().clone();
-        let theme = &theme_owned;
+            // borrow would block.
+            let theme_owned = cx.theme().clone();
+            let theme = &theme_owned;
             let mut c = card(theme, card_opacity);
             for (i, (label, field)) in keys.iter().enumerate() {
                 if i > 0 {
@@ -6132,12 +3432,6 @@ impl SettingsPanel {
         let global_summon_enabled = self.config.keybindings.global_summon_enabled;
         let global_summon_value = self.config.keybindings.global_summon.clone();
         let global_summon_recording = recording.as_deref() == Some("global_summon");
-        #[cfg(target_os = "macos")]
-        let quick_terminal_enabled = self.config.keybindings.quick_terminal_enabled;
-        #[cfg(target_os = "macos")]
-        let quick_terminal_value = self.config.keybindings.quick_terminal.clone();
-        #[cfg(target_os = "macos")]
-        let quick_terminal_recording = recording.as_deref() == Some("quick_terminal");
         // Owned clone: self.group() needs &mut cx, which a live cx.theme()
         // borrow would block.
         let theme_owned = cx.theme().clone();
@@ -6332,155 +3626,18 @@ impl SettingsPanel {
                 ),
         );
 
-        #[cfg(target_os = "macos")]
-        let quick_terminal_badge = if quick_terminal_recording {
-            div()
-                .min_h(px(28.0))
-                .px(px(10.0))
-                .flex()
-                .items_center()
-                .rounded(px(8.0))
-                .bg(theme.primary.opacity(0.10))
-                .text_color(theme.primary)
-                .text_size(px(13.0))
-                .font_weight(FontWeight::MEDIUM)
-                .child("Press shortcut…")
-                .into_any_element()
-        } else if !quick_terminal_value.trim().is_empty() {
-            crate::keycaps::keycaps_for_binding(&quick_terminal_value, theme)
-        } else {
-            div()
-                .min_h(px(28.0))
-                .px(px(10.0))
-                .flex()
-                .items_center()
-                .rounded(px(8.0))
-                .bg(theme.muted.opacity(0.08))
-                .text_size(px(13.0))
-                .font_weight(FontWeight::MEDIUM)
-                .text_color(theme.muted_foreground)
-                .child("Not set")
-                .into_any_element()
-        };
-
-        #[cfg(target_os = "macos")]
-        let quick_terminal_card = card(theme, card_opacity)
-            .child(
-                div()
-                    .px(px(16.0))
-                    .py(px(13.0))
-                    .flex()
-                    .items_start()
-                    .justify_between()
-                    .gap(px(16.0))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(4.0))
-                            .flex_1()
-                            .max_w(px(430.0))
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .child("Quick Terminal"),
-                            )
-                            .child(
-                                div()
-                                    .text_size(px(13.0))
-                                    .line_height(px(19.0))
-                                    .text_color(theme.muted_foreground.opacity(0.85))
-                                    .child("Show a dedicated floating Vu window that slides down from the top of the screen."),
-                            ),
-                    )
-                    .child(
-                        div().pt(px(1.0)).child(
-                            Switch::new("hotkey-window-enabled")
-                                .checked(quick_terminal_enabled)
-                                .small()
-                                .on_click(cx.listener(|this, checked: &bool, _, cx| {
-                                    this.config.keybindings.quick_terminal_enabled = *checked;
-                                    if *checked
-                                        && this.config.keybindings.quick_terminal.trim().is_empty()
-                                    {
-                                        this.config.keybindings.quick_terminal = "cmd-\\".to_string();
-                                    }
-                                    sync_keybinding_conflict_error(
-                                        &mut this.save_error,
-                                        &mut this.save_error_kind,
-                                        &this.config.keybindings,
-                                    );
-                                    cx.notify();
-                                })),
-                        ),
-                    ),
-            )
-            .child(row_separator(theme))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .gap(px(16.0))
-                    .px(px(16.0))
-                    .py(px(11.0))
-                    .text_color(if quick_terminal_enabled {
-                        theme.foreground
-                    } else {
-                        theme.muted_foreground
-                    })
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(3.0))
-                            .child(
-                                div()
-                                    .text_size(px(13.0))
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .child("Shortcut"),
-                            )
-                            .child(
-                                div()
-                                    .text_size(px(12.0))
-                                    .line_height(px(17.0))
-                                    .text_color(theme.muted_foreground.opacity(0.8))
-                                    .child("Use a low-conflict macOS shortcut. Cmd-Backslash matches the requested default."),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .id("key-badge-hotkey-window")
-                            .min_w(px(112.0))
-                            .flex()
-                            .justify_end()
-                            .opacity(if quick_terminal_enabled { 1.0 } else { 0.45 })
-                            .cursor_pointer()
-                            .rounded(px(7.0))
-                            .px(px(4.0))
-                            .py(px(3.0))
-                            .hover(|s| s.bg(theme.muted.opacity(0.08)))
-                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                if this.config.keybindings.quick_terminal_enabled {
-                                    this.set_recording_key(Some("quick_terminal".to_string()));
-                                    cx.notify();
-                                }
-                            }))
-                            .child(quick_terminal_badge),
-                    ),
-            );
-
-        let shortcut_groups = div()
-            .flex()
-            .flex_col()
-            .gap(px(8.0))
-            .child(self.group("global", "Global", global_summon_card, cx));
-        #[cfg(target_os = "macos")]
-        let shortcut_groups = shortcut_groups.child(quick_terminal_card);
-        let shortcut_groups = shortcut_groups
-            .child(div().h(px(8.0)))
-            .child(self.group("general", "General", general_card, cx));
+        let shortcut_groups = div().flex().flex_col().gap(px(8.0)).child(self.group(
+            "global",
+            "Global",
+            global_summon_card,
+            cx,
+        ));
+        let shortcut_groups = shortcut_groups.child(div().h(px(8.0))).child(self.group(
+            "general",
+            "General",
+            general_card,
+            cx,
+        ));
 
         section_content(
             "Keyboard Shortcuts",
@@ -6488,13 +3645,12 @@ impl SettingsPanel {
             theme,
         )
         .child(shortcut_groups)
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(8.0))
-                .child(self.group("fixed-shortcuts", "Fixed Shortcuts", fixed_tab_card, cx)),
-        )
+        .child(div().flex().flex_col().gap(px(8.0)).child(self.group(
+            "fixed-shortcuts",
+            "Fixed Shortcuts",
+            fixed_tab_card,
+            cx,
+        )))
         .child(
             div()
                 .flex()
@@ -6502,19 +3658,18 @@ impl SettingsPanel {
                 .gap(px(8.0))
                 .child(self.group("panes", "Panes", pane_card, cx)),
         )
+        .child(div().flex().flex_col().gap(px(8.0)).child(self.group(
+            "surfaces",
+            "Surfaces",
+            surface_card,
+            cx,
+        )))
         .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(8.0))
-                .child(self.group("surfaces", "Surfaces", surface_card, cx)),
-        )
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(8.0))
-                .child(self.group("terminal", "Terminal", card(theme, card_opacity)
+            div().flex().flex_col().gap(px(8.0)).child(
+                self.group(
+                    "terminal",
+                    "Terminal",
+                    card(theme, card_opacity)
                         // Terminal clipboard uses ⌘C/V on macOS and the
                         // Windows-Terminal-standard Ctrl+Shift+C/V on
                         // Windows (plain Ctrl+C would raise SIGINT in
@@ -6540,11 +3695,16 @@ impl SettingsPanel {
                             theme,
                         ))
                         .child(row_separator(theme))
-                        .child(key_row("Select All", "secondary-a", theme)), cx)),
+                        .child(key_row("Select All", "secondary-a", theme)),
+                    cx,
+                ),
+            ),
         )
     }
 }
 
+pub struct VisibilityChanged;
+impl EventEmitter<VisibilityChanged> for SettingsPanel {}
 impl EventEmitter<SaveSettings> for SettingsPanel {}
 impl EventEmitter<ThemePreview> for SettingsPanel {}
 impl EventEmitter<ThemeLivePreview> for SettingsPanel {}
@@ -6565,11 +3725,9 @@ impl Render for SettingsPanel {
 
         let active = self.active_section;
 
-        // Render content first (AI needs &mut self)
         let content = match active {
             SettingsSection::General => self.render_general(cx),
             SettingsSection::Appearance => self.render_appearance(cx),
-            SettingsSection::Ai => self.render_ai(window, cx),
             SettingsSection::Keys => self.render_keys(cx),
         };
 
@@ -6606,7 +3764,6 @@ impl Render for SettingsPanel {
             let target = match active {
                 _ if theme_editing => (viewport_h * 0.58).clamp(360.0, 620.0),
                 SettingsSection::Appearance => (viewport_h * 0.82).clamp(440.0, 780.0),
-                SettingsSection::Ai => (viewport_h * 0.82).clamp(440.0, 780.0),
                 _ => (viewport_h * 0.76).clamp(420.0, 720.0),
             };
             px(target.min(viewport_h - 32.0))
@@ -6733,17 +3890,6 @@ impl Render for SettingsPanel {
             .gap(px(8.0))
             .pl(header_left_padding)
             .pr(px(12.0))
-            .child(
-                // The small master, not the full mark: at 18px the two
-                // letterforms crowd the tile and mush together. Both carry
-                // their own tile, so this reads on the light and dark themes
-                // without a per-theme asset.
-                div().size(px(18.0)).flex_none().child(
-                    img("Vu-macOS-Dark-Small-256x256@2x.png")
-                        .size_full()
-                        .object_fit(ObjectFit::Contain),
-                ),
-            )
             .child(
                 div()
                     .text_size(px(14.0))
@@ -7120,15 +4266,12 @@ impl Render for SettingsPanel {
         } else {
             card_shell.items_center()
         };
-        let card = card_shell
-            .justify_center()
-            .opacity(overlay_progress)
-            .child(
-                div()
-                    .pt(vertical_reveal_offset(overlay_progress, 18.0))
-                    .opacity(overlay_progress)
-                    .child(surface),
-            );
+        let card = card_shell.justify_center().opacity(overlay_progress).child(
+            div()
+                .pt(vertical_reveal_offset(overlay_progress, 18.0))
+                .opacity(overlay_progress)
+                .child(surface),
+        );
 
         div()
             .id("settings-overlay")
@@ -7274,10 +4417,10 @@ impl gpui_component::select::SelectItem for FontChoice {
 
 /// One editable colour in a terminal theme.
 ///
-/// `hint` says what the slot actually paints on screen, since "ANSI 6" tells you
-/// nothing about the fact that it colours agent tool names. Chrome colours are
-/// derived from this same palette by `theme::generate_gpui_theme_json`, so
-/// editing ANSI 4 restyles the tab strip and sidebar accent too.
+/// `hint` says what the slot actually paints on screen, since "ANSI 6" alone is
+/// not descriptive. Chrome colours are derived from this same palette by
+/// `theme::generate_gpui_theme_json`, so editing ANSI 4 restyles the tab strip
+/// and sidebar accent too.
 struct ThemeSlot {
     label: &'static str,
     hint: &'static str,
@@ -7320,20 +4463,20 @@ const THEME_SLOTS: &[ThemeSlot] = &[
         ansi: None,
         is_background: true,
     },
-    slot(
-        "Foreground",
-        "Agent prose and your typed text",
-        None,
-    ),
+    slot("Foreground", "Default terminal and UI text", None),
     slot("Black", "Dim fills and separators", Some(0)),
     slot("Red", "Errors and removed diff lines", Some(1)),
     slot("Green", "Success, added diff lines, shell prompt", Some(2)),
     slot("Yellow", "Warnings and command arguments", Some(3)),
     slot("Blue", "UI accent, tab strip, links, directories", Some(4)),
     slot("Magenta", "Keywords and special values", Some(5)),
-    slot("Cyan", "Agent tool names and info", Some(6)),
+    slot("Cyan", "Commands and informational output", Some(6)),
     slot("White", "Bright default text", Some(7)),
-    slot("Bright Black", "Dimmed output, comments, thinking text", Some(8)),
+    slot(
+        "Bright Black",
+        "Dimmed output, comments, thinking text",
+        Some(8),
+    ),
     slot("Bright Red", "Bright variant of Red", Some(9)),
     slot("Bright Green", "Bright variant of Green", Some(10)),
     slot("Bright Yellow", "Bright variant of Yellow", Some(11)),
@@ -7563,38 +4706,6 @@ fn toggle_row(label: &str, hint: &str, toggle: Switch, theme: &gpui_component::T
         .child(div().pt(px(2.0)).child(toggle))
 }
 
-fn stacked_input_field(
-    label: &str,
-    hint: &str,
-    input: &Entity<InputState>,
-    theme: &gpui_component::Theme,
-) -> Div {
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(6.0))
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(2.0))
-                .child(
-                    div()
-                        .text_size(px(13.0))
-                        .font_weight(FontWeight::MEDIUM)
-                        .child(label.to_string()),
-                )
-                .child(
-                    div()
-                        .text_size(px(12.0))
-                        .line_height(px(18.0))
-                        .text_color(theme.muted_foreground.opacity(0.82))
-                        .child(hint.to_string()),
-                ),
-        )
-        .child(Input::new(input))
-}
-
 /// Convert a GPUI Keystroke to the binding format string (e.g. "cmd-shift-d").
 fn keystroke_to_binding(ks: &gpui::Keystroke) -> String {
     let mut parts = Vec::new();
@@ -7679,32 +4790,6 @@ fn key_row(action: &str, shortcut: &str, theme: &gpui_component::Theme) -> Div {
         .child(crate::keycaps::keycaps_for_binding(shortcut, theme))
 }
 
-pub(crate) fn provider_label(provider: &ProviderKind) -> &'static str {
-    match provider {
-        ProviderKind::Anthropic => "Anthropic",
-        ProviderKind::OpenAI => "OpenAI",
-        ProviderKind::ChatGPT => "ChatGPT Subscription",
-        ProviderKind::GitHubCopilot => "GitHub Copilot",
-        ProviderKind::OpenAICompatible => "OpenAI Compatible",
-        ProviderKind::MiniMax => "MiniMax",
-        ProviderKind::MiniMaxAnthropic => "MiniMax / Anthropic",
-        ProviderKind::Moonshot => "Moonshot",
-        ProviderKind::MoonshotAnthropic => "Moonshot / Anthropic",
-        ProviderKind::ZAI => "Z.AI",
-        ProviderKind::ZAIAnthropic => "Z.AI / Anthropic",
-        ProviderKind::DeepSeek => "DeepSeek",
-        ProviderKind::Groq => "Groq",
-        ProviderKind::Cohere => "Cohere",
-        ProviderKind::Gemini => "Gemini",
-        ProviderKind::Ollama => "Ollama",
-        ProviderKind::OpenRouter => "OpenRouter",
-        ProviderKind::Perplexity => "Perplexity",
-        ProviderKind::Mistral => "Mistral",
-        ProviderKind::Together => "Together",
-        ProviderKind::XAI => "xAI",
-    }
-}
-
 fn display_theme_name(name: &str) -> String {
     match name {
         "flexoki-dark" => "Flexoki Dark".into(),
@@ -7732,49 +4817,5 @@ fn display_theme_name(name: &str) -> String {
             })
             .collect::<Vec<_>>()
             .join(" "),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{ProviderKind, ProviderOAuthState, SettingsPanel, provider_connection_status};
-
-    #[test]
-    fn oauth_providers_are_ready_with_key_override() {
-        for provider in [ProviderKind::ChatGPT, ProviderKind::GitHubCopilot] {
-            let status = provider_connection_status(
-                SettingsPanel::provider_has_oauth(&provider),
-                false,
-                None,
-                false,
-                true,
-            );
-            assert_eq!(status, (true, "Ready"), "provider: {provider:?}");
-        }
-    }
-
-    #[test]
-    fn oauth_labels_take_precedence_over_key_override() {
-        let signing_in = ProviderOAuthState {
-            in_progress: true,
-            ..Default::default()
-        };
-        assert_eq!(
-            provider_connection_status(true, true, Some(&signing_in), false, true),
-            (true, "Signing In")
-        );
-
-        let connected = ProviderOAuthState {
-            connected: true,
-            ..Default::default()
-        };
-        assert_eq!(
-            provider_connection_status(true, true, Some(&connected), false, true),
-            (true, "Signed In")
-        );
-        assert_eq!(
-            provider_connection_status(true, true, None, true, true),
-            (true, "Signed In")
-        );
     }
 }

@@ -41,7 +41,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
-use vu_ghostty::{GhosttyApp, GhosttyScrollbar, GhosttySplitDirection, GhosttyTerminal};
 use futures::StreamExt;
 use futures::channel::mpsc::{UnboundedSender, unbounded};
 use gpui::*;
@@ -49,6 +48,7 @@ use gpui_component::ActiveTheme;
 use gpui_component::menu::ContextMenuExt;
 use image::{Frame, RgbaImage};
 use smallvec::SmallVec;
+use vu_ghostty::{GhosttyApp, GhosttyScrollbar, GhosttySplitDirection, GhosttyTerminal};
 
 use crate::terminal_ime::{TerminalImeInputHandler, TerminalImeView};
 use crate::terminal_links::{self, TerminalLink};
@@ -97,7 +97,7 @@ pub struct GhosttyTitleChanged(pub Option<String>);
 pub struct GhosttyProcessExited;
 pub struct GhosttyFocusChanged;
 pub struct GhosttySplitRequested(pub GhosttySplitDirection);
-pub struct GhosttyCwdChanged(pub Option<String>);
+pub struct GhosttyCwdChanged;
 
 impl EventEmitter<GhosttyTitleChanged> for GhosttyView {}
 impl EventEmitter<GhosttyProcessExited> for GhosttyView {}
@@ -381,7 +381,7 @@ impl GhosttyView {
         if cwd != self.last_cwd {
             self.last_cwd = cwd.clone();
             changed = true;
-            cx.emit(GhosttyCwdChanged(cwd));
+            cx.emit(GhosttyCwdChanged);
         }
 
         // No action-callback channel on Windows (cf. macOS's

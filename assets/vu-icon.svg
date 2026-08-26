@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2a30"/>
+      <stop offset="1" stop-color="#0e0e11"/>
+    </linearGradient>
+    <linearGradient id="ac" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff9a7a"/>
+      <stop offset="1" stop-color="#f0603f"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.02"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.25"/>
+    </linearGradient>
+  </defs>
+  <!-- macOS squircle: ~22.4% radius, 100px inset like Apple templates -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#rim)"/>
+  <!-- v caret: a single chevron, rounded, the shell's prompt shape -->
+  <path d="M 322 392 L 512 612 L 702 392" fill="none" stroke="url(#ac)" stroke-width="96" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- cursor block: terminal hint -->
+  <rect x="628" y="612" width="52" height="96" rx="10" fill="#ff9a7a" opacity="0.92"/>
+</svg>

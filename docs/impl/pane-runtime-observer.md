@@ -13,9 +13,9 @@ For serious workflows, the visible runtime is usually a stack:
 3. remote shell
 4. tmux or zellij
 5. another shell
-6. an agent CLI, vim, htop, less, or a long-running program
+6. vim, htop, less, or another long-running program
 
-The current agent context model is still mostly a snapshot:
+The current pane context is still mostly a snapshot:
 
 - title
 - cwd
@@ -38,7 +38,7 @@ This document defines the long-term architecture for that answer.
 - Represent nested scopes explicitly.
 - Preserve confidence and freshness with every claim.
 - Work from Ghostty facts without rebuilding another terminal engine.
-- Support external agent CLIs without hijacking them.
+- Support interactive terminal programs without hijacking them.
 - Degrade honestly when the platform cannot provide strong evidence.
 
 ## Non-goals
@@ -46,7 +46,7 @@ This document defines the long-term architecture for that answer.
 - Perfect remote introspection without cooperation from the remote machine.
 - Regex-based certainty about every TUI.
 - Ghostty-specific hacks that pretend the C API exposes more than it really does.
-- Hiding uncertainty from the user or the agent.
+- Hiding uncertainty from users or control clients.
 
 ## Core rule
 
@@ -100,11 +100,10 @@ This layer answers:
 
 Consumers include:
 
-- the built-in agent prompt
 - `list_panes`
+- scripts and control clients
 - tab and sidebar labels
 - notifications
-- approval UI
 - future session restore and resume surfaces
 
 Consumers must receive structured runtime state, not re-run their own heuristics on raw text.
@@ -181,7 +180,6 @@ Current implementation in vu:
 - `mode`
 - `shell_metadata_fresh`
 - `remote_host`
-- `agent_cli`
 - `tmux_session`
 - `last_verified_scope_stack`
 - `last_verified_tmux_session`
@@ -234,7 +232,6 @@ Suggested scope kinds:
 - `Multiplexer`
 - `Shell`
 - `InteractiveApp`
-- `AgentCli`
 
 Suggested app kinds:
 
@@ -247,11 +244,6 @@ Suggested app kinds:
 - `Top`
 - `Unknown`
 
-Suggested agent CLI kinds:
-
-- `KnownAgent`
-- `Unknown`
-
 Example:
 
 ```text
@@ -261,7 +253,7 @@ Example:
   RemoteShell(zsh),
   Multiplexer(kind=tmux, session=deploy),
   Shell(bash),
-  AgentCli(kind=KnownAgent)
+  InteractiveApp(kind=Unknown)
 ]
 ```
 
@@ -319,7 +311,7 @@ the runtime model is ready for this signal, but the public embedded surface API 
 
 ### Raw observations
 
-These remain valuable to the model, but vu does not promote them into typed runtime state.
+These remain useful to users and control clients, but vu does not promote them into typed runtime state.
 
 #### Screen text and structure
 
@@ -327,24 +319,14 @@ Examples:
 
 - tmux status bars
 - boxed layouts
-- agent CLI banners
+- application banners
 - vim-like rulers
 
-These stay in `read_pane` / prompt output as raw observations. They do not create `PaneRuntimeState` facts.
+These stay in `read_pane` output as raw observations. They do not create `PaneRuntimeState` facts.
 
 #### Title
 
 Titles are useful for human inspection, but they are not authoritative foreground-runtime identity.
-
-#### Filesystem artifacts
-
-Examples:
-
-- agent-specific local metadata
-- agent-specific workspace metadata
-- `AGENTS.md`
-
-These can explain why a tool might be in use, but they do not prove the pane is running it.
 
 ## Backend adapters
 
@@ -394,9 +376,9 @@ This matters because a product design that depends on remote hostname coming fro
 Current vu behavior reflects that limit:
 
 - remote host identity is left `unknown` unless vu has a stronger backend fact
-- tmux and agent-CLI identity only enter typed runtime state through authoritative command-line or surface-state evidence
-- pane titles and screen structure remain raw observations for the model, not runtime facts
-- prompt and `list_panes` expose backend-support flags so the model can see when Ghostty cannot prove command text, alternate-screen state, or remote-host identity
+- tmux identity only enters typed runtime state through authoritative command-line or surface-state evidence
+- pane titles and screen structure remain raw observations, not runtime facts
+- `list_panes` exposes backend-support flags so clients can see when Ghostty cannot prove command text, alternate-screen state, or remote-host identity
 - each tab now owns per-pane runtime observers that persist defensible facts across sparse frames and feed every consumer from the same state
 
 ## Probe design
@@ -429,7 +411,7 @@ Purpose:
 
 Purpose:
 
-- expose screen text and layout as raw observations for the model and the user
+- expose screen text and layout as raw observations for control clients and users
 
 Constraint:
 
@@ -456,7 +438,7 @@ Purpose:
 Examples:
 
 - "prod deploy tmux"
-- "agent task on staging"
+- "deploy task on staging"
 - "logs tail pane"
 
 Manual labels should never overwrite facts. They should layer on top of them.
@@ -488,17 +470,15 @@ Examples:
 - When the foreground process group returns to a shell and OSC 133 prompt markers resume, shell metadata can become fresh again.
 - When the pane is inside `ssh`, remote runtime identity must stay `unknown` unless supported by stronger evidence.
 
-## Agent-facing contract
+## Client-facing contract
 
-The built-in agent should not reason directly from raw title, cwd, and output.
-
-It should receive a structured summary such as:
+Control clients should use a structured summary rather than infer state from
+raw title, cwd, and output. The summary includes:
 
 - `scope_stack`
 - `active_scope_kind`
 - `remote_host`
 - `multiplexer_session`
-- `agent_cli_kind`
 - `shell_metadata_fresh`
 - `screen_mode`
 - `confidence`
@@ -510,14 +490,12 @@ Example warning:
 
 ## Product implications
 
-This architecture is not only for prompts.
-
 It also enables better product surfaces:
 
 - clearer pane badges
 - better sidebar names
-- safer approval copy for remote operations
-- accurate notifications from external agent CLIs
+- safer targeting for remote operations
+- accurate process notifications
 - reliable resume state when returning to a workspace
 
 ## Implementation plan
@@ -528,10 +506,10 @@ Shipped in vu:
 
 - `PaneObservationFrame`, `PaneEvidence`, `PaneRuntimeState`, and `PaneRuntimeObserver`
 - per-tab observer maps keyed by `PaneId`
-- shared observer output consumed by agent context, `list_panes`, sidebar naming, and smart-input remote classification
+- shared observer output consumed by `list_panes` and sidebar naming
 - Ghostty command-boundary tracking (`input_generation` vs `last_command_finished_input_generation`) for shell freshness
-- explicit observation-support flags surfaced to the prompt and `list_panes`
-- stateful retention for authoritative tmux and external agent CLI identity, with explicit invalidation when a fresh shell returns
+- explicit observation-support flags surfaced to `list_panes`
+- stateful retention for authoritative tmux identity, with explicit invalidation when a fresh shell returns
 - no title- or screen-pattern heuristics promoted into typed runtime state
 
 Current Ghostty embedded status:
@@ -554,13 +532,13 @@ Current Ghostty embedded status:
 
 ### Phase 4
 
-- add external-agent CLI classifiers based only on explicit backend evidence
-- expose runtime summaries in `list_panes` and agent context
+- add interactive-application classifiers based only on explicit backend evidence
+- expose runtime summaries in `list_panes`
 
 ### Phase 5
 
 - add user-visible scope badges and manual labels
-- use runtime scopes in approvals and notifications
+- use runtime scopes in notifications and target warnings
 
 ## Testing strategy
 
@@ -571,8 +549,8 @@ Current Ghostty embedded status:
   - local shell -> tmux
   - local shell -> ssh
   - local shell -> ssh -> tmux
-  - local shell -> agent CLI
-  - local shell -> ssh -> tmux -> agent CLI
+  - local shell -> interactive TUI
+  - local shell -> ssh -> tmux -> interactive TUI
 
 ## What this avoids
 
@@ -580,8 +558,8 @@ This design avoids three long-term failures:
 
 1. believing process-wide environment variables describe the focused pane
 2. over-trusting shell metadata when a TUI has taken over the screen
-3. scattering app-specific heuristics across prompts, tools, and UI labels
+3. scattering app-specific heuristics across control clients and UI labels
 
-That is the standard required if vu wants real credibility in SSH, tmux, and external-agent workflows.
+That is the standard required if vu wants real credibility in SSH, tmux, and external-tool workflows.
 
-The next paired layer is the control plane: how vu safely acts on those observed runtimes without confusing vu panes, tmux panes, shell execution, and TUI input. vu now ships the first typed `PaneControlState` layer on top of the observer, and the longer-term design remains in `docs/impl/agent-runtime-control-plane.md`.
+The paired control layer acts on observed runtimes without confusing Vu panes, tmux panes, shell execution, and TUI input. See `docs/impl/socket-api.md`.

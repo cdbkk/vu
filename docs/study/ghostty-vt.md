@@ -15,7 +15,7 @@ We initially planned to use **libghostty-vt** — the standalone VT parser libra
 | Maintenance | We maintain ~3000 lines of Grid + rendering | ~800 line FFI wrapper |
 | Build | Zig toolchain + bindgen | Pre-built libghostty, Rust FFI only |
 
-**The deciding factor:** COMMAND_FINISHED. Ghostty fires this action when OSC 133;D arrives, providing the exit code and nanosecond-precision duration of the completed command. This single capability eliminates the 3-second blind timeout in `terminal_exec`, making agent command execution instant and reliable. Building this from libghostty-vt would have required reimplementing Ghostty's shell integration handling.
+**The deciding factor:** COMMAND_FINISHED. Ghostty fires this action when OSC 133;D arrives, providing the exit code and nanosecond-precision duration of the completed command. This removes the blind timeout from visible command execution through the control socket. Building this from libghostty-vt would have required reimplementing Ghostty's shell integration handling.
 
 ### Architecture
 
@@ -104,7 +104,7 @@ What the embedded API does **not** currently give us as a stable product contrac
 
 - the exact foreground program identity
 - PTY foreground process group
-- a nested scope stack such as `ssh -> tmux -> agent CLI`
+- a nested scope stack such as `ssh -> tmux -> interactive TUI`
 - a direct export of Ghostty's richer semantic prompt model for host applications
 
 This matters for vu:
@@ -112,7 +112,7 @@ This matters for vu:
 - Ghostty should be treated as a strong source of terminal facts
 - vu still needs its own pane runtime observer
 - if vu needs process-group identity, the durable move is to upstream a libghostty API for it
-- we should not design external-agent or tmux awareness around assumptions that Ghostty will directly tell us the whole runtime state
+- we should not design external-tool or tmux awareness around assumptions that Ghostty will directly tell us the whole runtime state
 
 One more important limit: Ghostty's OSC 7 handling validates host information against the local system when reporting `PWD`. That means `PWD` is not a durable embedded signal for remote host identity in the way a naive reader might expect.
 

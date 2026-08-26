@@ -178,14 +178,20 @@ What is app-specific and should stay per-repo:
 - updater feed URL
 - release-channel defaults
 
-## Local Dry Run
+## Local dry run
 
-Ad-hoc signed local build:
+Local macOS builds use ad-hoc signing when `APPLE_SIGNING_IDENTITY` is unset.
+The standard bundle and install recipes need no signing environment variables:
 
 ```bash
-VU_ALLOW_ADHOC_SIGNING=1 \
-VU_SKIP_NOTARIZATION=1 \
-./scripts/macos/release.sh
+just macos-bundle
+just macos-install
+```
+
+To build local release artifacts without notarization:
+
+```bash
+VU_SKIP_NOTARIZATION=1 ./scripts/macos/release.sh
 ```
 
 Signed local build with notarization:

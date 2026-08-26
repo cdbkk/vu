@@ -82,19 +82,6 @@ If a cached view causes overlap, clipping, or stale layout, the cache boundary i
 
 ## Vu-Specific Guidance
 
-### Markdown and chat surfaces
-
-- Prefer parsed markdown caches on the message/document model.
-- Cache inline text-run generation for paragraphs, headings, and table cells.
-- Cache syntax-highlight runs for code blocks.
-- Avoid per-token flex trees for long replies.
-- For long assistant replies, isolate each markdown block behind a stable `Entity`
-  and reuse that entity across parent renders. Keep per-block UI state such as
-  table scroll handles on that entity, not inside parsed markdown data that is
-  produced off the UI thread.
-- Do not hide/fold long replies as the primary performance fix. Folding can be a
-  UX affordance, but the expanded state must remain responsive.
-
 ### Terminal-adjacent UI
 
 - Keep terminal surfaces and heavy side panels isolated.

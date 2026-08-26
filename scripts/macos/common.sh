@@ -161,12 +161,7 @@ signing_identity() {
     return
   fi
 
-  if [[ "${VU_ALLOW_ADHOC_SIGNING:-0}" == "1" ]]; then
-    printf '%s\n' '-'
-    return
-  fi
-
-  fail "APPLE_SIGNING_IDENTITY is required unless VU_ALLOW_ADHOC_SIGNING=1"
+  printf '%s\n' '-'
 }
 
 have_notary_credentials() {

@@ -1,9 +1,7 @@
 use super::*;
 
-const AGENT_CLI_DETECT_LOOKBACK_LINES: usize = 80;
-
 impl VuWorkspace {
-    /// Handle a visible terminal execution request from the agent.
+    /// Handle a visible terminal execution request from the terminal.
     ///
     /// Writes the command to the focused PTY so the user sees it execute.
     /// Uses Ghostty's COMMAND_FINISHED signal when available, with a bounded
@@ -37,14 +35,14 @@ impl VuWorkspace {
         }
 
         let (observation, runtime) = self.observe_terminal_runtime_for_tab(tab_idx, &pane, 20, cx);
-        let control = vu_agent::control::PaneControlState::from_runtime(&runtime);
+        let control = vu_core::pane_control::PaneControlState::from_runtime(&runtime);
         let managed_remote_workspace =
-            vu_agent::context::remote_workspace_anchor(&runtime, &observation);
+            vu_core::pane_context::remote_workspace_anchor(&runtime, &observation);
         if !control.allows_visible_shell_exec() && managed_remote_workspace.is_none() {
             let active_scope = runtime
                 .active_scope
                 .as_ref()
-                .map(vu_agent::context::PaneRuntimeScope::summary)
+                .map(vu_core::pane_context::PaneRuntimeScope::summary)
                 .unwrap_or_else(|| runtime.mode.as_str().to_string());
             let host = runtime.remote_host.unwrap_or_else(|| "unknown".to_string());
             let notes = if control.notes.is_empty() {
@@ -53,10 +51,10 @@ impl VuWorkspace {
                 format!("\nnotes:\n- {}", control.notes.join("\n- "))
             };
             let suggestion = match control.visible_target.kind {
-                vu_agent::PaneVisibleTargetKind::TmuxSession => {
+                vu_core::pane_control::PaneVisibleTargetKind::TmuxSession => {
                     if control
                         .capabilities
-                        .contains(&vu_agent::PaneControlCapability::QueryTmux)
+                        .contains(&vu_core::pane_control::PaneControlCapability::QueryTmux)
                     {
                         format!(
                             "\n\nSUGGESTED APPROACH: This pane exposes native tmux control. Prefer tmux-native tools over outer-pane send_keys.\n\
@@ -78,7 +76,7 @@ impl VuWorkspace {
                         )
                     }
                 }
-                vu_agent::PaneVisibleTargetKind::InteractiveApp => {
+                vu_core::pane_control::PaneVisibleTargetKind::InteractiveApp => {
                     format!(
                         "\n\nSUGGESTED APPROACH: Use read_pane(pane_index={idx}) to inspect the current screen, then \
                          send_keys(pane_index={idx}, ...) for keystroke-level interaction. \
@@ -140,12 +138,11 @@ impl VuWorkspace {
         pane.write(cmd_with_newline.as_bytes(), cx);
         if let Some(pane_id) = self.tabs[tab_idx].pane_tree.pane_id_for_terminal(&pane) {
             self.record_shell_command(tab_idx, pane_id, &req.command, pane.current_dir(cx));
-            self.after_shell_command_recorded(cx);
         }
         self.record_runtime_event_for_terminal(
             tab_idx,
             &pane,
-            vu_agent::context::PaneRuntimeEvent::VisibleShellExec {
+            vu_core::pane_context::PaneRuntimeEvent::VisibleShellExec {
                 command: req.command.clone(),
                 input_generation: pane.input_generation(cx),
             },
@@ -195,7 +192,7 @@ impl VuWorkspace {
                         let prompt_like = observation.screen_hints.iter().any(|hint| {
                             matches!(
                                 hint.kind,
-                                vu_agent::context::PaneObservationHintKind::PromptLikeInput
+                                vu_core::pane_context::PaneObservationHintKind::PromptLikeInput
                             )
                         });
 
@@ -265,10 +262,10 @@ impl VuWorkspace {
     pub(super) fn handle_pane_request_for_tab(
         &mut self,
         tab_idx: usize,
-        req: vu_agent::PaneRequest,
+        req: vu_core::PaneRequest,
         cx: &mut Context<Self>,
     ) {
-        use vu_agent::{PaneInfo, PaneQuery, PaneResponse};
+        use vu_core::{PaneInfo, PaneQuery, PaneResponse};
 
         let pane_tree = &self.tabs[tab_idx].pane_tree;
         let focused_pid = pane_tree.focused_pane_id();
@@ -288,9 +285,10 @@ impl VuWorkspace {
                             Self::SECONDARY_PANE_OBSERVATION_LINES,
                             cx,
                         );
-                        let control = vu_agent::control::PaneControlState::from_runtime(&runtime);
+                        let control =
+                            vu_core::pane_control::PaneControlState::from_runtime(&runtime);
                         let remote_workspace =
-                            vu_agent::context::remote_workspace_anchor(&runtime, &observation);
+                            vu_core::pane_context::remote_workspace_anchor(&runtime, &observation);
                         let title = observation
                             .title
                             .clone()
@@ -324,7 +322,6 @@ impl VuWorkspace {
                             control_capabilities: control.capabilities.clone(),
                             control_notes: control.notes.clone(),
                             active_scope: runtime.active_scope.clone(),
-                            agent_cli: runtime.agent_cli.clone(),
                             evidence: runtime.evidence.clone(),
                             runtime_stack: runtime.scope_stack,
                             last_verified_runtime_stack: runtime.last_verified_scope_stack,
@@ -358,7 +355,7 @@ impl VuWorkspace {
                         self.record_runtime_event_for_terminal(
                             tab_idx,
                             &resolved.pane,
-                            vu_agent::context::PaneRuntimeEvent::RawInput {
+                            vu_core::pane_context::PaneRuntimeEvent::RawInput {
                                 keys: keys.clone(),
                                 input_generation: resolved.pane.input_generation(cx),
                             },
@@ -409,7 +406,8 @@ impl VuWorkspace {
                     Ok(resolved) => {
                         let (_, runtime) =
                             self.observe_terminal_runtime_for_tab(tab_idx, &resolved.pane, 20, cx);
-                        let control = vu_agent::control::PaneControlState::from_runtime(&runtime);
+                        let control =
+                            vu_core::pane_control::PaneControlState::from_runtime(&runtime);
                         if let Some(tmux) = control.tmux {
                             PaneResponse::TmuxInfo(tmux)
                         } else {
@@ -428,11 +426,11 @@ impl VuWorkspace {
                 Ok(resolved) => {
                     let (_, runtime) =
                         self.observe_terminal_runtime_for_tab(tab_idx, &resolved.pane, 20, cx);
-                    let control = vu_agent::control::PaneControlState::from_runtime(&runtime);
+                    let control = vu_core::pane_control::PaneControlState::from_runtime(&runtime);
                     let tmux_mode = control.tmux.as_ref().map(|tmux| tmux.mode);
                     if !control
                         .capabilities
-                        .contains(&vu_agent::PaneControlCapability::QueryTmux)
+                        .contains(&vu_core::pane_control::PaneControlCapability::QueryTmux)
                     {
                         PaneResponse::Error(format!(
                             "Pane {} (id {}) does not currently expose tmux native query capability.\nvisible_target: {}\ntmux_mode: {}\ncontrol_attachments: {}\ncontrol_capabilities: {}",
@@ -440,7 +438,7 @@ impl VuWorkspace {
                             resolved.pane_id,
                             control.visible_target.summary(),
                             tmux_mode.map(|mode| mode.as_str()).unwrap_or("none"),
-                            vu_agent::control::format_control_attachments(&control.attachments),
+                            vu_core::pane_control::format_control_attachments(&control.attachments),
                             control
                                 .capabilities
                                 .iter()
@@ -463,7 +461,7 @@ impl VuWorkspace {
                                 .map(|duration| duration.as_nanos())
                                 .unwrap_or_default()
                         );
-                        let command = vu_agent::tmux::build_tmux_list_command(&nonce);
+                        let command = vu_core::tmux::build_tmux_list_command(&nonce);
                         self.spawn_shell_anchor_command(
                             tab_idx,
                             resolved.pane,
@@ -471,8 +469,8 @@ impl VuWorkspace {
                             command,
                             10,
                             move |lines| {
-                                vu_agent::tmux::parse_tmux_list_lines(&lines, &nonce)
-                                    .map(vu_agent::PaneResponse::TmuxList)
+                                vu_core::tmux::parse_tmux_list_lines(&lines, &nonce)
+                                    .map(vu_core::PaneResponse::TmuxList)
                             },
                             response_tx,
                             cx,
@@ -490,10 +488,10 @@ impl VuWorkspace {
                 Ok(resolved) => {
                     let (_, runtime) =
                         self.observe_terminal_runtime_for_tab(tab_idx, &resolved.pane, 20, cx);
-                    let control = vu_agent::control::PaneControlState::from_runtime(&runtime);
+                    let control = vu_core::pane_control::PaneControlState::from_runtime(&runtime);
                     if !control
                         .capabilities
-                        .contains(&vu_agent::PaneControlCapability::QueryTmux)
+                        .contains(&vu_core::pane_control::PaneControlCapability::QueryTmux)
                     {
                         PaneResponse::Error(format!(
                             "Pane {} (id {}) does not currently expose tmux native query capability for capture.\nvisible_target: {}\ncontrol_capabilities: {}",
@@ -522,7 +520,7 @@ impl VuWorkspace {
                                 .map(|duration| duration.as_nanos())
                                 .unwrap_or_default()
                         );
-                        let command = vu_agent::tmux::build_tmux_capture_command(
+                        let command = vu_core::tmux::build_tmux_capture_command(
                             &nonce,
                             target.as_deref(),
                             lines,
@@ -534,12 +532,12 @@ impl VuWorkspace {
                             command,
                             10,
                             move |lines| {
-                                vu_agent::tmux::parse_tmux_capture_lines(
+                                vu_core::tmux::parse_tmux_capture_lines(
                                     &lines,
                                     &nonce,
                                     target.as_deref(),
                                 )
-                                .map(vu_agent::PaneResponse::TmuxCapture)
+                                .map(vu_core::PaneResponse::TmuxCapture)
                             },
                             response_tx,
                             cx,
@@ -559,10 +557,10 @@ impl VuWorkspace {
                 Ok(resolved) => {
                     let (_, runtime) =
                         self.observe_terminal_runtime_for_tab(tab_idx, &resolved.pane, 20, cx);
-                    let control = vu_agent::control::PaneControlState::from_runtime(&runtime);
+                    let control = vu_core::pane_control::PaneControlState::from_runtime(&runtime);
                     if !control
                         .capabilities
-                        .contains(&vu_agent::PaneControlCapability::SendTmuxKeys)
+                        .contains(&vu_core::pane_control::PaneControlCapability::SendTmuxKeys)
                     {
                         PaneResponse::Error(format!(
                             "Pane {} (id {}) does not currently expose tmux native send-keys capability.\nvisible_target: {}\ncontrol_capabilities: {}",
@@ -582,7 +580,7 @@ impl VuWorkspace {
                             resolved.pane_index, resolved.pane_id
                         ))
                     } else {
-                        match vu_agent::tmux::build_tmux_send_keys_command(
+                        match vu_core::tmux::build_tmux_send_keys_command(
                             &target,
                             literal_text.as_deref(),
                             &key_names,
@@ -597,7 +595,7 @@ impl VuWorkspace {
                                     command,
                                     10,
                                     move |_lines| {
-                                        Ok(vu_agent::PaneResponse::Content(format!(
+                                        Ok(vu_core::PaneResponse::Content(format!(
                                             "tmux send-keys delivered to target {}",
                                             target
                                         )))
@@ -625,10 +623,10 @@ impl VuWorkspace {
                 Ok(resolved) => {
                     let (_, runtime) =
                         self.observe_terminal_runtime_for_tab(tab_idx, &resolved.pane, 20, cx);
-                    let control = vu_agent::control::PaneControlState::from_runtime(&runtime);
+                    let control = vu_core::pane_control::PaneControlState::from_runtime(&runtime);
                     if !control
                         .capabilities
-                        .contains(&vu_agent::PaneControlCapability::ExecTmuxCommand)
+                        .contains(&vu_core::pane_control::PaneControlCapability::ExecTmuxCommand)
                     {
                         PaneResponse::Error(format!(
                             "Pane {} (id {}) does not currently expose tmux native run-command capability.\nvisible_target: {}\ncontrol_capabilities: {}",
@@ -657,7 +655,7 @@ impl VuWorkspace {
                                 .map(|duration| duration.as_nanos())
                                 .unwrap_or_default()
                         );
-                        let shell_command = vu_agent::tmux::build_tmux_exec_command(
+                        let shell_command = vu_core::tmux::build_tmux_exec_command(
                             &nonce,
                             location,
                             target.as_deref(),
@@ -673,10 +671,10 @@ impl VuWorkspace {
                             shell_command,
                             12,
                             move |lines| {
-                                vu_agent::tmux::parse_tmux_exec_lines(
+                                vu_core::tmux::parse_tmux_exec_lines(
                                     &lines, &nonce, location, detached,
                                 )
-                                .map(vu_agent::PaneResponse::TmuxExec)
+                                .map(vu_core::PaneResponse::TmuxExec)
                             },
                             response_tx,
                             cx,
@@ -695,7 +693,7 @@ impl VuWorkspace {
                     let pane = resolved.pane;
                     let (_, runtime) =
                         self.observe_terminal_runtime_for_tab(tab_idx, &pane, 20, cx);
-                    let control = vu_agent::control::PaneControlState::from_runtime(&runtime);
+                    let control = vu_core::pane_control::PaneControlState::from_runtime(&runtime);
                     if !control.allows_shell_probe() {
                         PaneResponse::Error(format!(
                             "Pane {} (id {}) does not currently expose the probe_shell_context capability. \
@@ -704,7 +702,7 @@ impl VuWorkspace {
                             pane_index,
                             pane_id,
                             control.visible_target.summary(),
-                            vu_agent::control::format_control_attachments(&control.attachments),
+                            vu_core::pane_control::format_control_attachments(&control.attachments),
                             control
                                 .capabilities
                                 .iter()
@@ -727,7 +725,7 @@ impl VuWorkspace {
                                 .map(|duration| duration.as_nanos())
                                 .unwrap_or_default()
                         );
-                        let command = vu_agent::shell_probe::build_shell_probe_command(&nonce);
+                        let command = vu_core::shell_probe::build_shell_probe_command(&nonce);
                         let _ = pane.take_command_finished(cx);
                         pane.write(format!("{command}\n").as_bytes(), cx);
 
@@ -760,7 +758,7 @@ impl VuWorkspace {
                                 let lines = this
                                     .update(cx, |_, cx| pane.recent_lines(200, cx))
                                     .unwrap_or_default();
-                                match vu_agent::shell_probe::parse_shell_probe_lines(&lines, &nonce)
+                                match vu_core::shell_probe::parse_shell_probe_lines(&lines, &nonce)
                                 {
                                     Ok(result) => {
                                         let recorded_result = result.clone();
@@ -768,7 +766,7 @@ impl VuWorkspace {
                                             workspace.record_runtime_event_for_terminal(
                                                 tab_idx,
                                                 &pane,
-                                                vu_agent::context::PaneRuntimeEvent::ShellProbe {
+                                                vu_core::pane_context::PaneRuntimeEvent::ShellProbe {
                                                     result: recorded_result,
                                                     captured_input_generation: pane.input_generation(cx),
                                                 },
@@ -824,35 +822,20 @@ impl VuWorkspace {
                     Ok(resolved) => {
                         let pane_index = resolved.pane_index;
                         let pane_id = resolved.pane_id;
-                        let pane_target = vu_agent::tools::PaneSelector::new(None, Some(pane_id));
+                        let pane_target =
+                            vu_core::pane_request::PaneSelector::new(None, Some(pane_id));
                         let pane = resolved.pane;
+                        let (_, runtime) =
+                            self.observe_terminal_runtime_for_tab(tab_idx, &pane, 20, cx);
                         let has_si = pane.has_shell_integration(cx);
                         let timeout = timeout_secs.unwrap_or(30).min(120);
                         let response_tx = req.response_tx;
 
-                        // vu #239: never poll an interactive agent-CLI pane (Claude Code /
-                        // Codex / OpenCode). Those TUIs never return to a settled shell prompt,
-                        // so wait_for would loop until the turn hits max_turns and the panel
-                        // appears hung. Short-circuit with guidance toward agent_cli_turn.
-                        let observation =
-                            pane.observation_frame(AGENT_CLI_DETECT_LOOKBACK_LINES, cx);
-                        if let Some(agent) = vu_agent::context::classify_screen_agent_cli(
-                            observation.title.as_deref(),
-                            &observation.recent_output,
-                        ) {
-                            log::info!("[wait_for] → skipped: interactive agent-CLI '{agent}'");
+                        if runtime.mode == vu_core::pane_context::PaneMode::Tui {
+                            log::info!("[wait_for] -> skipped: interactive pane");
                             let _ = response_tx.send(PaneResponse::WaitComplete {
-                                status: "skipped_agent_cli".into(),
-                                output: format!(
-                                    concat!(
-                                        "This pane is running an interactive agent-CLI ('{}'), which never ",
-                                        "returns to a settled shell prompt — waiting on it would loop indefinitely. ",
-                                        "Do not poll it with wait_for or repeated read_pane. To drive it, use ",
-                                        "agent_cli_turn(agent_name=\"{}\", prompt=…); otherwise send one input ",
-                                        "and stop, or just report the current screen."
-                                    ),
-                                    agent, agent
-                                ),
+                                status: "skipped_interactive".into(),
+                                output: pane.recent_lines(50, cx).join("\n"),
                             });
                             return;
                         }

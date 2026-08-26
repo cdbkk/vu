@@ -15,7 +15,7 @@ companion plan in `docs/impl/linux-port.md`.
 As of Phase 2 the workspace builds on Windows, Linux, and macOS. What
 you get per platform:
 
-| Target | UI binary | Terminal pane | Control socket | Agent / settings / CLI |
+| Target | UI binary | Terminal pane | Control socket | Settings / CLI |
 |:-------|:---------:|:-------------:|:--------------:|:----------------------:|
 | macOS  | ✅ real   | ✅ libghostty + Metal | `/tmp/vu.sock` | ✅ |
 | Windows | ✅ real  | ✅ libghostty-vt + ConPTY + D3D11/DirectWrite | `\\.\pipe\vu` | ✅ |
@@ -28,7 +28,7 @@ rustup default stable
 git clone https://github.com/nowledge-co/con-terminal.git vu-terminal
 cd vu-terminal
 cargo wbuild -p vu --release          # → target\release\vu-app.exe
-cargo wtest  -p vu-core -p vu-cli -p vu-agent -p vu-terminal
+cargo wtest  -p vu-core -p vu-cli -p vu-terminal
 ```
 
 Prerequisites:
@@ -170,11 +170,6 @@ prep work.
 Officially supports Windows x86_64 with CI. Depends on upstream Zed's
 gpui by git, matching our workspace pin. Should require no per-target
 changes.
-
-### Rig, tokio, serde, etc.
-
-All cross-platform. Rig only assumes std + reqwest, which we already
-build with rustls.
 
 ## The path to a working Windows build
 

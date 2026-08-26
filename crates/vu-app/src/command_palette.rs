@@ -74,13 +74,6 @@ const PALETTE_ACTIONS: &[PaletteAction] = &[
         shortcut: "secondary-m",
         category: "App",
     },
-    #[cfg(target_os = "macos")]
-    PaletteAction {
-        id: "quick-terminal",
-        label: "Quick Terminal",
-        shortcut: "",
-        category: "App",
-    },
     PaletteAction {
         id: "new-tab",
         label: "New Tab",
@@ -140,18 +133,6 @@ const PALETTE_ACTIONS: &[PaletteAction] = &[
         label: "Focus Terminal",
         shortcut: "",
         category: "Terminal",
-    },
-    PaletteAction {
-        id: "toggle-agent",
-        label: "Toggle Agent Panel",
-        shortcut: "secondary-l",
-        category: "Agent",
-    },
-    PaletteAction {
-        id: "cycle-input-mode",
-        label: "Cycle Input Mode",
-        shortcut: "secondary-;",
-        category: "Input",
     },
     PaletteAction {
         id: "split-right",

@@ -13,9 +13,9 @@
 
 use std::sync::Arc;
 
-use vu_ghostty::{GhosttyApp, GhosttySplitDirection, GhosttyTerminal};
 use gpui::*;
 use gpui_component::ActiveTheme;
+use vu_ghostty::{GhosttyApp, GhosttySplitDirection, GhosttyTerminal};
 
 actions!(ghostty, [ConsumeTab, ConsumeTabPrev]);
 
@@ -24,7 +24,7 @@ pub struct GhosttyTitleChanged(pub Option<String>);
 pub struct GhosttyProcessExited;
 pub struct GhosttyFocusChanged;
 pub struct GhosttySplitRequested(pub GhosttySplitDirection);
-pub struct GhosttyCwdChanged(pub Option<String>);
+pub struct GhosttyCwdChanged;
 
 impl EventEmitter<GhosttyTitleChanged> for GhosttyView {}
 impl EventEmitter<GhosttyProcessExited> for GhosttyView {}
@@ -152,7 +152,7 @@ impl Render for GhosttyView {
                     .text_xs()
                     .text_color(theme.foreground.opacity(0.4))
                     .child(
-                        "Agent panel, settings, command palette, and the control \
+                        "Settings, command palette, and the control \
                          socket all work. The terminal surface will render here \
                          when the Linux backend lands.",
                     ),

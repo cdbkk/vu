@@ -116,7 +116,7 @@ pub struct GhosttyTitleChanged(pub Option<String>);
 pub struct GhosttyProcessExited;
 pub struct GhosttyFocusChanged;
 pub struct GhosttySplitRequested(pub GhosttySplitDirection);
-pub struct GhosttyCwdChanged(pub Option<String>);
+pub struct GhosttyCwdChanged;
 
 impl EventEmitter<GhosttyTitleChanged> for GhosttyView {}
 impl EventEmitter<GhosttyProcessExited> for GhosttyView {}
@@ -408,7 +408,7 @@ impl GhosttyView {
         if cwd != self.last_cwd {
             self.last_cwd = cwd.clone();
             changed = true;
-            cx.emit(GhosttyCwdChanged(cwd));
+            cx.emit(GhosttyCwdChanged);
         }
 
         if !terminal.is_alive() && !self.process_exit_emitted {
@@ -450,7 +450,7 @@ impl GhosttyView {
             if cwd != self.last_cwd {
                 self.last_cwd = cwd.clone();
                 changed = true;
-                cx.emit(GhosttyCwdChanged(cwd));
+                cx.emit(GhosttyCwdChanged);
             }
 
             if !terminal.is_alive() && !self.process_exit_emitted {

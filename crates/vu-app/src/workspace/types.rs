@@ -196,29 +196,11 @@ pub(super) struct Tab {
     pub(super) user_label: Option<String>,
     /// Optional accent color set via the tab context menu.
     pub(super) color: Option<vu_core::session::TabAccentColor>,
-    /// AI-suggested label, when the suggestion model is enabled and
-    /// has produced one. Sits between `user_label` and the regex
-    /// heuristic in the naming priority — never overrides an
-    /// explicit user choice, but does override the heuristic when
-    /// available.
-    pub(super) ai_label: Option<String>,
-    /// AI-suggested icon, paired with `ai_label`. When `None`, the
-    /// row falls back to the heuristic icon.
-    pub(super) ai_icon: Option<TabIconKind>,
-    /// Stable identifier for this tab across the lifetime of the
-    /// window — used as the cache key in the `TabSummaryEngine` so
-    /// reorders, closes, and re-opens don't collide. Allocated from
-    /// `next_tab_summary_id` at tab construction time.
+    /// Stable identifier for this tab across the lifetime of the window.
     pub(super) summary_id: u64,
-    /// Bumped when the tab's terminal context changes in a way that
-    /// invalidates in-flight AI summaries for the previous context.
-    pub(super) summary_epoch: u64,
     pub(super) needs_attention: bool,
-    pub(super) session: AgentSession,
-    pub(super) agent_routing: AgentRoutingState,
-    pub(super) panel_state: PanelState,
-    pub(super) runtime_trackers: RefCell<HashMap<usize, vu_agent::context::PaneRuntimeTracker>>,
-    pub(super) runtime_cache: RefCell<HashMap<usize, vu_agent::context::PaneRuntimeState>>,
+    pub(super) runtime_trackers: RefCell<HashMap<usize, vu_core::pane_context::PaneRuntimeTracker>>,
+    pub(super) runtime_cache: RefCell<HashMap<usize, vu_core::pane_context::PaneRuntimeState>>,
     pub(super) shell_history: HashMap<usize, VecDeque<CommandSuggestionEntry>>,
 }
 
@@ -244,14 +226,6 @@ pub(super) struct NSOperatingSystemVersion {
     pub(super) major_version: isize,
     pub(super) minor_version: isize,
     pub(super) patch_version: isize,
-}
-
-#[derive(Clone)]
-pub(super) struct ShellSuggestionResult {
-    pub(super) tab_idx: usize,
-    pub(super) pane_id: usize,
-    pub(super) prefix: String,
-    pub(super) completion: String,
 }
 
 pub(super) enum LocalPathCompletion {
@@ -280,8 +254,8 @@ pub(super) struct PendingCreatePane {
     pub(super) command: Option<String>,
     pub(super) cwd: Option<String>,
     pub(super) tab_idx: usize,
-    pub(super) location: vu_agent::tools::PaneCreateLocation,
-    pub(super) response_tx: crossbeam_channel::Sender<vu_agent::PaneResponse>,
+    pub(super) location: vu_core::PaneCreateLocation,
+    pub(super) response_tx: crossbeam_channel::Sender<vu_core::PaneResponse>,
 }
 
 pub(super) enum PendingWindowControlRequest {
@@ -307,7 +281,7 @@ pub(super) enum PendingSurfaceControlRequest {
     Split {
         tab_idx: usize,
         source: vu_core::SurfaceTarget,
-        location: vu_agent::tools::PaneCreateLocation,
+        location: vu_core::PaneCreateLocation,
         title: Option<String>,
         command: Option<String>,
         owner: Option<String>,
@@ -320,13 +294,6 @@ pub(super) enum PendingSurfaceControlRequest {
         close_empty_owned_pane: bool,
         response_tx: oneshot::Sender<ControlResult>,
     },
-}
-
-pub(super) struct PendingControlAgentRequest {
-    pub(super) request_id: u64,
-    pub(super) prompt: String,
-    pub(super) auto_approve_tools: bool,
-    pub(super) response_tx: tokio::sync::oneshot::Sender<ControlResult>,
 }
 
 pub(super) enum SessionSaveRequest {

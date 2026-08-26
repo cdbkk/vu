@@ -7,19 +7,10 @@ impl VuWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let agent_panel_open = session.agent_panel_open;
-        let agent_panel_width = session
-            .agent_panel_width
-            .unwrap_or(AGENT_PANEL_DEFAULT_WIDTH);
         let window_width = window.bounds().size.width.as_f32();
-        let agent_panel_outer_width = if agent_panel_open {
-            agent_panel_width.min(max_agent_panel_width(window_width)) + 1.0
-        } else {
-            0.0
-        };
         let initial_sidebar_width = SessionSidebar::clamped_panel_width(
             session.left_panel_width.unwrap_or(PANEL_MIN_WIDTH * 1.25),
-            max_sidebar_panel_width(window_width, agent_panel_outer_width),
+            max_sidebar_panel_width(window_width, 0.0),
         );
         let sidebar = cx.new(|cx| {
             let mut s = SessionSidebar::new(cx);
@@ -73,41 +64,24 @@ impl VuWorkspace {
         })
         .map(std::sync::Arc::new)
         .unwrap_or_else(|e| panic!("Fatal: failed to initialize Ghostty: {}", e));
-        let harness = AgentHarness::new(&config).unwrap_or_else(|e| {
-            log::error!(
-                "Failed to create agent harness: {}. Agent features disabled.",
-                e
-            );
-            panic!("Fatal: agent harness initialization failed: {}", e);
-        });
-        harness.prewarm_input_classification();
-        let shell_suggestion_engine = harness.suggestion_engine(180);
-        let tab_summary_engine = harness.tab_summary_engine();
         let session_save_tx = spawn_session_save_worker();
         let (control_request_tx, control_request_rx) = crossbeam_channel::unbounded();
-        let (shell_suggestion_tx, shell_suggestion_rx) = crossbeam_channel::unbounded();
-        let (tab_summary_tx, tab_summary_rx) = crossbeam_channel::unbounded();
-        let (skill_scan_tx, skill_scan_rx) = crossbeam_channel::unbounded();
-        let control_socket = match vu_core::spawn_control_socket_server(
-            harness.runtime_handle(),
-            control_request_tx,
-        ) {
-            Ok(handle) => Some(handle),
-            Err(err) => {
-                log::error!("Failed to start vu control socket: {}", err);
-                None
-            }
-        };
-        let model_registry = ModelRegistry::new();
-        if model_registry.needs_refresh() {
-            let registry_for_fetch = model_registry.clone();
-            harness.spawn_detached(async move {
-                if let Err(e) = registry_for_fetch.fetch().await {
-                    log::warn!("Failed to refresh model registry: {}", e);
+        let control_runtime = std::sync::Arc::new(
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(1)
+                .enable_all()
+                .build()
+                .expect("control runtime must initialize"),
+        );
+        let control_socket =
+            match vu_core::spawn_control_socket_server(control_runtime.clone(), control_request_tx)
+            {
+                Ok(handle) => Some(handle),
+                Err(err) => {
+                    log::error!("Failed to start vu control socket: {}", err);
+                    None
                 }
-            });
-        }
-
+            };
         let restore_terminal_text = config.appearance.restore_terminal_text;
         let make_terminal = |cwd: Option<&str>,
                              restored_screen_text: Option<&[String]>,
@@ -135,30 +109,6 @@ impl VuWorkspace {
             .iter()
             .enumerate()
             .map(|(i, tab_state)| {
-                // Restore per-tab conversation, with migration from global conversation_id
-                let agent_session = if let Some(conv_id) = &tab_state.conversation_id {
-                    match Conversation::load(conv_id) {
-                        Ok(conv) => AgentSession::with_conversation(conv),
-                        Err(_) => AgentSession::new(),
-                    }
-                } else if i == 0 {
-                    // Migration: first tab gets the old session-level conversation
-                    if let Some(conv_id) = &session.conversation_id {
-                        match Conversation::load(conv_id) {
-                            Ok(conv) => AgentSession::with_conversation(conv),
-                            Err(_) => AgentSession::new(),
-                        }
-                    } else {
-                        AgentSession::new()
-                    }
-                } else {
-                    AgentSession::new()
-                };
-                let panel_state = {
-                    let conv = agent_session.conversation().clone();
-                    let conv = conv.lock();
-                    PanelState::from_conversation(&conv)
-                };
                 let pane_tree = if let Some(layout) = &tab_state.layout {
                     let mut restore_terminal =
                         |restore_cwd: Option<&str>,
@@ -185,19 +135,9 @@ impl VuWorkspace {
                         tab_state.title.clone()
                     },
                     user_label: tab_state.user_label.clone(),
-                    ai_label: None,
-                    ai_icon: None,
                     color: tab_state.color,
                     summary_id: i as u64,
-                    summary_epoch: 0,
                     needs_attention: false,
-                    session: agent_session,
-                    agent_routing: if tab_state.agent_routing.is_empty() {
-                        Self::default_agent_routing(&config.agent)
-                    } else {
-                        tab_state.agent_routing.clone()
-                    },
-                    panel_state,
                     runtime_trackers: RefCell::new(HashMap::new()),
                     runtime_cache: RefCell::new(HashMap::new()),
                     shell_history: Self::restore_shell_history(tab_state),
@@ -210,15 +150,9 @@ impl VuWorkspace {
                 pane_tree: PaneTree::new(terminal),
                 title: "Terminal".to_string(),
                 user_label: None,
-                ai_label: None,
-                ai_icon: None,
                 color: None,
                 summary_id: 0,
-                summary_epoch: 0,
                 needs_attention: false,
-                session: AgentSession::new(),
-                agent_routing: Self::default_agent_routing(&config.agent),
-                panel_state: PanelState::new(),
                 runtime_trackers: RefCell::new(HashMap::new()),
                 runtime_cache: RefCell::new(HashMap::new()),
                 shell_history: HashMap::new(),
@@ -235,8 +169,6 @@ impl VuWorkspace {
                 .map(|(i, tab)| {
                     let presentation = smart_tab_presentation(
                         tab.user_label.as_deref(),
-                        tab.ai_label.as_deref(),
-                        tab.ai_icon.map(|k| k.svg_path()),
                         None,
                         Some(tab.title.as_str()),
                         None,
@@ -269,19 +201,8 @@ impl VuWorkspace {
             Self::merge_shell_histories(global_shell_history, &persisted_history);
         let global_input_history =
             Self::restore_global_input_history(&session, &persisted_history, &global_shell_history);
-        // Take the active tab's restored panel state for the AgentPanel
-        let initial_panel_state =
-            std::mem::replace(&mut tabs[active_tab].panel_state, PanelState::new());
-        let agent_panel = cx.new(|cx| {
-            let mut panel = AgentPanel::with_state(initial_panel_state, window, cx);
-            panel.set_auto_approve(config.agent.auto_approve_tools);
-            panel
-        });
         let input_bar = cx.new(|cx| InputBar::new(window, cx));
-        let registry = model_registry.clone();
-        let oauth_runtime = harness.runtime_handle();
-        let settings_panel =
-            cx.new(|cx| SettingsPanel::new(&config, registry, oauth_runtime, window, cx));
+        let settings_panel = cx.new(|cx| SettingsPanel::new(&config, window, cx));
         let command_palette = cx.new(|cx| CommandPalette::new(window, cx));
         let initial_recent_inputs = global_input_history
             .iter()
@@ -289,10 +210,6 @@ impl VuWorkspace {
             .take(80)
             .cloned()
             .collect::<Vec<_>>();
-        agent_panel.update(cx, |panel, _cx| {
-            panel.set_ui_opacity(effective_ui_opacity);
-            panel.set_recent_inputs(initial_recent_inputs.clone());
-        });
         input_bar.update(cx, |bar, cx| {
             bar.set_ui_opacity(effective_ui_opacity);
             bar.set_recent_commands(initial_recent_inputs, cx);
@@ -309,8 +226,6 @@ impl VuWorkspace {
             .detach();
         cx.subscribe_in(&input_bar, window, Self::on_input_escape)
             .detach();
-        cx.subscribe_in(&input_bar, window, Self::on_skill_autocomplete_changed)
-            .detach();
         cx.subscribe_in(
             &input_bar,
             window,
@@ -323,35 +238,13 @@ impl VuWorkspace {
             .detach();
         cx.subscribe_in(&settings_panel, window, Self::on_appearance_preview)
             .detach();
-        // Re-render workspace when settings panel visibility changes (e.g. X close button)
-        cx.observe(&settings_panel, |_, _, cx| cx.notify()).detach();
+        // Re-render workspace only when settings panel visibility changes (e.g. X close button).
+        // A blanket observe re-rendered the whole workspace on every settings scroll tick.
+        cx.subscribe_in(&settings_panel, window, |_, _, _: &VisibilityChanged, _, cx| cx.notify())
+            .detach();
         cx.subscribe_in(&command_palette, window, Self::on_palette_select)
             .detach();
         cx.subscribe_in(&command_palette, window, Self::on_palette_dismissed)
-            .detach();
-        cx.subscribe_in(&agent_panel, window, Self::on_new_conversation)
-            .detach();
-        cx.subscribe_in(&agent_panel, window, Self::on_load_conversation)
-            .detach();
-        cx.subscribe_in(&agent_panel, window, Self::on_delete_conversation)
-            .detach();
-        cx.subscribe_in(&agent_panel, window, Self::on_inline_input_submit)
-            .detach();
-        cx.subscribe_in(
-            &agent_panel,
-            window,
-            Self::on_inline_skill_autocomplete_changed,
-        )
-        .detach();
-        cx.subscribe_in(&agent_panel, window, Self::on_cancel_request)
-            .detach();
-        cx.subscribe_in(&agent_panel, window, Self::on_set_auto_approve)
-            .detach();
-        cx.subscribe_in(&agent_panel, window, Self::on_select_session_provider)
-            .detach();
-        cx.subscribe_in(&agent_panel, window, Self::on_select_session_model)
-            .detach();
-        cx.subscribe_in(&agent_panel, window, Self::on_rerun_from_message)
             .detach();
         cx.subscribe_in(&sidebar, window, Self::on_sidebar_select)
             .detach();
@@ -520,124 +413,22 @@ impl VuWorkspace {
             }
         });
 
-        // Poll all tabs' agent sessions.
         cx.spawn(async move |this, cx| {
-            // Backstop interval for the AI-summary trigger below.
-            // See the comment on `last_summary_poll` use site.
-            let summary_poll_interval = std::time::Duration::from_secs(3);
-            let mut last_summary_poll = std::time::Instant::now();
             loop {
                 let mut got_event = false;
-
                 this.update(cx, |workspace, cx| {
-                    // Drain events from every tab's session
-                    for tab_idx in 0..workspace.tabs.len() {
-                        let is_active = tab_idx == workspace.active_tab;
-
-                        // Agent events
-                        while let Ok(event) = workspace.tabs[tab_idx].session.events().try_recv() {
-                            got_event = true;
-                            let suppress_event =
-                                workspace.handle_pending_control_agent_event(tab_idx, &event);
-                            if suppress_event {
-                                continue;
-                            }
-                            if is_active {
-                                workspace.handle_harness_event(event, cx);
-                            } else {
-                                workspace.tabs[tab_idx].panel_state.apply_event(event);
-                                workspace.tabs[tab_idx].needs_attention = true;
-                            }
-                        }
-
-                        // Terminal exec requests — route to the tab that owns the session
-                        while let Ok(req) = workspace.tabs[tab_idx]
-                            .session
-                            .terminal_exec_requests()
-                            .try_recv()
-                        {
-                            got_event = true;
-                            workspace.handle_terminal_exec_request_for_tab(tab_idx, req, cx);
-                        }
-
-                        // Pane queries — route to the tab that owns the session
-                        while let Ok(req) =
-                            workspace.tabs[tab_idx].session.pane_requests().try_recv()
-                        {
-                            got_event = true;
-                            workspace.handle_pane_request_for_tab(tab_idx, req, cx);
-                        }
-                    }
-
                     while let Ok(request) = workspace.control_request_rx.try_recv() {
                         got_event = true;
                         workspace.handle_control_request(request, cx);
                     }
-
-                    while let Ok(result) = workspace.shell_suggestion_rx.try_recv() {
-                        got_event = true;
-                        workspace.apply_shell_suggestion(result, cx);
-                    }
-
-                    while let Ok((generation, summary_epoch, summary)) =
-                        workspace.tab_summary_rx.try_recv()
-                    {
-                        got_event = true;
-                        workspace.apply_tab_summary(generation, summary_epoch, summary, cx);
-                    }
-
-                    while let Ok(result) = workspace.skill_scan_rx.try_recv() {
-                        got_event = true;
-                        let completion = workspace.harness.complete_skill_scan(result);
-                        let applied = completion.applied();
-                        if let Some(job) = completion.follow_up_job() {
-                            workspace.spawn_skill_scan_job(job);
-                        }
-                        if applied {
-                            cx.notify();
-                        }
-                    }
-
                     if workspace.pump_ghostty_views(cx) {
                         got_event = true;
-                        // Output flowed — ask the AI summarizer to
-                        // re-check. The engine's per-tab 5 s budget
-                        // and context-hash dedupe keep this from
-                        // firing more than once per real change.
-                        workspace.request_tab_summaries(cx);
                         cx.notify();
-                    } else if last_summary_poll.elapsed() >= summary_poll_interval {
-                        // Backstop for the pump-driven trigger
-                        // above. `pump_ghostty_views` only fires
-                        // while output is actively streaming, so a
-                        // tab whose context drifted while it sat
-                        // idle (user navigated away and back)
-                        // would never re-summarize. The engine's
-                        // per-tab cache + 5 s success budget keep
-                        // repeated calls cheap.
-                        workspace.request_tab_summaries(cx);
-                        last_summary_poll = std::time::Instant::now();
                     }
                 })
                 .ok();
 
                 if !got_event {
-                    // Idle tick. The previous 16ms cap meant a PTY
-                    // chunk arriving 1ms after the loop entered the
-                    // sleep had to wait the full 15ms before any
-                    // GPUI repaint was even scheduled — visible as
-                    // a stall between "user hits Enter on htop" and
-                    // "htop's alt-screen actually paints" on Linux,
-                    // because Linux drives the renderer through this
-                    // loop instead of through libghostty's own
-                    // NSView pump (macOS) or D3D11 swapchain
-                    // (Windows). 8ms keeps the work bounded —
-                    // `pump_ghostty_views` short-circuits on
-                    // unchanged `wake_generation` — while halving
-                    // the worst-case PTY-to-frame latency. Refresh
-                    // is still capped at the GPUI vsync rate
-                    // (typically 60 Hz) so this doesn't actually
-                    // double the paint work.
                     cx.background_executor()
                         .timer(std::time::Duration::from_millis(8))
                         .await;
@@ -671,12 +462,11 @@ impl VuWorkspace {
         let last_ghostty_wake_generation = ghostty_app.wake_generation();
         let next_tab_summary_id_init = tabs.len() as u64;
 
-        let mut workspace = Self {
+        let workspace = Self {
             config: config.clone(),
             sidebar,
             tabs,
             active_tab,
-            is_quick_terminal: false,
             terminal_font_family,
             terminal_tweaks,
             ui_font_family,
@@ -695,27 +485,19 @@ impl VuWorkspace {
             background_image_position,
             background_image_fit,
             background_image_repeat,
-            agent_panel,
             input_bar,
             settings_panel,
             settings_window: None,
             settings_window_panel: None,
             command_palette,
-            model_registry,
-            harness,
-            shell_suggestion_engine,
             global_shell_history,
             global_input_history,
             pane_scope_picker_open: false,
-            agent_panel_open,
-            agent_panel_motion: MotionValue::new(if agent_panel_open { 1.0 } else { 0.0 }),
-            agent_panel_width,
             tab_strip_motion: MotionValue::new(if has_multiple_tabs { 1.0 } else { 0.0 }),
             input_bar_visible: session.input_bar_visible,
             input_bar_motion: MotionValue::new(if session.input_bar_visible { 1.0 } else { 0.0 }),
             modal_was_open: false,
             ghostty_hidden: false,
-            agent_panel_drag: None,
             sidebar_drag: None,
             terminal_theme,
             ghostty_app,
@@ -723,13 +505,11 @@ impl VuWorkspace {
             #[cfg(target_os = "macos")]
             chrome_transition_underlay_until: None,
             #[cfg(target_os = "macos")]
-            agent_panel_snap_guard_until: None,
             #[cfg(target_os = "macos")]
             input_bar_snap_guard_until: None,
             #[cfg(target_os = "macos")]
             top_chrome_snap_guard_until: None,
             #[cfg(target_os = "macos")]
-            agent_panel_release_cover_until: None,
             #[cfg(target_os = "macos")]
             input_bar_release_cover_until: None,
             #[cfg(target_os = "macos")]
@@ -741,18 +521,9 @@ impl VuWorkspace {
             pending_surface_control_requests: Vec::new(),
             surface_rename: None,
             control_request_rx,
+            _control_runtime: control_runtime,
             control_socket,
-            pending_control_agent_requests: HashMap::new(),
-            shell_suggestion_rx,
-            shell_suggestion_tx,
-            tab_summary_engine,
-            tab_summary_rx,
-            tab_summary_tx,
-            skill_scan_rx,
-            skill_scan_tx,
-            tab_summary_generation: 0,
             next_tab_summary_id: next_tab_summary_id_init,
-            next_control_agent_request_id: 1,
             window_handle: window.window_handle(),
             workspace_handle: cx.weak_entity(),
             window_close_prepared: false,
@@ -784,13 +555,6 @@ impl VuWorkspace {
             search_view: search_view_entity,
             workspace_focus: cx.focus_handle(),
         };
-
-        if let Some(cwd) = workspace
-            .try_active_terminal()
-            .and_then(|t| t.current_dir(cx))
-        {
-            workspace.request_skill_scan_for_cwd(&cwd);
-        }
 
         workspace
     }
@@ -927,10 +691,9 @@ impl VuWorkspace {
         let pane_tree = &self.tabs[self.active_tab].pane_tree;
         let surface_terminals = pane_tree.surface_terminals();
         let focused_id = pane_tree.focused_pane_id();
-        let (mode, is_broadcast, is_focused, selected_ids) = {
+        let (is_broadcast, is_focused, selected_ids) = {
             let input_bar = self.input_bar.read(cx);
             (
-                input_bar.mode(),
                 input_bar.is_broadcast_scope(),
                 input_bar.is_focused_scope(),
                 input_bar.scope_selected_ids(),
@@ -941,7 +704,7 @@ impl VuWorkspace {
             .map(|(pane_id, _, _)| *pane_id)
             .collect::<HashSet<_>>();
 
-        let target_ids: HashSet<usize> = if mode == InputMode::Agent || is_focused {
+        let target_ids: HashSet<usize> = if is_focused {
             [focused_id].into_iter().collect()
         } else if is_broadcast {
             all_ids
@@ -1107,30 +870,6 @@ impl VuWorkspace {
             return;
         }
         self.sync_active_tab_native_view_visibility_after_layout(window, cx);
-    }
-
-    pub(super) fn request_skill_scan_for_cwd(&mut self, cwd: &str) {
-        let Some(job) = self.harness.request_skill_scan(cwd) else {
-            return;
-        };
-
-        self.spawn_skill_scan_job(job);
-    }
-
-    pub(super) fn spawn_skill_scan_job(&self, job: SkillScanJob) {
-        let failed_result = job.failed_result();
-        let tx = self.skill_scan_tx.clone();
-        self.harness.spawn_detached(async move {
-            match tokio::task::spawn_blocking(move || job.scan()).await {
-                Ok(result) => {
-                    let _ = tx.send(result);
-                }
-                Err(err) => {
-                    log::warn!("Skill scan task failed: {}", err);
-                    let _ = tx.send(failed_result);
-                }
-            }
-        });
     }
 
     pub(super) fn pump_ghostty_views(&mut self, cx: &mut Context<Self>) -> bool {

@@ -13,7 +13,7 @@ The terminal world is split across several narrower control surfaces:
 - app-native RPC protocols
 - OS and PTY process inspection
 
-If vu wants to become the terminal whose agent actually understands the terminal, it needs a layered control plane, not one guessed runtime snapshot.
+Vu needs a layered control plane, not one guessed runtime snapshot.
 
 ## The Closest Thing To "CDP" In Terminals
 
@@ -60,7 +60,7 @@ Interactive apps often have their own real control planes.
 Examples:
 
 - Neovim Msgpack-RPC
-- future agent CLI sockets or explicit machine-readable markers
+- future application sockets or explicit machine-readable markers
 
 When available, this is much stronger than screen parsing.
 
@@ -202,7 +202,7 @@ If a foreground app has a real API, use it.
 Examples:
 
 - Neovim Msgpack-RPC
-- future agent CLI control sockets
+- future application control sockets
 
 This is how vu should think about editors and advanced TUIs: not as things to pattern match, but as attachable runtimes when the app cooperates.
 
@@ -230,7 +230,7 @@ Examples:
 - tmux window
 - tmux pane
 - Neovim instance
-- agent CLI instance
+- interactive application instance
 
 Each node should carry:
 
@@ -258,7 +258,7 @@ Suggested attachment kinds:
 - `ShellPromptAttachment`
 - `TmuxControlAttachment`
 - `NeovimRpcAttachment`
-- `AgentCliAttachment`
+- `ApplicationRpcAttachment`
 - `OsPtyAttachment`
 
 Each attachment should carry:
@@ -287,7 +287,7 @@ Rules:
 
 - only `BackendFact` and `ProtocolFact` can gate tools
 - `ShellProbe` can orient and refine targeting
-- `ObservationHint` can only influence cautious UX and agent instructions
+- `ObservationHint` can only influence cautious UX and client warnings
 
 ### 4. Tool Families By Control Layer
 

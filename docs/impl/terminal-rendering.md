@@ -8,8 +8,7 @@ vu does not maintain its own VT parser, PTY loop, scrollback grid, or canvas ren
 Ghostty owns terminal execution end to end. vu owns:
 
 - window, tab, and split layout
-- AI harness integration
-- pane metadata, context extraction, and product UI
+- pane metadata and product UI
 - theme translation into Ghostty config
 
 Important clarification:
@@ -77,7 +76,7 @@ At the app level, vu already does that. The remaining migration work is about re
 6. Ghostty emits action callbacks such as title updates, PWD changes, and command-finished events.
 7. `vu-ghostty` stores those facts in `TerminalState` and bumps a wake generation after each wakeup-driven app tick.
 8. Vu's workspace-level housekeeping loop notices that generation change, drains surface-local state once for the window, and handles one-shot init retries.
-9. vu reads `TerminalState` and visible text to build pane metadata for the agent, sidebar, and tab UI.
+9. vu reads `TerminalState` and visible text to build pane metadata for the sidebar, tab UI, and control clients.
 
 This distinction matters. Ghostty's embedded API is designed around wakeup-driven ticking, not "tick it every N milliseconds and hope that is close enough."
 
@@ -95,13 +94,12 @@ protocol. Vu handles these ingress paths separately:
   is parsed only when every non-comment line is a local `file://` URI; mixed
   prose stays ordinary text.
 - Image clipboard entries are not converted to files by Vu. Instead, Vu
-  forwards a raw Ctrl+V keypress to the TUI. Agent TUIs such as Codex can then
-  read the OS clipboard directly and attach the image using their native flow.
+  forwards a raw Ctrl+V keypress to the TUI. Interactive programs can then read
+  the OS clipboard directly and handle the image through their native flow.
 
 If a clipboard item contains both image bytes and a text representation, image
 bytes win. If it contains file paths, paths win. That gives predictable behavior
-for the two common agent workflows: copy an actual image to attach it, or
-copy/drag image and code files to paste their paths.
+when copying an image or pasting file paths.
 
 This is intentionally separate from output-side inline graphics protocols. On
 macOS, full embedded Ghostty owns any inline graphics support it exposes. On the
@@ -125,7 +123,7 @@ Today vu relies on these Ghostty-facing facts:
 These are enough to support:
 
 - honest pane summaries
-- visible command execution for the built-in agent
+- visible command execution through the control socket
 - better tmux and TUI awareness
 - theme and font propagation into new panes
 
@@ -156,13 +154,13 @@ It exposes the capabilities that the rest of the app needs:
 - theme application
 
 The point of `TerminalPane` is no longer backend abstraction.
-It is product abstraction: one stable pane API for the workspace and agent layers.
+It is product abstraction: one stable pane API for the workspace and control plane.
 
 One important integration detail: `GhosttyView` should not own its own perpetual 16ms GPUI polling loop. That duplicates host work once per pane and becomes visible during live resize. Vu now keeps exactly one lightweight workspace pump for Ghostty-related housekeeping while leaving Ghostty's renderer itself wakeup-driven.
 
 Another important macOS alignment point is window step-resize. Standalone Ghostty updates `contentResizeIncrements` from the focused surface's cell size so AppKit drags the window in terminal-cell steps instead of continuous sub-cell pixel states. Vu now mirrors that behavior from the active terminal surface, which cuts a large amount of otherwise pointless intermediate resize work before it reaches either GPUI layout or `ghostty_surface_set_size`.
 
-One more host-side rule matters for TUI performance: normal UI renders must not force fresh terminal observations. Vu previously used runtime observation in the workspace render path just to derive pane labels and remote-host hints for the input bar. That path could pull visible/recent terminal text while a dense TUI was active. The UI now reads only cached runtime state during render; explicit terminal observation stays on agent/control paths where that cost is intentional.
+One more host-side rule matters for TUI performance: normal UI renders must not force fresh terminal observations. Vu previously used runtime observation in the workspace render path just to derive pane labels and remote-host hints for the input bar. That path could pull visible/recent terminal text while a dense TUI was active. The UI now reads only cached runtime state during render; explicit terminal observation stays on control paths where that cost is intentional.
 
 One more embedded-macOS detail turned out to matter: standalone Ghostty does not host the surface in a bare `NSView`. It wraps the surface in a scroll container and consumes `GHOSTTY_ACTION_SCROLLBAR` updates so the visible viewport stays synchronized with Ghostty's scrollback model during reflow and resize. Vu now mirrors that contract by caching Ghostty scrollbar actions in `vu-ghostty` and positioning the embedded surface inside a native scroll container. Without that, heavy TUIs could briefly render from upper scrollback during resize and only later settle back to the bottom.
 
@@ -180,21 +178,19 @@ The draw boundary matters as much as the size boundary. Ghostty's Metal renderer
 
 Do not set `NSWindow.contentResizeIncrements` from terminal cell size. It makes manual resizing feel cell-snapped, but AppKit also applies those increments to zoom/fullscreen sizing. That can leave a visible unfilled strip at the bottom of a maximized/fullscreen Vu window. Let the window fill the platform-provided frame exactly; the embedded Ghostty surface and PTY resize path are responsible for mapping the resulting pixel size to terminal rows/columns.
 
-Chrome seams around macOS embedded terminals are native-surface seams, not generic GPUI borders. The window root is transparent and the terminal can be translucent, so a fully transparent 1–4 px gap during agent-panel, input-bar, top-bar, split-divider, or vertical-sidebar motion can expose the desktop/backdrop as a white flash. Cover only the seam, and tint that cover from the adjacent terminal background at full opacity; GPUI seam covers do not get Ghostty's native blur/compositing, so making them translucent recreates the leak. Do not reintroduce a full terminal matte, which hides the leak by veiling the whole surface and creates a different blink.
+Chrome seams around macOS embedded terminals are native-surface seams, not generic GPUI borders. The window root is transparent and the terminal can be translucent, so a fully transparent 1–4 px gap during input-bar, top-bar, split-divider, or vertical-sidebar motion can expose the desktop/backdrop as a white flash. Cover only the seam, and tint that cover from the adjacent terminal background at full opacity; GPUI seam covers do not get Ghostty's native blur/compositing, so making them translucent recreates the leak. Do not reintroduce a full terminal matte, which hides the leak by veiling the whole surface and creates a different blink.
 
 Pane dividers still need to be legible. The divider color should not be the raw terminal background itself; that removes the user's visual split boundary. Use an opaque separator precomposed over the terminal background instead: visually it reads like a low-alpha foreground line, but the rendered `Hsla` alpha is `1.0`, so it never exposes the transparent window backing during fast split/zoom/chrome motion.
 
-The more robust rule is that there should be no clear backing at terminal/chrome boundaries on macOS. Chrome regions that are outside the native Ghostty view but visually adjacent to it should be precomposed over the terminal background before GPUI paints them, preserving the intended translucent-over-terminal look without letting the desktop participate in the color. The native Ghostty host view also keeps a small backing overdraw under GPUI seams, while the actual Metal surface stays aligned to the pane bounds. That gives AppKit and GPUI a safe overlap area during fast split, zoom, sidebar, agent-panel, and input-bar layout transitions.
+The more robust rule is that there should be no clear backing at terminal/chrome boundaries on macOS. Chrome regions that are outside the native Ghostty view but visually adjacent to it should be precomposed over the terminal background before GPUI paints them, preserving the intended translucent-over-terminal look without letting the desktop participate in the color. The native Ghostty host view also keeps a small backing overdraw under GPUI seams, while the actual Metal surface stays aligned to the pane bounds. That gives AppKit and GPUI a safe overlap area during fast split, zoom, sidebar, and input-bar layout transitions.
 
-Fast chrome toggles have one more guard: while input bar, agent panel, or tab strip changes are in flight, the workspace enables one shared native underlay view below all Ghostty hosts in that window. This is not the old full-terminal matte; it sits below terminal content and only replaces otherwise-clear window backing during AppKit/GPUI geometry races. Visibility is parent-scoped, not pane-scoped: each `GhosttyView` owns an id in a native owner set, and the shared underlay hides only when the set becomes empty. That prevents a newly initialized pane from hiding the underlay while another pane is still inside a transition. When the guard expires, the underlay is hidden again so normal terminal glass returns.
-
-The right agent panel has one extra rule: on macOS, its visual animation must not continuously animate the terminal layout width. A width-animated panel can move the native/GPUI boundary by dozens of pixels between frames, far beyond any reasonable seam cover. Vu therefore snaps the terminal layout to the panel's stable open/closed geometry and uses the motion value only for the panel's visual/content reveal. Windows and Linux keep the normal GPUI width animation because they do not embed the full Ghostty AppKit surface.
+Fast chrome toggles have one more guard: while input bar or tab strip changes are in flight, the workspace enables one shared native underlay view below all Ghostty hosts in that window. This is not the old full-terminal matte; it sits below terminal content and only replaces otherwise-clear window backing during AppKit/GPUI geometry races. Visibility is parent-scoped, not pane-scoped: each `GhosttyView` owns an id in a native owner set, and the shared underlay hides only when the set becomes empty. That prevents a newly initialized pane from hiding the underlay while another pane is still inside a transition. When the guard expires, the underlay is hidden again so normal terminal glass returns.
 
 One build-time rule matters too: the embedded Ghostty runtime itself must be compiled as a release-class library. Vu now passes Zig `-Doptimize=ReleaseFast` for the macOS Ghostty build by default. Without that, traces are dominated by Ghostty's own formatter, reflow, integrity-check, and debug-allocation paths, which makes Vu look fundamentally slower than standalone Ghostty even when the host integration is not the main bottleneck.
 
-## Agent execution
+## Visible command execution
 
-The `terminal_exec` tool writes the command into the visible Ghostty pane.
+`vu-cli panes exec` writes the command into the visible Ghostty pane.
 
 Completion strategy:
 

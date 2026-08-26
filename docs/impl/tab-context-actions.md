@@ -191,8 +191,8 @@ let pane_tree = PaneTree::from_state(&layout, focused_pane_id, &mut make_termina
 
 `to_state(cx, false)` serializes the full pane tree including split ratios, each pane's CWD, and surface metadata. `from_state` rebuilds the tree, spawning a fresh terminal in each pane's CWD. The `false` flag skips screen text capture (no need to copy scrollback into the duplicate).
 
-Copied fields: `pane_tree` (full layout), `user_label`, `color`, `agent_routing`.
-Not copied: `ai_label`, `ai_icon`, `session` (conversation), `panel_state`, `shell_history`.
+Copied fields: `pane_tree` (full layout), `user_label`, and `color`.
+Shell history is not copied.
 
 The new tab is inserted at `index + 1` and immediately activated.
 

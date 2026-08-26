@@ -6,10 +6,8 @@ This document defines the design principles that should govern every prototype a
 
 It is the shortest version of the brief: what the product should feel like, what visual habits it should follow, and what it should avoid.
 
-This guide is meant to be read first, then used together with:
-
-- `docs/design/vu-ux-product-spec.md`
-- `docs/design/vu-ui-visual-spec.md`
+This guide is meant to be read first, then used with
+`docs/design/vu-ui-visual-spec.md`.
 
 ---
 
@@ -35,7 +33,6 @@ This design language is based on four inputs:
    - `crates/vu-app/src/workspace/`
    - `crates/vu-app/src/ghostty_view.rs`
    - `crates/vu-app/src/input_bar.rs`
-   - `crates/vu-app/src/agent_panel.rs`
    - `crates/vu-app/src/settings_panel.rs`
 2. **Terminal-native interaction patterns**
    - terminal structure and discoverability
@@ -74,7 +71,7 @@ vu is light-first (Flexoki Light default) but must excel in both themes.
 - **Text muted**: Black at 25-40%
 - **Borders**: Black at 4-6% opacity (nearly invisible)
 - **Interactive hover**: Black at 3-6% opacity lift
-- **Accent**: Blue `#2563eb` for agent/AI, amber for warnings
+- **Accent**: Blue `#2563eb` for focus and selection, amber for warnings
 
 ### Dark Mode - Apple Style
 
@@ -85,14 +82,14 @@ vu is light-first (Flexoki Light default) but must excel in both themes.
 - **Text muted**: White at 30-40%
 - **Borders**: White at 4-6% opacity (nearly invisible)
 - **Interactive hover**: White at 4-6% opacity lift
-- **Accent**: Blue `#3b82f6` for agent/AI, amber for warnings
+- **Accent**: Blue `#3b82f6` for focus and selection, amber for warnings
 
 ### Key Rules
 
 - **No shadows** - Use opacity-based fills for elevation
 - **No borders by default** - Only for strong semantic separation
 - **Opacity-based system** - All neutrals derived from white/black with opacity
-- **Single accent color** - Blue for AI/agent, used sparingly
+- **Single accent color** - Blue for focus and primary actions, used sparingly
 
 ### Light Mode Details (Nowledge-inspired)
 
@@ -131,11 +128,9 @@ Following the Nowledge Graph Design System's **borderless, colorless** philosoph
 vu should feel like:
 
 - a serious native terminal first
-- a built-in AI harness second
 - a calm, premium workstation throughout
 
-The product should never feel like a chat app wrapped around a shell.
-It should feel like the best place to do terminal-native work in the AI era.
+The product should feel like the best place to do terminal-native work.
 
 ---
 
@@ -164,9 +159,8 @@ Accent color is reserved for meaning:
 - focus
 - active selection
 - success / running
-- warning / approval
+- warning
 - error / danger
-- assistant presence where useful
 
 ### 5. Dense, but Never Cramped
 
@@ -175,14 +169,8 @@ Spacing is a functional tool, not empty luxury.
 
 ### 6. Trust Through Inspectability
 
-As the agent gets more powerful, the UI must become more legible, not more magical.
-Users should always understand:
-
-- what context is attached
-- what the agent plans to do
-- what tool calls will run
-- which pane or session is affected
-- what changed afterward
+Automated control must stay legible. Users should always understand which pane
+or session a command targets and what changed afterward.
 
 ### 7. Progressive Disclosure
 
@@ -230,14 +218,14 @@ Unlike a knowledge app or dashboard product, vu has to solve for:
 - PTY truth and shell correctness
 - split panes and tabs
 - SSH and tmux awareness
-- command execution and approvals
-- compatibility with external agent CLIs and other terminal-native workflows
+- command execution through the terminal and control socket
+- compatibility with terminal-native programs and external control clients
 
 That means vu needs:
 
 - stronger focus cues than a content app
 - slightly firmer interaction boundaries than a borderless data view
-- clearer state signaling around active panes, approvals, and remote context
+- clearer state signaling around active panes and remote context
 - a deliberate blend of system sans for UI and mono for terminal/code content
 
 The result should carry the **taste level** of the Nowledge reference system, while becoming darker, faster, and more operational.
@@ -252,7 +240,7 @@ When evaluating a new screen or component, ask:
 2. Could this hierarchy be solved with typography and spacing instead of another container?
 3. Is color being used for meaning, or just for decoration?
 4. Is the interaction obvious without becoming loud?
-5. Does this increase trust, especially for agent actions?
+5. Does this increase trust for automated actions?
 6. Could advanced detail be hidden by default?
 7. Does the motion make the product feel faster and calmer?
 
@@ -285,7 +273,7 @@ The target feeling for vu is:
 
 Primary accent color throughout: `#007AFF` (Apple's system blue)
 
-- Used for: Agent mode, selections, primary actions, links
+- Used for: selections, primary actions, links
 - Not used for: Decorative purposes, backgrounds, borders
 
 ### Pane Selection (Multi-Pane Targeting) - Final Design
@@ -354,9 +342,7 @@ The input area is the most critical interactive surface. Every pixel matters.
 
 - Size: 32x32px (w-8 h-8)
 - Shape: fully rounded (rounded-full)
-- Active states:
-  - Agent mode: `#007AFF` background, white arrow
-  - Shell mode: white/black solid, inverted arrow
+- Active: `#007AFF` background, white arrow
 - Inactive: 4% fill (dark) or 3% (light), 15% text
 - Interaction: active:scale-95 for tactile feedback
 - Loading: CircleNotch spinner animation
@@ -367,7 +353,7 @@ The input area is the most critical interactive surface. Every pixel matters.
 - Padding: 4px horizontal (px-1)
 - Font: 10px medium
 - Left: "Enter to send" + "Shift+Enter for newline" (15% opacity)
-- Right: Mode indicator - "Agent" (blue), "Shell", or "Auto"
+- Right: pane target summary when multiple panes exist
 
 **Pane Target Pills (Status Bar)**
 

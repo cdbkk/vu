@@ -17,7 +17,6 @@ It translates the product brief into practical guidance for:
 It should be read together with:
 
 - `docs/design/vu-design-language.md`
-- `docs/design/vu-ux-product-spec.md`
 
 ---
 
@@ -98,7 +97,7 @@ Not through obvious card borders, loud gradients, or deep shadow stacks.
 | elevated | oklch(0.15 0.01 260) | Lifted surfaces |
 | card | oklch(0.14 0.01 260) | Panel backgrounds |
 | primary | oklch(0.65 0.15 245) | Calm blue focus |
-| accent | oklch(0.55 0.12 280) | Lavender assistant |
+| accent | oklch(0.55 0.12 280) | Secondary highlight |
 | success | oklch(0.65 0.18 145) | Green success |
 | warning | oklch(0.75 0.15 80) | Amber caution |
 | destructive | oklch(0.55 0.2 25) | Red danger |
@@ -171,9 +170,9 @@ Color should be used rarely and precisely.
 
 - blue: focus, selected route, active state
 - green: success, healthy, completed
-- amber: pending, approval needed, caution
+- amber: pending or caution
 - red: failure, destructive, dangerous scope
-- lavender: assistant presence and streaming state when useful
+- lavender: secondary emphasis when useful
 
 ### Rule
 
@@ -221,14 +220,14 @@ Keep the scale tight and disciplined.
 - 11 px: micro labels, metadata, status tags
 - 12 px: secondary UI text, tab labels, helpers
 - 13 px: default UI body text
-- 14 px: composer text, primary assistant body text
+- 14 px: input text and primary body text
 - 16 px: section headers and stronger labels
 - 20–24 px: large titles only where appropriate
 
 ### Rules
 
 - use opacity before bold when possible
-- keep assistant prose readable and compact
+- keep prose readable and compact
 - use mono only for terminal data, code, commands, paths, diffs, and technical identifiers
 - avoid too many weights and sizes in a single surface
 
@@ -252,9 +251,7 @@ Use an 8 px base rhythm with 4 px support increments.
 
 ### Where to be generous
 
-- assistant cards
 - settings sections
-- approval sheets
 - modal overlays
 - outer shell composition
 
@@ -294,14 +291,14 @@ Flat and calm.
 Titlebar, metadata rail, pane headers, composer container.
 Slightly lifted from terminal.
 
-### Level 2 — companion surfaces
+### Level 2 — supporting surfaces
 
-Assistant panel, timeline cards, inline explain surfaces.
+Sidebar panels and inline status surfaces.
 Soft fill, subtle shape.
 
 ### Level 3 — decision surfaces
 
-Command palette, approval sheet, settings modal.
+Command palette and settings modal.
 May use stronger contrast and slightly more explicit edges.
 
 ### Rule
@@ -346,7 +343,7 @@ A thin contextual strip below the titlebar.
 - repo or folder name
 - branch
 - remote host when relevant
-- task or assistant status
+- task or process status
 - subtle session state
 
 ### Guidance
@@ -357,14 +354,13 @@ A thin contextual strip below the titlebar.
 
 ## 3. Main work area
 
-Contains split panes and, when present, the assistant companion.
+Contains split panes.
 
 ### Guidance
 
 - keep the terminal the visual anchor
 - dividers stay hairline
 - pane headers are optional but useful
-- assistant should dock elegantly and not feel bolted on
 
 ## 4. Composer
 
@@ -383,7 +379,6 @@ The composer should be persistent, calm, and visually stable.
 Used for:
 
 - command palette
-- approvals
 - settings
 - search
 - session switching
@@ -427,54 +422,14 @@ Avoid thick glowing frames or loud neon focus rings.
 
 ---
 
-## Assistant Companion
-
-The assistant panel should feel like part of the terminal workspace, not a separate product.
-
-## Widths to design
-
-- collapsed rail
-- compact docked state
-- full companion state
-
-### Suggested defaults
-
-- collapsed: narrow signal rail
-- open: around 340–380 px on a comfortable desktop width
-- resizable when the layout allows
-
-## Panel model
-
-Design it as a **task timeline**, not a chat transcript.
-
-### Timeline sections
-
-- intent
-- context attached
-- plan
-- tool calls
-- outputs
-- diffs / artifacts
-- final summary
-
-### Visual guidance
-
-- one calm card model repeated consistently
-- strong title + subdued metadata
-- collapsible detail regions
-- code and diff areas get mono treatment and slightly firmer containment
-
----
-
 ## Composer Specification
 
 The composer is one of the defining surfaces of vu.
 
 ## Structure
 
-- route chip on the left
 - primary input region
-- attached context pills
+- pane target controls when several panes exist
 - right-side send or action affordance
 - minimal but visible hinting
 
@@ -483,8 +438,6 @@ The composer is one of the defining surfaces of vu.
 - idle
 - focused
 - multiline expanded
-- context attached
-- waiting approval
 - disabled or unavailable when appropriate
 
 ## Styling guidance
@@ -495,42 +448,10 @@ The composer is one of the defining surfaces of vu.
 - placeholder low contrast but readable
 - pills remain compact and quiet
 
-### Example context pills
+### Example target pills
 
 - `Pane: backend`
-- `Repo: kingston`
-- `Branch: main`
-- `Selection: 18 lines`
-- `Last command failed`
-
----
-
-## Tool and Approval Cards
-
-These are operational surfaces and should feel more explicit than passive assistant text.
-
-## Tool cards should show
-
-- action name
-- target scope
-- short command or file summary
-- state
-- risk level
-- key actions
-
-## Approval cards should show
-
-- what will happen
-- where it will happen
-- why approval is required
-- direct approve / edit / deny actions
-- expandable detail for full output or command text
-
-### Visual guidance
-
-- use semantic badges sparingly
-- do not rely on giant warning panels
-- let the severity come from wording, icon, and precise accent color
+- `All panes`
 
 ---
 
@@ -565,7 +486,7 @@ vu should adopt the same level of restraint while adapting it for a darker, more
 ## Guidance
 
 - category navigation should be simple and low-noise
-- advanced provider and automation settings stay collapsed until relevant
+- advanced control-socket settings stay collapsed until relevant
 - settings groups should breathe
 - controls should look calm, not enterprise-heavy
 
@@ -574,8 +495,7 @@ Good categories may include:
 - appearance
 - terminal
 - keybindings
-- AI providers and models
-- automation / socket permissions
+- control socket
 - sessions
 
 ---
@@ -621,7 +541,7 @@ Motion should make vu feel smoother and faster.
 
 ## Recommended uses
 
-- assistant reveal
+- sidebar reveal
 - disclosure rows
 - composer growth
 - notification appearance
@@ -652,12 +572,11 @@ Minimum expectations:
 The design team should produce polished views for at least:
 
 - default local workspace
-- multi-pane workspace with assistant open
+- multi-pane workspace
 - failed command recovery state
-- approval / diff review state
 - SSH / tmux workspace state
 - background task completion state
-- command palette / attach-context flow
+- command palette flow
 - settings surface
 
 ---
@@ -669,7 +588,6 @@ The current code already points toward a strong architecture:
 - `crates/vu-app/src/workspace/` gives a useful shell composition model
 - `crates/vu-app/src/ghostty_view.rs` keeps the terminal primary
 - `crates/vu-app/src/input_bar.rs` proves the value of a bottom-anchored composer
-- `crates/vu-app/src/agent_panel.rs` is the seed of the future companion timeline
 - `crates/vu-app/src/theme.rs` should evolve from hard-coded values into semantic design tokens
 
 The next design pass should refine this direction, not replace it with a totally different product shape.
@@ -738,5 +656,4 @@ The React/Next.js prototype at `components/vu/terminal-app.tsx` serves as the pr
 2. **No borders by default** - Only for status bar and pane dividers (4% opacity)
 3. **Checkbox style** - 15x15px, 4px radius, 1px border unselected, solid fill selected
 4. **Send button** - 32x32px circle, Apple Messages style
-5. **Mode detection** - Shell vs Agent auto-detected from input content
-6. **Broadcast mode** - Amber "ALL" badge appears when multiple panes targeted
+5. **Broadcast mode** - Amber "ALL" badge appears when multiple panes targeted

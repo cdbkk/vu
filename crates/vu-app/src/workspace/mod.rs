@@ -16,8 +16,6 @@ use gpui_component::{
 use serde_json::json;
 use tokio::sync::oneshot;
 
-const AGENT_PANEL_DEFAULT_WIDTH: f32 = 400.0;
-const AGENT_PANEL_MIN_WIDTH: f32 = 200.0;
 const TERMINAL_MIN_CONTENT_WIDTH: f32 = 360.0;
 const TOP_BAR_COMPACT_HEIGHT: f32 = 28.0;
 const TOP_BAR_TABS_HEIGHT: f32 = 36.0;
@@ -35,27 +33,22 @@ const TAB_DRAG_PREVIEW_WIDTH: f32 = 180.0;
 const TAB_DRAG_PREVIEW_HEIGHT: f32 = 28.0;
 
 use crate::activity_bar::{ActivityBar, ActivitySlot, ActivitySlotChanged, ActivityTogglePanel};
-use crate::agent_panel::{
-    AgentPanel, CancelRequest, DeleteConversation, InlineInputSubmit,
-    InlineSkillAutocompleteChanged, LoadConversation, NewConversation, PanelState,
-    RerunFromMessage, SelectSessionModel, SelectSessionProvider, SetAutoApprove,
-};
 use crate::command_palette::{
     CommandPalette, PaletteDismissed, PaletteSelect, ToggleCommandPalette,
 };
 use crate::editor_view::{ActiveFileChanged, EditorEmptied, EditorView};
 use crate::file_tree_view::{FileTreeView, OpenFile};
 use crate::input_bar::{
-    EscapeInput, InputBar, InputEdited, InputMode, InputScopeChanged, PaneInfo,
-    SkillAutocompleteChanged, SubmitInput, TogglePaneScopePicker as TogglePaneScopePickerRequested,
+    EscapeInput, InputBar, InputEdited, InputScopeChanged, PaneInfo, SubmitInput,
+    TogglePaneScopePicker as TogglePaneScopePickerRequested,
 };
-use crate::model_registry::ModelRegistry;
 use crate::motion::MotionValue;
 use crate::pane_tree::{
     PaneTree, SplitDirection, SplitPlacement, SurfaceCreateOptions, SurfaceRenameEditor,
 };
 use crate::settings_panel::{
     self, AppearancePreview, SaveSettings, SettingsPanel, ThemeLivePreview, ThemePreview,
+    VisibilityChanged,
 };
 use crate::sidebar::{
     DraggedTab, DraggedTabOrigin, NewSession, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH, SessionEntry,
@@ -72,48 +65,37 @@ use crate::ghostty_view::{
     GhosttyTitleChanged, GhosttyView,
 };
 use crate::{
-    AddWorkspaceLayoutTabs, AskAi, ClearRestoredTerminalHistory, ClearTerminal, ClosePane,
-    CloseSurface, CloseTab, CollapseSidebar, Copy, Cut, CycleInputMode, EditorDeleteBackward,
-    EditorDeleteForward, EditorInsertNewline, EditorMoveDown, EditorMoveEnd, EditorMoveHome,
-    EditorMoveLeft, EditorMoveLineEnd, EditorMoveLineStart, EditorMoveRight, EditorMoveUp,
-    EditorSave, EditorSelectDown, EditorSelectEnd, EditorSelectHome, EditorSelectLeft,
-    EditorSelectRight, EditorSelectUp, ExportWorkspaceLayout, FocusFiles, FocusInput, Minimize,
-    NewSurface, NewSurfaceSplitDown, NewSurfaceSplitRight, NewTab, NextSurface, NextTab,
+    AddWorkspaceLayoutTabs, ClearRestoredTerminalHistory, ClearTerminal, ClosePane, CloseSurface,
+    CloseTab, CollapseSidebar, Copy, Cut, EditorDeleteBackward, EditorDeleteForward,
+    EditorInsertNewline, EditorMoveDown, EditorMoveEnd, EditorMoveHome, EditorMoveLeft,
+    EditorMoveLineEnd, EditorMoveLineStart, EditorMoveRight, EditorMoveUp, EditorSave,
+    EditorSelectDown, EditorSelectEnd, EditorSelectHome, EditorSelectLeft, EditorSelectRight,
+    EditorSelectUp, ExportWorkspaceLayout, FocusFiles, FocusInput, Minimize, NewSurface,
+    NewSurfaceSplitDown, NewSurfaceSplitRight, NewTab, NextSurface, NextTab,
     OpenWorkspaceLayoutWindow, Paste, PreviousSurface, PreviousTab, Quit, RenameSurface,
     SearchFiles, SelectAll, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5, SelectTab6,
-    SelectTab7, SelectTab8, SelectTab9, SplitDown, SplitLeft, SplitRight, SplitUp,
-    ToggleAgentPanel, ToggleLeftPanel, TogglePaneScopePicker, TogglePaneZoom, Undo,
-};
-use vu_agent::{
-    AgentConfig, Conversation, ProviderKind, TerminalExecRequest, TerminalExecResponse,
+    SelectTab7, SelectTab8, SelectTab9, SplitDown, SplitLeft, SplitRight, SplitUp, ToggleLeftPanel,
+    TogglePaneScopePicker, TogglePaneZoom, Undo,
 };
 use vu_core::config::{
     AppearanceConfig, Config, TabsOrientation, TerminalConfig, sanitize_terminal_font_family,
 };
 use vu_core::control::{
-    AgentAskResult, ControlCommand, ControlError, ControlRequestEnvelope, ControlResult,
-    SystemIdentifyResult, TabInfo,
-};
-use vu_core::harness::{
-    AgentHarness, AgentSession, HarnessEvent, InputKind, SkillScanJob, SkillScanResult,
+    ControlCommand, ControlError, ControlRequestEnvelope, ControlResult, SystemIdentifyResult,
+    TabInfo,
 };
 use vu_core::session::{
-    AgentModelOverrideState, AgentRoutingState, GlobalHistoryState, PaneLayoutState,
-    PaneSplitDirection, Session, TabState,
+    GlobalHistoryState, PaneLayoutState, PaneSplitDirection, Session, TabState,
 };
 use vu_core::workspace_layout::WorkspaceLayout;
-use vu_core::{
-    SuggestionContext, SuggestionEngine, TabIconKind, TabSummary, TabSummaryEngine,
-    TabSummaryRequest,
-};
+use vu_core::{TerminalExecRequest, TerminalExecResponse};
 
-mod agent_panel_events;
 mod caption;
 mod chrome;
 mod chrome_actions;
-mod control_agent_tools;
 mod control_requests;
 mod control_surfaces;
+mod control_terminal_tools;
 mod editor_actions;
 mod helpers;
 mod input_events;
@@ -139,16 +121,12 @@ use tab_presentation::*;
 use terminal_factory::*;
 use types::*;
 
-/// The main workspace: tabs + agent panel + input bar + settings overlay
+/// The main workspace: tabs + input bar + settings overlay
 pub struct VuWorkspace {
     config: Config,
     sidebar: Entity<SessionSidebar>,
     tabs: Vec<Tab>,
     active_tab: usize,
-    /// True when this workspace is the singleton quick terminal,
-    /// which must never be fully closed — closing the last tab
-    /// should reinitialize a fresh tab and hide the window instead.
-    is_quick_terminal: bool,
     terminal_font_family: String,
     terminal_tweaks: vu_ghostty::Tweaks,
     ui_font_family: String,
@@ -167,21 +145,14 @@ pub struct VuWorkspace {
     background_image_position: String,
     background_image_fit: String,
     background_image_repeat: bool,
-    agent_panel: Entity<AgentPanel>,
     input_bar: Entity<InputBar>,
     settings_panel: Entity<SettingsPanel>,
     settings_window: Option<AnyWindowHandle>,
     settings_window_panel: Option<Entity<SettingsPanel>>,
     command_palette: Entity<CommandPalette>,
-    model_registry: ModelRegistry,
-    harness: AgentHarness,
-    shell_suggestion_engine: SuggestionEngine,
     global_shell_history: VecDeque<CommandSuggestionEntry>,
     global_input_history: VecDeque<String>,
     pane_scope_picker_open: bool,
-    agent_panel_open: bool,
-    agent_panel_motion: MotionValue,
-    agent_panel_width: f32,
     tab_strip_motion: MotionValue,
     input_bar_visible: bool,
     input_bar_motion: MotionValue,
@@ -189,8 +160,6 @@ pub struct VuWorkspace {
     /// restore terminal focus when a modal dismisses itself internally.
     modal_was_open: bool,
     ghostty_hidden: bool,
-    /// Agent panel drag state: start X position and start width when drag began.
-    agent_panel_drag: Option<(f32, f32)>,
     /// Vertical tabs panel drag state: start X position and start width when drag began.
     sidebar_drag: Option<(f32, f32)>,
     /// Current terminal color theme
@@ -202,13 +171,11 @@ pub struct VuWorkspace {
     #[cfg(target_os = "macos")]
     chrome_transition_underlay_until: Option<Instant>,
     #[cfg(target_os = "macos")]
-    agent_panel_snap_guard_until: Option<Instant>,
     #[cfg(target_os = "macos")]
     input_bar_snap_guard_until: Option<Instant>,
     #[cfg(target_os = "macos")]
     top_chrome_snap_guard_until: Option<Instant>,
     #[cfg(target_os = "macos")]
-    agent_panel_release_cover_until: Option<Instant>,
     #[cfg(target_os = "macos")]
     input_bar_release_cover_until: Option<Instant>,
     #[cfg(target_os = "macos")]
@@ -225,30 +192,12 @@ pub struct VuWorkspace {
     surface_rename: Option<SurfaceRenameEditor>,
     /// Control-plane requests from the external `vu-cli` socket bridge.
     control_request_rx: crossbeam_channel::Receiver<ControlRequestEnvelope>,
+    /// Runtime backing the local control socket.
+    _control_runtime: std::sync::Arc<tokio::runtime::Runtime>,
     /// Keeps the Unix socket alive for this workspace instance.
     control_socket: Option<vu_core::ControlSocketHandle>,
-    /// Pending external agent requests keyed by 0-based tab index.
-    pending_control_agent_requests: HashMap<usize, PendingControlAgentRequest>,
-    shell_suggestion_rx: crossbeam_channel::Receiver<ShellSuggestionResult>,
-    shell_suggestion_tx: crossbeam_channel::Sender<ShellSuggestionResult>,
-    /// Background AI engine that produces optional tab labels and icons.
-    /// Shares the harness's tokio runtime and the user's
-    /// `agent.suggestion_model` settings.
-    tab_summary_engine: TabSummaryEngine,
-    tab_summary_rx: crossbeam_channel::Receiver<(u64, u64, TabSummary)>,
-    tab_summary_tx: crossbeam_channel::Sender<(u64, u64, TabSummary)>,
-    skill_scan_rx: crossbeam_channel::Receiver<SkillScanResult>,
-    skill_scan_tx: crossbeam_channel::Sender<SkillScanResult>,
-    /// Bumped whenever summary-model settings change so late async
-    /// responses from the old configuration are ignored.
-    tab_summary_generation: u64,
-    /// Monotonic counter for [`Tab::summary_id`] — stable across the
-    /// window's lifetime so the summary engine's per-tab cache
-    /// survives reorders and tab close/reopen.
+    /// Monotonic stable id for tabs created during this window's lifetime.
     next_tab_summary_id: u64,
-    /// Monotonic request id for control-plane agent asks so stale timeout tasks cannot
-    /// cancel a newer request on the same tab.
-    next_control_agent_request_id: u64,
     /// Window handle used to re-enter a window-aware context from deferred control work.
     window_handle: AnyWindowHandle,
     /// Weak self handle for deferred window callbacks.

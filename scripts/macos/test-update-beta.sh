@@ -20,8 +20,7 @@ fi
 # Default to an obviously old local build so any real CI release is newer.
 export VU_BUILD_NUMBER="${VU_BUILD_NUMBER:-0}"
 
-# Local update testing does not need notarization. Ad-hoc signing is enough.
-export VU_ALLOW_ADHOC_SIGNING="${VU_ALLOW_ADHOC_SIGNING:-1}"
+# Local update testing uses the default ad-hoc signature and skips notarization.
 export VU_SKIP_NOTARIZATION="${VU_SKIP_NOTARIZATION:-1}"
 
 # Derive the bundle/feed/output paths in this shell too; release.sh computes

@@ -1,156 +1,47 @@
-# vu-cli and surfaces
+# vu-cli
 
-`vu-cli` is the command-line handle for a running vu app. It is installed with
-vu on macOS, Windows, and Linux.
+`vu-cli` controls a running Vu process through its local JSON-RPC socket.
 
-Most users do not need it. Use it when another program, script, test runner, or
-agent needs to inspect the visible terminal, create panes, drive pane-local
-surfaces, or ask vu's built-in agent.
-
-External agents should get a real terminal to work with, not a headless shell
-that behaves differently from what the user sees.
-
-## Check that vu is reachable
-
-Start vu first, then run:
-
-```sh
-vu-cli identify
-vu-cli tabs list
-vu-cli panes list
-```
-
-For scripts and agent adapters, prefer JSON:
+Use `--json` for scripts:
 
 ```sh
 vu-cli --json identify
-vu-cli --json tree
+vu-cli --json tabs list
+vu-cli --json panes list --tab 1
 ```
 
-`vu-cli` asks the running app for state instead of guessing from outside the
-terminal.
-
-## Pane commands
-
-Read terminal content:
+## Panes
 
 ```sh
-vu-cli --json panes read --tab 1 --pane-id 0 --lines 120
+vu-cli panes read --tab 1 --pane-index 1 --lines 80
+vu-cli panes send-keys --tab 1 --pane-index 1 --keys "git status\n"
+vu-cli panes create --tab 1 --location right
+vu-cli panes wait --tab 1 --pane-index 2 --timeout 10
 ```
 
-Create a visible split:
+Pane indexes address Vu's visible panes. They do not address nested tmux panes.
+
+## Surfaces
 
 ```sh
-vu-cli --json panes create --tab 1 --location right --command "htop"
+vu-cli --json surfaces list --tab 1
+vu-cli --json surfaces create --tab 1 --pane-index 1 --title logs
+vu-cli --json surfaces wait-ready --surface-id 2 --timeout 10
+vu-cli surfaces send-text --surface-id 2 "tail -f app.log\n"
+vu-cli surfaces read --surface-id 2 --lines 80
 ```
 
-Run a command visibly in a shell pane:
+Wait for a new surface before sending input that assumes its shell has initialized.
+
+## tmux
 
 ```sh
-vu-cli --json panes exec --tab 1 --pane-id 0 -- cargo test -q
+vu-cli --json tmux inspect --pane-index 1
+vu-cli --json tmux list --pane-index 1
+vu-cli tmux capture --pane-index 1 --target %3 --lines 80
+vu-cli tmux send-keys --pane-index 1 --target %3 --literal-text "git status" --enter
 ```
-
-Use `pane_id` for follow-up automation. Pane indexes can change when a user
-splits, closes, or rearranges panes.
-
-## Surface commands
-
-A pane is a visible split region. A surface is a terminal session inside one
-pane. Every pane has one active surface, and a pane can host more surfaces when
-you want pane-local tabs.
-
-This is the pattern most subagent tools want:
-
-1. Create the first worker as a visible split.
-2. Add later workers as surfaces inside that worker pane.
-3. Drive each worker by `surface_id`.
-4. Close each worker surface when it finishes.
-
-Create the first worker pane:
-
-```sh
-vu-cli --json surfaces split \
-  --tab 1 \
-  --pane-id 0 \
-  --location right \
-  --title worker-1 \
-  --owner pi-interactive-subagents \
-  --command "codex"
-```
-
-Create another worker inside the same pane:
-
-```sh
-vu-cli --json surfaces create \
-  --tab 1 \
-  --pane-id <worker_pane_id> \
-  --title worker-2 \
-  --owner pi-interactive-subagents \
-  --command "codex"
-```
-
-Wait before sending input:
-
-```sh
-vu-cli --json surfaces wait-ready --surface-id <surface_id> --timeout 10
-```
-
-Drive the worker:
-
-```sh
-vu-cli --json surfaces send-text --surface-id <surface_id> "explain this repo"
-vu-cli --json surfaces send-key --surface-id <surface_id> enter
-vu-cli --json surfaces read --surface-id <surface_id> --lines 120
-```
-
-Close it:
-
-```sh
-vu-cli --json surfaces close --surface-id <surface_id>
-```
-
-If a worker pane was created only for owned surfaces, an orchestrator can ask vu
-to close that pane when its last surface closes:
-
-```sh
-vu-cli --json surfaces close \
-  --surface-id <surface_id> \
-  --close-empty-owned-pane
-```
-
-## Ask the built-in agent from a script
-
-`agent ask` uses the same in-app agent session you see in the side panel:
-
-```sh
-vu-cli --json agent ask --tab 1 "Summarize what is happening in this tab"
-```
-
-That means the response appears in vu, uses the tab's current context, and
-follows the same provider and approval settings as the UI.
-
-## Automation rules
-
-- Use `--json` for anything a program will parse.
-- Use `pane_id` and `surface_id` after discovery.
-- Call `surfaces wait-ready` before driving a new surface.
-- Treat `panes exec` as visible shell control, not a hidden subprocess runner.
-- Give orchestrator-created surfaces an `--owner` so cleanup can be scoped.
-- Re-read `tree` after user-visible layout changes.
-
-The socket is local to the user session. It is not a remote API, and it does not
-change shell permissions. If a script can drive `vu-cli`, it can drive the
-visible terminal you already opened.
 
 ## Socket path
 
-Release builds use the default socket for the installed channel. Debug builds
-use a separate debug socket so a local development build can run beside the
-installed app.
-
-Set `VU_SOCKET_PATH` only when you intentionally run vu on a custom endpoint:
-
-```sh
-VU_SOCKET_PATH=/tmp/vu-alt.sock vu
-vu-cli --socket /tmp/vu-alt.sock identify
-```
+Release builds use `/tmp/vu.sock` on Unix and `\\.\pipe\vu` on Windows. Debug builds use a separate endpoint. Set `VU_SOCKET_PATH` or pass `--socket` to override it.

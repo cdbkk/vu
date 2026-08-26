@@ -172,9 +172,7 @@ mod tests {
         assert!(is_vu_app_cli_target(Path::new(
             "/Applications/vu Dev.app/Contents/MacOS/vu-cli"
         )));
-        assert!(!is_vu_app_cli_target(Path::new(
-            "/opt/homebrew/bin/vu-cli"
-        )));
+        assert!(!is_vu_app_cli_target(Path::new("/opt/homebrew/bin/vu-cli")));
         assert!(!is_vu_app_cli_target(Path::new(
             "/Applications/Other.app/Contents/MacOS/other-cli"
         )));

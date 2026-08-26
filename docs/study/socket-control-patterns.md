@@ -2,7 +2,7 @@
 
 ## Overview
 
-A terminal product that supports agent workflows benefits from a socket-based control plane that is independent from any built-in model runtime.
+A terminal product benefits from a socket-based control plane that is independent from its UI.
 
 The important pattern is:
 
@@ -14,17 +14,15 @@ The important pattern is:
 
 - **UI**: native macOS shell
 - **Terminal**: embedded terminal runtime
-- **Agent comms**: Unix domain socket, JSON-RPC style messaging
+- **Client communication**: Unix domain socket, JSON-RPC style messaging
 
-## Key Insight: Agent-Agnostic Design
+## Key Insight: Client-Agnostic Design
 
-The app should provide infrastructure for external agents:
+The app should provide infrastructure for external tools:
 
 - Socket API for control and notifications
-- Agents run inside the terminal as regular processes when appropriate
+- Tools run inside the terminal as regular processes when appropriate
 - The app enhances workflow visibility without becoming the workflow owner
-
-Built-in agent support can exist, but it should be an addition, not the foundation.
 
 ## Socket API
 
@@ -61,7 +59,7 @@ Critical for performance:
 
 ## Patterns to Adopt
 
-1. **Socket API as foundation** — built-in agent is just one client
+1. **Socket API as foundation** — scripts and tools use one stable interface
 2. **Off-main socket threading** — hot paths never block rendering
 3. **Notification system** — per-pane and global notifications
 4. **Capability-based access** — clients declare what they need

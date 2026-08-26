@@ -9,8 +9,6 @@ source "$SCRIPT_DIR/common.sh"
 setup_release_env
 
 require_cmd codesign
-require_cmd spctl
-require_cmd xcrun
 
 cli_binary="$VU_APP_BUNDLE_PATH/Contents/MacOS/vu-cli"
 if [[ ! -x "$cli_binary" ]]; then
@@ -29,9 +27,15 @@ fi
 log "Verifying code signature for $VU_APP_BUNDLE_PATH"
 codesign --verify --deep --strict --verbose=2 "$VU_APP_BUNDLE_PATH"
 
-if [[ "${VU_ALLOW_ADHOC_SIGNING:-0}" == "1" ]]; then
-  log "Skipping Gatekeeper verification because ad-hoc signing is enabled"
+is_adhoc_signature=0
+if codesign -dv "$VU_APP_BUNDLE_PATH" 2>&1 | grep -q 'Signature=adhoc'; then
+  is_adhoc_signature=1
+fi
+
+if [[ "$is_adhoc_signature" == "1" ]]; then
+  log "Skipping Gatekeeper verification for ad-hoc signature"
 else
+  require_cmd spctl
   spctl -a -vv --type exec "$VU_APP_BUNDLE_PATH"
 fi
 
@@ -40,7 +44,8 @@ if [[ -f "$VU_DMG_PATH" ]]; then
   codesign --verify --verbose=2 "$VU_DMG_PATH"
 fi
 
-if [[ "${VU_ALLOW_ADHOC_SIGNING:-0}" != "1" && "${VU_SKIP_NOTARIZATION:-0}" != "1" ]] && have_notary_credentials; then
+if [[ "$is_adhoc_signature" == "0" && "${VU_SKIP_NOTARIZATION:-0}" != "1" ]] && have_notary_credentials; then
+  require_cmd xcrun
   xcrun stapler validate "$VU_APP_BUNDLE_PATH"
   xcrun stapler validate "$VU_DMG_PATH"
 fi

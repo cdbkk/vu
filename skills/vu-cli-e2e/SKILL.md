@@ -1,6 +1,6 @@
 ---
 name: vu-cli-e2e
-description: Validate Vu's local socket control plane against a real running app session, and write/run vu-test integration tests. Use when testing vu-cli, the Unix socket API, pane control, tmux control, in-session agent calls, or when writing E2E test cases in crates/vu-test/testdata/.
+description: Validate Vu's local socket control plane against a real running app session, and write or run vu-test integration tests. Use when testing vu-cli, the Unix socket API, pane control, tmux control, or E2E cases in crates/vu-test/testdata/.
 ---
 
 # vu-cli E2E & vu-test
@@ -24,16 +24,14 @@ Default workflow:
 5. Only use `panes exec` on panes that expose `exec_visible_shell`.
 6. Use `tree` / `surfaces list` only for pane-local surface validation.
 7. After `surfaces create` or `surfaces split`, use `surfaces wait-ready --surface-id <id> --timeout 10` before sending input that assumes an initialized shell.
-8. Use `agent ask` to verify the real in-tab built-in agent session.
 
 Rules:
 
 - Prefer `--json` for every command in automated evaluation.
 - Prefer `pane_id` over `pane_index` for follow-up actions.
 - Prefer `surface_id` for follow-up actions only when testing the explicit `surfaces.*` API.
-- Keep existing pane and agent benchmarks on `panes.*`; surfaces are additive and must not change the built-in agent's pane model.
+- Keep existing pane tests on `panes.*`; surfaces are additive and must not change the pane model.
 - After visible execution, confirm the pane still reports `shell_prompt` and keeps `exec_visible_shell`.
-- If `agent ask` fails, check provider config/env before blaming the socket layer.
 
 Known current limit:
 
@@ -83,9 +81,8 @@ The `json-subset` assertion only checks the keys you specify — extra fields in
 
 - **Unit-test functions** in Rust (`#[cfg(test)]`) for logic. Use `vu-test` only for integration and interactive behavior that requires a live session.
 - **No low-value tests** — don't write tests just to hit coverage. Every test should catch a real bug or document a real contract.
-- Group tests by domain: `panes/`, `tabs/`, `agent/`, `system/`.
+- Group tests by domain: `panes/`, `tabs/`, `surfaces/`, `system/`.
 - After `panes create`, always add a `panes wait` step before asserting `is_alive` — the new pane's surface may not be ready immediately.
-- For agent panel tests, use `agent open-panel-for-request` to drive the motion state, then `agent panel-state` to assert the result.
 
 ### Example test
 

@@ -9,7 +9,7 @@ rail/panel inside the sidebar.
 ## Layout
 
 ```text
-[optional tool/session rail] [active sidebar panel] [pane tree] [agent panel]
+[optional tool/session rail] [active sidebar panel] [pane tree]
 ```
 
 When the left sidebar is hidden, none of the three sidebar columns render. This

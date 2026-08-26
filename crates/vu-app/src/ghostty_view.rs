@@ -21,13 +21,13 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+use gpui::{prelude::FluentBuilder as _, *};
+use gpui_component::ActiveTheme;
+use gpui_component::menu::ContextMenuExt;
 use vu_ghostty::ffi;
 use vu_ghostty::{
     GhosttyApp, GhosttySplitDirection, GhosttySurfaceEvent, GhosttyTerminal, MouseButton,
 };
-use gpui::{prelude::FluentBuilder as _, *};
-use gpui_component::ActiveTheme;
-use gpui_component::menu::ContextMenuExt;
 
 use crate::terminal_paste::{
     TerminalPastePayload, payload_from_clipboard, payload_from_external_paths,
@@ -110,7 +110,7 @@ pub struct GhosttyProcessExited;
 pub struct GhosttyFocusChanged;
 /// Emitted when Ghostty requests a new split from this surface.
 pub struct GhosttySplitRequested(pub GhosttySplitDirection);
-pub struct GhosttyCwdChanged(pub Option<String>);
+pub struct GhosttyCwdChanged;
 
 impl EventEmitter<GhosttyTitleChanged> for GhosttyView {}
 impl EventEmitter<GhosttyProcessExited> for GhosttyView {}
@@ -269,7 +269,7 @@ impl GhosttyView {
                 }
                 GhosttySurfaceEvent::PwdChanged(cwd) => {
                     self.last_cwd = Some(cwd.clone());
-                    cx.emit(GhosttyCwdChanged(Some(cwd)));
+                    cx.emit(GhosttyCwdChanged);
                 }
             }
         }
@@ -293,7 +293,7 @@ impl GhosttyView {
         if cwd != self.last_cwd {
             self.last_cwd = cwd.clone();
             changed = true;
-            cx.emit(GhosttyCwdChanged(cwd));
+            cx.emit(GhosttyCwdChanged);
         }
 
         #[cfg(target_os = "macos")]
@@ -1432,7 +1432,7 @@ impl GhosttyView {
                 "m" | "`" | "~" | ">" | "<" => return false,
                 // Splits (cmd-d, cmd-shift-d)
                 "d" => return false,
-                // Agent & input
+                // Input bar
                 "l" | "i" => return false,
                 // Edit menu (handled by OS)
                 "c" | "v" | "x" | "z" | "a" => return false,
@@ -2111,27 +2111,29 @@ impl Render for GhosttyView {
                             // forwarded window-wide. Ghostty clamps
                             // out-of-bounds coordinates and autoscrolls.
                             let entity = entity.clone();
-                            window.on_mouse_event(move |event: &MouseMoveEvent, phase, _window, cx| {
-                                if phase != DispatchPhase::Bubble
-                                    || event.pressed_button != Some(gpui::MouseButton::Left)
-                                {
-                                    return;
-                                }
-                                let _ = entity.update(cx, |view: &mut GhosttyView, _cx| {
-                                    if !view.left_button_dragging {
+                            window.on_mouse_event(
+                                move |event: &MouseMoveEvent, phase, _window, cx| {
+                                    if phase != DispatchPhase::Bubble
+                                        || event.pressed_button != Some(gpui::MouseButton::Left)
+                                    {
                                         return;
                                     }
-                                    view.last_mouse_position = Some(event.position);
-                                    if let Some(ref terminal) = view.terminal {
-                                        let (x, y) = view.view_local_pos(event.position);
-                                        terminal.send_mouse_pos(
-                                            x,
-                                            y,
-                                            gpui_mods_to_ghostty(&event.modifiers),
-                                        );
-                                    }
-                                });
-                            });
+                                    let _ = entity.update(cx, |view: &mut GhosttyView, _cx| {
+                                        if !view.left_button_dragging {
+                                            return;
+                                        }
+                                        view.last_mouse_position = Some(event.position);
+                                        if let Some(ref terminal) = view.terminal {
+                                            let (x, y) = view.view_local_pos(event.position);
+                                            terminal.send_mouse_pos(
+                                                x,
+                                                y,
+                                                gpui_mods_to_ghostty(&event.modifiers),
+                                            );
+                                        }
+                                    });
+                                },
+                            );
                         }
                     },
                 )
@@ -2181,7 +2183,9 @@ fn resolve_open_url(url: &str, cwd: Option<&str>) -> String {
     let path = if url.starts_with('/') {
         std::path::PathBuf::from(url)
     } else if let Some(rest) = url.strip_prefix("~/") {
-        std::env::home_dir().map(|h| h.join(rest)).unwrap_or_else(|| std::path::PathBuf::from(url))
+        std::env::home_dir()
+            .map(|h| h.join(rest))
+            .unwrap_or_else(|| std::path::PathBuf::from(url))
     } else if let Some(cwd) = cwd {
         std::path::Path::new(cwd).join(url)
     } else {
@@ -2197,9 +2201,15 @@ mod open_url_tests {
 
     #[test]
     fn bare_paths_become_file_urls() {
-        assert_eq!(resolve_open_url("/tmp/a b.png", None), "file:///tmp/a%20b.png");
+        assert_eq!(
+            resolve_open_url("/tmp/a b.png", None),
+            "file:///tmp/a%20b.png"
+        );
         assert_eq!(resolve_open_url("x.png", Some("/tmp")), "file:///tmp/x.png");
-        assert_eq!(resolve_open_url("https://a.b/c", Some("/tmp")), "https://a.b/c");
+        assert_eq!(
+            resolve_open_url("https://a.b/c", Some("/tmp")),
+            "https://a.b/c"
+        );
         assert_eq!(resolve_open_url("mailto:a@b.c", None), "mailto:a@b.c");
     }
 }

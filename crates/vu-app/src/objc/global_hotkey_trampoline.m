@@ -8,8 +8,6 @@ typedef void (*vu_hotkey_callback_t)(void);
 static EventHotKeyRef g_vu_hotkey_ref = NULL;
 static EventHandlerRef g_vu_hotkey_handler = NULL;
 static vu_hotkey_callback_t g_vu_hotkey_callback = NULL;
-static EventHotKeyRef g_vu_qt_hotkey_ref = NULL;
-static vu_hotkey_callback_t g_vu_qt_hotkey_callback = NULL;
 static id g_vu_window_cycle_monitor = nil;
 static NSMutableArray<NSNumber *> *g_vu_window_cycle_order = nil;
 static NSTimeInterval g_vu_last_window_cycle_timestamp = 0;
@@ -37,8 +35,6 @@ static OSStatus vu_hotkey_handler(EventHandlerCallRef nextHandler, EventRef even
 
     if (hotkey_id.id == 1 && g_vu_hotkey_callback != NULL) {
         g_vu_hotkey_callback();
-    } else if (hotkey_id.id == 2 && g_vu_qt_hotkey_callback != NULL) {
-        g_vu_qt_hotkey_callback();
     }
     return noErr;
 }
@@ -103,66 +99,6 @@ bool vu_register_global_hotkey(
     return status == noErr;
 }
 
-bool vu_register_quick_terminal_hotkey(
-    uint32_t key_code,
-    bool shift,
-    bool control,
-    bool alt,
-    bool command,
-    vu_hotkey_callback_t callback
-) {
-    if (g_vu_qt_hotkey_ref != NULL) {
-        UnregisterEventHotKey(g_vu_qt_hotkey_ref);
-        g_vu_qt_hotkey_ref = NULL;
-    }
-
-    if (g_vu_hotkey_handler == NULL) {
-        EventTypeSpec spec = {
-            .eventClass = kEventClassKeyboard,
-            .eventKind = kEventHotKeyPressed,
-        };
-        InstallApplicationEventHandler(
-            NewEventHandlerUPP(vu_hotkey_handler),
-            1,
-            &spec,
-            NULL,
-            &g_vu_hotkey_handler
-        );
-    }
-
-    g_vu_qt_hotkey_callback = callback;
-
-    UInt32 modifiers = 0;
-    if (shift) {
-        modifiers |= shiftKey;
-    }
-    if (control) {
-        modifiers |= controlKey;
-    }
-    if (alt) {
-        modifiers |= optionKey;
-    }
-    if (command) {
-        modifiers |= cmdKey;
-    }
-
-    EventHotKeyID hotkey_id = {
-        .signature = 'conh',
-        .id = 2,
-    };
-
-    OSStatus status = RegisterEventHotKey(
-        key_code,
-        modifiers,
-        hotkey_id,
-        GetApplicationEventTarget(),
-        0,
-        &g_vu_qt_hotkey_ref
-    );
-
-    return status == noErr;
-}
-
 void vu_unregister_global_hotkey(void) {
     if (g_vu_hotkey_ref != NULL) {
         UnregisterEventHotKey(g_vu_hotkey_ref);
@@ -170,23 +106,7 @@ void vu_unregister_global_hotkey(void) {
     }
     g_vu_hotkey_callback = NULL;
 
-    // Tear down the shared Carbon event handler when no hotkey remains
-    // registered — avoids dispatching every global key event through a
-    // no-op handler.
-    if (g_vu_qt_hotkey_ref == NULL && g_vu_hotkey_handler != NULL) {
-        RemoveEventHandler(g_vu_hotkey_handler);
-        g_vu_hotkey_handler = NULL;
-    }
-}
-
-void vu_unregister_quick_terminal_hotkey(void) {
-    if (g_vu_qt_hotkey_ref != NULL) {
-        UnregisterEventHotKey(g_vu_qt_hotkey_ref);
-        g_vu_qt_hotkey_ref = NULL;
-    }
-    g_vu_qt_hotkey_callback = NULL;
-
-    if (g_vu_hotkey_ref == NULL && g_vu_hotkey_handler != NULL) {
+    if (g_vu_hotkey_handler != NULL) {
         RemoveEventHandler(g_vu_hotkey_handler);
         g_vu_hotkey_handler = NULL;
     }

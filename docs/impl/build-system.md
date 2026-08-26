@@ -29,7 +29,6 @@ members = [
     "crates/vu-paths",
     "crates/vu-terminal",
     "crates/vu-ghostty",
-    "crates/vu-agent",
     "crates/vu-cli",
 ]
 ```
@@ -38,12 +37,11 @@ members = [
 
 | Crate | Purpose |
 |-------|---------|
-| `vu` | GPUI app shell, tabs, splits, settings, agent panel |
-| `vu-core` | harness, config, session persistence |
+| `vu` | GPUI app shell, tabs, splits, and settings |
+| `vu-core` | config and session persistence |
 | `vu-paths` | shared platform-safe per-user app directories |
 | `vu-ghostty` | Rust wrapper around libghostty C API |
 | `vu-terminal` | terminal theme data and Ghostty palette translation helpers |
-| `vu-agent` | built-in AI harness and tools |
 
 ## Key dependencies
 
@@ -51,10 +49,7 @@ members = [
 |------------|---------|
 | `gpui` | native GPU UI framework (upstream Zed git source) |
 | `gpui-component` | reusable UI controls (upstream Longbridge git source) |
-| `rig-core` | multi-provider agent runtime (crates.io) |
-| `tokio` | async runtime for agent work |
-| `crossbeam-channel` | UI and harness event routing |
-| `reqwest` | live model list fetch from models.dev |
+| `crossbeam-channel` | UI event routing |
 
 ## Dependency sourcing
 

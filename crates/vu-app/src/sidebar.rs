@@ -253,7 +253,7 @@ pub struct SessionSidebar {
     /// this and stays at the fixed rail width.
     panel_width: f32,
     /// Render-time maximum supplied by the workspace after reserving
-    /// terminal and agent-panel width. This keeps the sidebar's actual
+    /// terminal and adjacent panel width. This keeps the sidebar's actual
     /// painted edge aligned with workspace seam and resize-handle math.
     effective_panel_max_width: f32,
     /// Inline rename state, `Some` while the user is editing a label.

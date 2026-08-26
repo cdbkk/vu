@@ -1,4 +1,3 @@
-use vu_core::session::{PaneLayoutState, PaneSplitDirection, SurfaceState};
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::{
@@ -7,6 +6,7 @@ use gpui_component::{
     menu::{ContextMenuExt, PopupMenuItem},
     tooltip::Tooltip,
 };
+use vu_core::session::{PaneLayoutState, PaneSplitDirection, SurfaceState};
 
 use crate::editor_view::EditorView;
 use crate::sidebar::{DraggedTab, DraggedTabOrigin};
@@ -32,13 +32,13 @@ pub enum SplitPlacement {
 /// Unique identifier for a leaf pane.
 ///
 /// Pane IDs remain the public, stable split-layout target used by the
-/// built-in agent and the existing `panes.*` control API.
+/// existing `panes.*` control API.
 pub type PaneId = usize;
 
 /// Unique identifier for a terminal surface hosted inside a pane.
 ///
 /// A pane can hold multiple surfaces, but only its active surface participates
-/// in pane-level agent context. This lets external orchestrators create
+/// in pane-level control state. This lets external clients create
 /// pane-local tabs without changing the benchmarked pane contract.
 pub type SurfaceId = usize;
 
@@ -920,10 +920,6 @@ impl PaneTree {
 
     pub fn focused_pane_id(&self) -> PaneId {
         self.focused_pane_id
-    }
-
-    pub fn focused_terminal_entity_id(&self) -> Option<EntityId> {
-        Self::find_terminal(&self.root, self.focused_pane_id).map(|terminal| terminal.entity_id())
     }
 
     /// Find the pane ID for a given terminal by entity ID
@@ -2230,7 +2226,12 @@ impl PaneTree {
                 window.prevent_default();
                 cx.stop_propagation();
             })
-            .child(svg().path(zoom_icon).size(icon_px(11.0)).text_color(btn_color));
+            .child(
+                svg()
+                    .path(zoom_icon)
+                    .size(icon_px(11.0))
+                    .text_color(btn_color),
+            );
 
         // ✕ close button — only when there are splits
         let close_btn = if has_splits {
@@ -3191,21 +3192,6 @@ mod tests {
             next_split_id: 1,
             dragging: None,
         }
-    }
-
-    #[::core::prelude::v1::test]
-    fn focused_terminal_entity_id_is_none_without_focused_terminal() {
-        let tree = PaneTree {
-            root: empty_leaf(0),
-            focused_pane_id: 0,
-            zoomed_pane_id: None,
-            next_id: 1,
-            next_surface_id: 0,
-            next_split_id: 0,
-            dragging: None,
-        };
-
-        assert_eq!(tree.focused_terminal_entity_id(), None);
     }
 
     #[::core::prelude::v1::test]

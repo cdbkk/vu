@@ -26,7 +26,7 @@ tracker is GitHub issue #18. The deeper architecture notes live in
 
 Current platform state:
 
-| Target | UI binary | Terminal pane | Control socket | Agent / settings / CLI |
+| Target | UI binary | Terminal pane | Control socket | Settings / CLI |
 |:-------|:---------:|:-------------:|:--------------:|:----------------------:|
 | macOS  | ✅ real   | ✅ libghostty + Metal | `/tmp/vu.sock` | ✅ |
 | Windows | ✅ real  | ✅ libghostty-vt + ConPTY + D3D11/DirectWrite | `\\.\pipe\vu` | ✅ |
@@ -44,7 +44,7 @@ What that gives you:
   xfwm4 / mutter / kwin titlebar stacked on top of the GPUI shell);
   the in-app top bar carries the same minimize / maximize / close
   caption cluster Windows uses
-- tabs, sidebar, agent panel, settings, command palette
+- tabs, sidebar, settings, command palette
 - Unix-domain control socket at `/tmp/vu.sock`
 - `vu-cli` and all portable crates working
 - a real Linux terminal pane backed by Unix PTY + `libghostty-vt` and

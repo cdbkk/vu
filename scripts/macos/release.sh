@@ -14,9 +14,12 @@ require_cmd hdiutil
 require_cmd rsync
 require_cmd shasum
 
-"$SCRIPT_DIR/build-app.sh"
-
 sign_identity_value="$(signing_identity)"
+if [[ "$sign_identity_value" == "-" && "${VU_SKIP_NOTARIZATION:-0}" != "1" ]] && have_notary_credentials; then
+  fail "notarization requires APPLE_SIGNING_IDENTITY"
+fi
+
+"$SCRIPT_DIR/build-app.sh"
 
 run_codesign() {
   local max_attempts=4

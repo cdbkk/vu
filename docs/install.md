@@ -4,7 +4,7 @@ vu is in beta. macOS is the primary supported platform today. Windows and Linux
 builds are available as previews.
 
 Every installer includes the app and `vu-cli`. The CLI is used by scripts,
-test runners, and external agent orchestrators to talk to a running vu session.
+test runners, and external tools to talk to a running vu session.
 
 Use the official installer when you want the newest beta as soon as it ships.
 Community packages are convenient if they already fit your system workflow, but
@@ -95,8 +95,7 @@ Auto-injection can be skipped, though, when something else owns the shell
 startup path: tmux, `exec zsh`, login-shell mode, a framework that resets
 `ZDOTDIR`, and similar setups. When that happens, vu still works as a
 terminal, but it loses shell metadata: new panes may open at `$HOME`, the
-sidebar may miss the foreground process or cwd, and AI tab labels have less
-context.
+sidebar and tab labels may miss the foreground process or cwd.
 
 You can check whether integration loaded in a fresh vu tab:
 

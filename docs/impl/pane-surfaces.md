@@ -9,15 +9,14 @@ Vu's public pane model now has two layers:
 
 Every pane always has one active surface. A pane may also host additional
 inactive surfaces, which behave like pane-local terminal tabs. The existing
-pane APIs, built-in agent tools, and terminal-agent benchmarks continue to see
-only the active surface of each pane.
+pane APIs continue to see only the active surface of each pane.
 
-This is an additive control-plane feature for external orchestrators that need
-interactive subagent patterns without creating unbounded visible splits.
+This is an additive control-plane feature for clients that need multiple
+terminal sessions without creating unbounded visible splits.
 
 ## Why This Exists
 
-Interactive subagent tools often want this lifecycle:
+Automation tools often want this lifecycle:
 
 1. First worker gets a visible split, usually to the right of the caller.
 2. Later workers join that same worker pane as tabs.
@@ -37,13 +36,12 @@ control-plane terminal session inside a pane.
 The compatibility rule is strict:
 
 - `panes.*` targets panes and operates on the active surface only.
-- The built-in agent prompt/tool set keeps the existing pane model.
-- Existing benchmark fixtures should keep using `panes.*` unless a test is
+- Existing clients keep using `panes.*` unless a test is
   explicitly about pane-local surfaces.
 - Surface APIs are opt-in under `surfaces.*`.
 
-This prevents a new abstraction from changing the behavior of Vu's benchmarked
-agent harness or the user-facing pane picker.
+This prevents a new abstraction from changing existing control-client behavior
+or the user-facing pane picker.
 
 ## Control API
 
@@ -130,8 +128,7 @@ Default surface shortcuts are configurable in Settings -> Keyboard Shortcuts:
   Alt-Shift-] cycle; Alt-Shift-R renames; Alt-Shift-X closes.
 
 These palette actions are deliberately pane-local. They do not change the
-existing `panes.*` control-plane contract, the built-in agent harness target
-model, or terminal-agent benchmark assumptions.
+existing `panes.*` control-plane contract.
 
 The terminal context menu uses the same GPUI actions as the Command Palette and
 app menu instead of custom callbacks. That keeps right-click behavior aligned
@@ -139,21 +136,20 @@ with keyboard and automation entry points: the menu first restores focus to the
 clicked terminal, then dispatches the selected action through the normal window
 action path.
 
-This mirrors the interactive-subagent flow: create the first worker as a
-visible split, then add later workers as surfaces inside that worker pane so
-parallel agents do not keep shrinking the main terminal layout.
+This mirrors an automation flow: create the first worker as a visible split,
+then add later workers as surfaces inside that worker pane so parallel jobs do
+not keep shrinking the main terminal layout.
 
-## pi-interactive-subagents Readiness
+## Automation Client Readiness
 
-Vu is API-ready for the pi-interactive-subagents pattern, but it is not a
-byte-for-byte cmux CLI clone. The preferred integration is a Vu-specific
-backend that uses `vu-cli --json` instead of parsing cmux text handles:
+Vu is ready for clients that use `vu-cli --json` instead of parsing terminal
+output:
 
 - First worker: `vu-cli --json surfaces split --location right --title <name>
-  --owner pi-interactive-subagents`
+  --owner automation`
 - Remember the returned `pane_id` and `surface_id`.
 - Later workers: `vu-cli --json surfaces create --pane-id <worker_pane_id>
-  --title <name> --owner pi-interactive-subagents`
+  --title <name> --owner automation`
 - Drive workers with `surfaces wait-ready`, `surfaces send-text`,
   `surfaces send-key`, and `surfaces read`.
 - Clean up with `surfaces close --surface-id <surface_id>
@@ -177,8 +173,8 @@ vu-cli --json surfaces split \
   --pane-id 0 \
   --location right \
   --title worker-1 \
-  --owner pi-interactive-subagents \
-  --command "codex"
+  --owner automation \
+  --command "bash"
 ```
 
 Then create more worker sessions inside the same pane:
@@ -188,8 +184,8 @@ vu-cli --json surfaces create \
   --tab 1 \
   --pane-id <worker_pane_id> \
   --title worker-2 \
-  --owner pi-interactive-subagents \
-  --command "codex"
+  --owner automation \
+  --command "bash"
 ```
 
 Wait for the worker before driving it:
@@ -230,7 +226,7 @@ closes.
 - Hidden surfaces keep running and continue receiving terminal output.
 - Hidden surfaces keep the same PTY/grid size as their host pane. Vu resizes
   inactive surfaces to the visible terminal host bounds even while they are not
-  rendered, so TUI agents that start in background surfaces see the correct
+  rendered, so TUIs that start in background surfaces see the correct
   rows and columns before focus moves to them.
 - On macOS, surface focus is also a native geometry checkpoint. Activating a
   hidden surface must revalidate the embedded Ghostty surface size against the
@@ -254,7 +250,7 @@ For an installed beta app:
 ```bash
 VU_LOG_FILE="$HOME/Desktop/vu-surface-geometry.log" \
 VU_GHOSTTY_PROFILE=1 \
-RUST_LOG=vu::perf=info,vu_ghostty::perf=info,vu=warn,vu_core=warn,vu_agent=warn \
+RUST_LOG=vu::perf=info,vu_ghostty::perf=info,vu=warn,vu_core=warn \
 "/Applications/vu Beta.app/Contents/MacOS/vu"
 ```
 

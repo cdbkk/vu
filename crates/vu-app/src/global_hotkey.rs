@@ -1,6 +1,6 @@
-use vu_core::config::KeybindingConfig;
 use gpui::{App, AsyncApp, Keystroke};
 use std::cell::RefCell;
+use vu_core::config::KeybindingConfig;
 
 unsafe extern "C" {
     fn vu_register_global_hotkey(
@@ -12,15 +12,6 @@ unsafe extern "C" {
         callback: extern "C" fn(),
     ) -> bool;
     fn vu_unregister_global_hotkey();
-    fn vu_register_quick_terminal_hotkey(
-        key_code: u32,
-        shift: bool,
-        control: bool,
-        alt: bool,
-        command: bool,
-        callback: extern "C" fn(),
-    ) -> bool;
-    fn vu_unregister_quick_terminal_hotkey();
     fn vu_app_is_active() -> bool;
 }
 
@@ -50,16 +41,6 @@ pub fn update_from_keybindings(keybindings: &KeybindingConfig) {
             vu_register_global_hotkey(key_code, shift, control, alt, command, callback)
         },
         on_global_hotkey_pressed,
-    );
-    register_hotkey(
-        keybindings.quick_terminal_enabled,
-        &keybindings.quick_terminal,
-        "quick terminal",
-        || unsafe { vu_unregister_quick_terminal_hotkey() },
-        |key_code, shift, control, alt, command, callback| unsafe {
-            vu_register_quick_terminal_hotkey(key_code, shift, control, alt, command, callback)
-        },
-        on_quick_terminal_pressed,
     );
 }
 
@@ -134,27 +115,6 @@ extern "C" fn on_global_hotkey_pressed() {
     });
 }
 
-extern "C" fn on_quick_terminal_pressed() {
-    // Capture the frontmost app NOW — still inside the Carbon hotkey callback,
-    // before macOS activates vu as the hotkey owner. By the time the async
-    // spawn runs, vu is already frontmost and capture_return_pid() would
-    // filter it out, losing the pid we need to restore focus on hide.
-    let pre_captured_pid = crate::quick_terminal::capture_frontmost_pid_before_activation();
-
-    GLOBAL_HOTKEY_APP.with(|app| {
-        let Some(app) = app.borrow().clone() else {
-            return;
-        };
-
-        app.spawn(async move |cx| {
-            cx.update(|cx| {
-                crate::quick_terminal::toggle_with_pid(pre_captured_pid, cx);
-            });
-        })
-        .detach();
-    });
-}
-
 pub fn is_app_active() -> bool {
     unsafe { vu_app_is_active() }
 }
@@ -162,7 +122,6 @@ pub fn is_app_active() -> bool {
 pub fn suspend_global_hotkeys(_keybindings: &KeybindingConfig) {
     unsafe {
         vu_unregister_global_hotkey();
-        vu_unregister_quick_terminal_hotkey();
     }
     HOTKEYS_SUSPENDED.with(|s| *s.borrow_mut() = true);
 }
@@ -271,13 +230,6 @@ mod tests {
         let keystroke = parse_global_hotkey("alt-space").expect("alt-space should parse");
         assert!(keystroke.modifiers.alt);
         assert_eq!(keystroke.key, "space");
-    }
-
-    #[test]
-    fn parses_default_quick_terminal_hotkey() {
-        let keystroke = parse_global_hotkey("cmd-\\").expect("cmd-\\ should parse");
-        assert!(keystroke.modifiers.platform);
-        assert_eq!(keystroke.key, "\\");
     }
 
     #[test]

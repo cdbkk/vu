@@ -6,7 +6,7 @@ Issue: [#111](https://github.com/nowledge-co/con-terminal/issues/111)
 
 Restorable workspaces are a continuity feature, not a process snapshot feature.
 Vu should bring the user back to the same working shape: windows, tabs, panes,
-pane-local surfaces, cwd, history, focus, and agent context. It must not pretend
+pane-local surfaces, cwd, history, and focus. It must not pretend
 that a shell process, a TUI process, or arbitrary terminal scrollback can be
 faithfully resumed.
 
@@ -70,7 +70,7 @@ Required qualities:
 - **Stable in git.** Exported paths are repo-relative and slash-separated on
   every OS, so Windows/macOS/Linux do not churn diffs.
 - **No trust surprise.** Layout profiles never run commands, replay history,
-  restore conversations, or embed terminal text.
+  or embed terminal text.
 - **Privacy control exists before data accumulates.** Terminal text continuity
   is default-on for new installs and existing beta users because workspace
   continuity is the default product promise. Settings exposes an opt-out and
@@ -90,7 +90,7 @@ Required qualities:
    zellij, shells, or the underlying application.
 
 2. **Private state and shared intent are different products.**
-   Conversations, command history, trust decisions, window geometry, scrollback,
+   Command history, trust decisions, window geometry, scrollback,
    active focus, and credentials are private. Team-shared files must be
    reviewable, deterministic, and safe to clone.
 
@@ -131,7 +131,7 @@ Required qualities:
 The user has one Vu window with three tabs:
 
 - `Dev`: editor shell, server pane, tests pane
-- `Agents`: two pane-local surfaces, `Planner` and `Worker`
+- `Workers`: two pane-local surfaces, `Planner` and `Worker`
 - `Release`: one shell in `~/release`
 
 When Vu launches cold tomorrow:
@@ -139,9 +139,8 @@ When Vu launches cold tomorrow:
 - the same windows/tabs/panes/surfaces return
 - each terminal opens at its remembered cwd
 - the active tab/pane/surface is restored
-- per-tab agent conversation resumes from private state
 - commands are not automatically rerun
-- global and project history are available for suggestions
+- global and project command history remain available
 
 Example UI copy for restored panes:
 
@@ -161,7 +160,6 @@ Expected result:
 - one clean shell
 - default cwd from config or launch context
 - shared command/input history
-- no copied agent conversation
 - no copied tabs, panes, or surfaces
 
 This is already the behavior direction of `fresh_window_session_with_history()`.
@@ -221,7 +219,7 @@ Suggested private storage:
   history.json
 ```
 
-### Flow 5: Agent Orchestrator Surfaces
+### Flow 5: Automation Client Surfaces
 
 An external orchestrator creates a pane with multiple surfaces:
 
@@ -267,7 +265,6 @@ Purpose:
 - focused pane
 - active tab
 - pane-local surfaces
-- agent panel state
 - input bar state
 - left sidebar state
 
@@ -281,7 +278,6 @@ Sketch:
   "active_tab": 0,
   "tabs": [],
   "chrome": {
-    "agent_panel_open": true,
     "input_bar_visible": true,
     "left_panel_open": true
   }
@@ -311,7 +307,6 @@ Purpose:
 
 - last local workspace shape for a project
 - project-scoped command/input history
-- per-tab conversation IDs
 - last active tab/pane/surface for that project
 
 Sketch:
@@ -358,10 +353,9 @@ Current schema constraints:
 
 - `format = "vu.workspace.layout"`
 - `version = 1`
-- tabs, panes, surfaces, split geometry, cwd, and optional agent defaults
+- tabs, panes, surfaces, split geometry, and cwd
 - no `run`
 - no `restore`
-- no conversations
 - no command history
 - no scrollback
 - no trust decisions
@@ -480,7 +474,7 @@ Status: layout import/export is implemented; task files remain deferred.
   remains private restore.
 - Start with `.vu/tasks.toml` for named commands.
 - Keep `.vu/workspace.toml` layout-only.
-- Never store secrets, conversations, command history, scrollback, active focus,
+- Never store secrets, command history, scrollback, active focus,
   or trust decisions in repo files.
 
 ### Phase 6: Screen Text History
@@ -514,7 +508,7 @@ artifacts and forces the patch to be rebased before shipping.
 - No hidden command replay.
 - No terminal scrollback persistence in exported layouts.
 - No shell-history file rewriting.
-- No cross-machine conversation sync.
+- No cross-machine private-state sync.
 - No repo-stored credentials, tokens, or private histories.
 - No command-running workspace files in the first production slice.
 
@@ -527,9 +521,9 @@ Before a restorable-workspace PR is merge-ready, verify:
 - Pane-local surfaces survive restore with correct title/cwd/owner.
 - No project file is written unless the user explicitly requests export.
 - No command runs because of restore.
-- Exported layout TOML contains no commands, conversations, history, or
+- Exported layout TOML contains no commands, history, or
   scrollback.
-- A second process does not clone the restored layout and agent conversation.
+- A second process does not clone the restored layout.
 - Old session files still load.
 - Windows, Linux, and macOS keep the same semantics even if their storage paths
   differ.

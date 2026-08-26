@@ -119,12 +119,12 @@ cat > "${stage_dir}/${linux_app_id}.desktop" <<EOF
 Type=Application
 Name=vu
 GenericName=Terminal
-Comment=GPU-accelerated terminal emulator with a built-in AI agent harness
+Comment=GPU-accelerated terminal emulator
 Exec=/usr/local/bin/vu %U
 Icon=vu
 Terminal=false
 Categories=System;TerminalEmulator;Utility;
-Keywords=terminal;shell;command;cli;ai;agent;
+Keywords=terminal;shell;command;cli;
 StartupWMClass=${linux_app_id}
 EOF
 

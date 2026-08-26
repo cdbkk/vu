@@ -3,12 +3,11 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use vu_agent::{PaneCreateLocation, TmuxExecLocation};
-use vu_core::{
-    ControlCommand, JSON_RPC_VERSION, JsonRpcRequest, JsonRpcResponse, PaneTarget, SurfaceTarget,
-    control_socket_path,
-};
 use serde_json::{Value, json};
+use vu_core::{
+    ControlCommand, JSON_RPC_VERSION, JsonRpcRequest, JsonRpcResponse, PaneCreateLocation,
+    PaneTarget, SurfaceTarget, TmuxExecLocation, control_socket_path,
+};
 
 #[derive(Parser)]
 #[command(name = "vu-cli", about = "CLI control surface for a running vu app")]
@@ -41,10 +40,6 @@ enum Command {
     Tmux {
         #[command(subcommand)]
         command: TmuxCommand,
-    },
-    Agent {
-        #[command(subcommand)]
-        command: AgentCommand,
     },
 }
 
@@ -87,14 +82,6 @@ enum TmuxCommand {
     Capture(TmuxCaptureArgs),
     SendKeys(TmuxSendKeysArgs),
     Run(TmuxRunArgs),
-}
-
-#[derive(Subcommand)]
-enum AgentCommand {
-    Ask(AgentAskArgs),
-    NewConversation(TabArgs),
-    OpenPanelForRequest(TabArgs),
-    PanelState(TabArgs),
 }
 
 #[derive(Args, Clone, Default)]
@@ -327,18 +314,6 @@ struct TmuxRunArgs {
     detached: bool,
     #[arg(required = true, trailing_var_arg = true)]
     command: Vec<String>,
-}
-
-#[derive(Args, Clone)]
-struct AgentAskArgs {
-    #[command(flatten)]
-    tab: TabArgs,
-    #[arg(long)]
-    auto_approve_tools: bool,
-    #[arg(long)]
-    timeout: Option<u64>,
-    #[arg(required = true, trailing_var_arg = true)]
-    prompt: Vec<String>,
 }
 
 fn main() -> Result<()> {
@@ -640,47 +615,6 @@ fn main() -> Result<()> {
                 print_result(&result, cli.json, render_pretty_json)?;
             }
         },
-        Command::Agent { command } => match command {
-            AgentCommand::Ask(args) => {
-                let result = send_command(
-                    &socket_path,
-                    ControlCommand::AgentAsk {
-                        tab_index: args.tab.tab,
-                        prompt: join_words(args.prompt),
-                        auto_approve_tools: args.auto_approve_tools,
-                        timeout_secs: args.timeout,
-                    },
-                )?;
-                print_result(&result, cli.json, render_agent_ask)?;
-            }
-            AgentCommand::NewConversation(args) => {
-                let result = send_command(
-                    &socket_path,
-                    ControlCommand::AgentNewConversation {
-                        tab_index: args.tab,
-                    },
-                )?;
-                print_result(&result, cli.json, render_new_conversation)?;
-            }
-            AgentCommand::OpenPanelForRequest(args) => {
-                let result = send_command(
-                    &socket_path,
-                    ControlCommand::AgentOpenPanelForRequest {
-                        tab_index: args.tab,
-                    },
-                )?;
-                print_result(&result, cli.json, render_pretty_json)?;
-            }
-            AgentCommand::PanelState(args) => {
-                let result = send_command(
-                    &socket_path,
-                    ControlCommand::AgentPanelState {
-                        tab_index: args.tab,
-                    },
-                )?;
-                print_result(&result, cli.json, render_pretty_json)?;
-            }
-        },
     }
 
     Ok(())
@@ -882,11 +816,8 @@ fn render_tabs_list(value: &Value) -> Result<()> {
         };
         let index = tab["index"].as_u64().unwrap_or(0);
         let pane_count = tab["pane_count"].as_u64().unwrap_or(0);
-        let conversation_id = tab["conversation_id"].as_str().unwrap_or("");
         let title = tab["title"].as_str().unwrap_or("Untitled");
-        println!(
-            "{marker} tab {index:<3} panes={pane_count:<2} conversation={conversation_id}  {title}"
-        );
+        println!("{marker} tab {index:<3} panes={pane_count:<2}  {title}");
     }
     Ok(())
 }
@@ -1120,25 +1051,6 @@ fn render_tmux_capture(value: &Value) -> Result<()> {
         .and_then(Value::as_str)
         .unwrap_or("");
     print!("{content}");
-    Ok(())
-}
-
-fn render_agent_ask(value: &Value) -> Result<()> {
-    let content = value
-        .get("message")
-        .and_then(|message| message.get("content"))
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    print!("{content}");
-    Ok(())
-}
-
-fn render_new_conversation(value: &Value) -> Result<()> {
-    println!(
-        "Started new conversation {} on tab {}",
-        value["conversation_id"].as_str().unwrap_or(""),
-        value["tab_index"].as_u64().unwrap_or(0)
-    );
     Ok(())
 }
 

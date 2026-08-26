@@ -10,7 +10,7 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 
-use vu_agent::{PaneCreateLocation, TmuxExecLocation};
+use crate::{PaneCreateLocation, TmuxExecLocation};
 
 /// Default control endpoint location.
 ///
@@ -114,10 +114,7 @@ const CONTROL_METHODS: &[(&str, &str)] = &[
         "system.capabilities",
         "List supported control-plane methods.",
     ),
-    (
-        "tabs.list",
-        "List tabs and their conversation/session metadata.",
-    ),
+    ("tabs.list", "List tabs and their pane metadata."),
     ("tabs.new", "Create a new active tab."),
     (
         "tabs.close",
@@ -185,22 +182,6 @@ const CONTROL_METHODS: &[(&str, &str)] = &[
     ("tmux.capture", "Capture content from a tmux pane target."),
     ("tmux.send_keys", "Send keys to a tmux pane target."),
     ("tmux.run", "Launch a command via tmux."),
-    (
-        "agent.ask",
-        "Send a prompt to a tab's built-in agent session and wait for the response.",
-    ),
-    (
-        "agent.new_conversation",
-        "Start a fresh built-in agent conversation for a tab.",
-    ),
-    (
-        "agent.open_panel_for_request",
-        "Open the agent panel via the agent-request path (drives motion state) and return panel state.",
-    ),
-    (
-        "agent.panel_state",
-        "Return the current agent panel open/visible state.",
-    ),
 ];
 
 pub fn control_methods() -> Vec<ControlMethodInfo> {
@@ -231,15 +212,6 @@ pub struct TabInfo {
     pub pane_count: usize,
     pub focused_pane_id: usize,
     pub needs_attention: bool,
-    pub conversation_id: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AgentAskResult {
-    pub tab_index: usize,
-    pub conversation_id: String,
-    pub prompt: String,
-    pub message: vu_agent::Message,
 }
 
 #[derive(Debug, Clone)]
@@ -374,23 +346,6 @@ pub enum ControlCommand {
         cwd: Option<String>,
         detached: bool,
     },
-    AgentAsk {
-        tab_index: Option<usize>,
-        prompt: String,
-        auto_approve_tools: bool,
-        timeout_secs: Option<u64>,
-    },
-    AgentNewConversation {
-        tab_index: Option<usize>,
-    },
-    /// Open the agent panel via the "Ask AI" / agent-request path (drives motion state).
-    AgentOpenPanelForRequest {
-        tab_index: Option<usize>,
-    },
-    /// Return the current agent panel open/visible state.
-    AgentPanelState {
-        tab_index: Option<usize>,
-    },
 }
 
 impl ControlCommand {
@@ -424,10 +379,6 @@ impl ControlCommand {
             Self::TmuxCapture { .. } => "tmux.capture",
             Self::TmuxSendKeys { .. } => "tmux.send_keys",
             Self::TmuxRun { .. } => "tmux.run",
-            Self::AgentAsk { .. } => "agent.ask",
-            Self::AgentNewConversation { .. } => "agent.new_conversation",
-            Self::AgentOpenPanelForRequest { .. } => "agent.open_panel_for_request",
-            Self::AgentPanelState { .. } => "agent.panel_state",
         }
     }
 
@@ -657,20 +608,6 @@ impl ControlCommand {
                 "cwd": cwd,
                 "detached": detached,
             }),
-            Self::AgentAsk {
-                tab_index,
-                prompt,
-                auto_approve_tools,
-                timeout_secs,
-            } => json!({
-                "tab_index": tab_index,
-                "prompt": prompt,
-                "auto_approve_tools": auto_approve_tools,
-                "timeout_secs": timeout_secs,
-            }),
-            Self::AgentNewConversation { tab_index } => json!({ "tab_index": tab_index }),
-            Self::AgentOpenPanelForRequest { tab_index } => json!({ "tab_index": tab_index }),
-            Self::AgentPanelState { tab_index } => json!({ "tab_index": tab_index }),
         }
     }
 
@@ -876,33 +813,6 @@ impl ControlCommand {
                     window_name: params.window_name,
                     cwd: params.cwd,
                     detached: params.detached,
-                })
-            }
-            "agent.ask" => {
-                let params: AgentAskParams = decode_params(params)?;
-                Ok(Self::AgentAsk {
-                    tab_index: params.tab_index,
-                    prompt: params.prompt,
-                    auto_approve_tools: params.auto_approve_tools,
-                    timeout_secs: params.timeout_secs,
-                })
-            }
-            "agent.new_conversation" => {
-                let params: TabScopedParams = decode_params(params)?;
-                Ok(Self::AgentNewConversation {
-                    tab_index: params.tab_index,
-                })
-            }
-            "agent.open_panel_for_request" => {
-                let params: TabScopedParams = decode_params(params)?;
-                Ok(Self::AgentOpenPanelForRequest {
-                    tab_index: params.tab_index,
-                })
-            }
-            "agent.panel_state" => {
-                let params: TabScopedParams = decode_params(params)?;
-                Ok(Self::AgentPanelState {
-                    tab_index: params.tab_index,
                 })
             }
             _ => Err(ControlError::method_not_found(method)),
@@ -1220,9 +1130,7 @@ async fn handle_json_rpc_request(
             jsonrpc: JSON_RPC_VERSION.to_string(),
             id,
             result: None,
-            error: Some(
-                ControlError::internal("vu control bridge is unavailable").into_json_rpc(),
-            ),
+            error: Some(ControlError::internal("vu control bridge is unavailable").into_json_rpc()),
         };
     }
 
@@ -1670,15 +1578,6 @@ impl TmuxRunParams {
     fn target(&self) -> PaneTarget {
         PaneTarget::new(self.pane_index, self.pane_id)
     }
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default)]
-struct AgentAskParams {
-    tab_index: Option<usize>,
-    prompt: String,
-    auto_approve_tools: bool,
-    timeout_secs: Option<u64>,
 }
 
 fn decode_params<T>(params: Value) -> Result<T, ControlError>

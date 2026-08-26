@@ -1,68 +1,20 @@
-# vu docs
+# Vu documentation
 
-vu is a terminal first. If you hide the input bar and agent panel, it should
-feel like a fast, elegant terminal with nothing extra in the way.
+Vu is a GPU-accelerated terminal with tabs, split panes, saved workspaces, configurable appearance, and a local control API.
 
-<p align="center">
-  <a href="screenshots.md">
-    <img width="1080" alt="Vu main window with terminal panes and the agent panel" src="https://github.com/user-attachments/assets/389898d6-56bf-46aa-9279-65e59a57ed23" />
-  </a>
-</p>
+## User guides
 
-When you ask for AI, vu uses the terminal objects you already work with:
-panes, SSH sessions, tmux panes, TUIs, visible output, and working directories.
-When a one-off routine becomes worth repeating, skills let you keep it as a
-slash command. When you build on top of vu, `vu-cli` and surfaces give
-external agents a real terminal to drive.
-
-Start with the page that matches what you are trying to do.
-
-## Start
-
-| Need | Read |
+| Task | Guide |
 | --- | --- |
-| Install vu | [Install](install.md) |
-| Learn the main controls | [Quick controls](quick-controls.md) |
-| Open a drop-down terminal from anywhere on macOS | [Quick Terminal](quick-terminal.md) |
-| Work with tabs, panes, broadcast, links, and pane zoom | [Terminal workflows](terminal-workflows.md) |
-| Connect providers, tune appearance, and edit shortcuts | [Settings](settings.md) |
+| Learn the default shortcuts | [Quick controls](quick-controls.md) |
+| Change themes, fonts, and shortcuts | [Settings](settings.md) |
+| Work with tabs, panes, and terminal surfaces | [Terminal workflows](terminal-workflows.md) |
+| Install Vu | [Install](install.md) |
+| Drive Vu from scripts and tests | [vu-cli and surfaces](vu-cli.md) |
 
-## Use vu every day
+## Development
 
-| Need | Read |
-| --- | --- |
-| Use the agent panel without leaving the terminal | [Built-in agent](agent.md) |
-| Turn a repeated terminal routine into a slash command | [Skills and workflows](skills-and-workflows.md) |
-| Save or share a project layout | [Workspace profiles](workspace-layout-profiles-guide.md) |
-| See the app | [Screenshots](screenshots.md) |
-| See what changed | [Changelog](../CHANGELOG.md) |
-
-## Build on vu
-
-| Need | Read |
-| --- | --- |
-| Drive vu from scripts, test runners, or external agents | [vu-cli and surfaces](vu-cli.md) |
-
-## Platform status
-
-- macOS is the primary beta platform.
-- Windows is in preview.
-- Linux is in preview.
-
-Platform-specific limits are tracked in the source repository:
-[Windows](https://github.com/nowledge-co/con-terminal/issues/34) and
-[Linux](https://github.com/nowledge-co/con-terminal/issues/18).
-
-## Contributor docs
-
-These public docs are for people using vu. If you want to build or change vu
-itself, start with the contributor quickstart in the source repository. The
-implementation notes in `docs/impl/` and `docs/study/` are written for
-contributors, not for the hosted docs navigation.
-
-## Source of truth
-
-The public docs navigation comes from [`docs/manifest.json`](manifest.json).
-When a PR adds, renames, or removes a public docs page, update the manifest in
-that PR. CI checks the manifest, and merges to `main` rebuild
-`vu.nowledge.co/docs`.
+- [Architecture](../DESIGN.md)
+- [Contributor guide](../HACKING.md)
+- [Implementation notes](impl/)
+- [Design system](design/vu-design-language.md)

@@ -20,20 +20,7 @@ impl VuWorkspace {
     ) {
         let input_bar_focused =
             self.input_bar_visible && self.input_bar.focus_handle(cx).is_focused(window);
-        let agent_inline_refocused = if !input_bar_focused && self.agent_panel_open {
-            let inline_focused = self
-                .agent_panel
-                .read(cx)
-                .inline_input_is_focused(window, cx);
-            inline_focused
-                && self
-                    .agent_panel
-                    .update(cx, |panel, cx| panel.focus_inline_input(window, cx))
-        } else {
-            false
-        };
-
-        let check_editor_or_terminal = !input_bar_focused && !agent_inline_refocused;
+        let check_editor_or_terminal = !input_bar_focused;
         let editor_has_keyboard_focus =
             check_editor_or_terminal && self.editor_has_keyboard_focus(window, cx);
         let active_pane_is_editor = check_editor_or_terminal && self.has_active_tab() && {
@@ -45,14 +32,12 @@ impl VuWorkspace {
 
         match activation_focus_target_for_reassertion(
             input_bar_focused,
-            agent_inline_refocused,
             editor_has_keyboard_focus,
             active_pane_is_editor,
         ) {
             ActivationFocusTarget::InputBar => {
                 self.input_bar.focus_handle(cx).focus(window, cx);
             }
-            ActivationFocusTarget::AgentInlineInput => {}
             ActivationFocusTarget::ActiveEditor => {
                 self.focus_active_editor_or_workspace(window, cx);
             }
@@ -67,7 +52,6 @@ impl VuWorkspace {
     }
 
     pub(super) fn quit(&mut self, _: &Quit, _window: &mut Window, cx: &mut Context<Self>) {
-        self.cancel_all_sessions();
         self.flush_session_save(cx);
         // Tear down ghostty surfaces before app exit to avoid Metal/NSView crashes.
         // Hide views and unfocus first, then clear the tabs vector so GhosttyTerminal
@@ -100,55 +84,8 @@ impl VuWorkspace {
         self.focus_preferred_input_surface(window, cx);
     }
 
-    /// Send the focused terminal's selection to the agent input.
-    ///
-    /// Grabs the current selection (if any), routes it to the preferred
-    /// input surface (input bar in Agent mode, or the agent panel's inline
-    /// input when the bar is hidden), and focuses that input so the user
-    /// can type their question immediately. Without a selection this still
-    /// focuses the agent input, so the shortcut doubles as "ask AI".
-    pub(super) fn ask_ai(&mut self, _: &AskAi, window: &mut Window, cx: &mut Context<Self>) {
-        if self.is_modal_open(cx) {
-            return;
-        }
-
-        let selection = self
-            .has_active_tab()
-            .then(|| {
-                self.tabs[self.active_tab]
-                    .pane_tree
-                    .try_visible_focus_terminal()
-                    .and_then(|(_, terminal)| terminal.selection_text(cx))
-            })
-            .flatten()
-            .map(|text| text.trim_end().to_string())
-            .filter(|text| !text.is_empty());
-
-        if !self.input_bar_visible && self.agent_panel_open {
-            let inserted = self.agent_panel.update(cx, |panel, cx| {
-                panel.ask_ai_with_context(selection.as_deref(), window, cx)
-            });
-            if inserted {
-                return;
-            }
-        }
-
-        self.focus_input_bar_surface(window, cx);
-        self.input_bar.update(cx, |bar, cx| {
-            bar.ask_ai_with_context(selection.as_deref(), window, cx);
-        });
-    }
-
     pub(super) fn is_input_surface_focused(&self, window: &Window, cx: &App) -> bool {
-        let input_bar_focused =
-            self.input_bar_visible && self.input_bar.focus_handle(cx).is_focused(window);
-        let agent_inline_focused = self.agent_panel_open
-            && self
-                .agent_panel
-                .read(cx)
-                .inline_input_is_focused(window, cx);
-
-        input_bar_focused || agent_inline_focused
+        self.input_bar_visible && self.input_bar.focus_handle(cx).is_focused(window)
     }
 
     pub(super) fn focus_preferred_input_surface(
@@ -156,17 +93,6 @@ impl VuWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.input_bar_visible {
-            if self.agent_panel_open {
-                let focused_inline = self
-                    .agent_panel
-                    .update(cx, |panel, cx| panel.focus_inline_input(window, cx));
-                if !focused_inline {
-                    self.focus_agent_inline_input_next_frame(window, cx);
-                }
-                return;
-            }
-        }
         self.focus_input_bar_surface(window, cx);
     }
 
@@ -201,22 +127,6 @@ impl VuWorkspace {
         };
         self.tabs[self.active_tab].pane_tree.focus(pane_id);
         terminal.focus(window, cx);
-        self.sync_active_terminal_focus_states(cx);
-        cx.notify();
-    }
-
-    pub(super) fn cycle_input_mode(
-        &mut self,
-        _: &CycleInputMode,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.input_bar.update(cx, |bar, cx| {
-            bar.cycle_mode(window, cx);
-        });
-        if self.input_bar.read(cx).mode() == InputMode::Agent {
-            self.pane_scope_picker_open = false;
-        }
         self.sync_active_terminal_focus_states(cx);
         cx.notify();
     }
@@ -258,8 +168,6 @@ impl VuWorkspace {
         }
 
         let config = self.config.clone();
-        let registry = self.model_registry.clone();
-        let runtime = self.harness.runtime_handle();
         let workspace = cx.weak_entity();
         let main_window = window.window_handle();
         let opened_panel: Rc<RefCell<Option<Entity<SettingsPanel>>>> = Rc::new(RefCell::new(None));
@@ -279,8 +187,7 @@ impl VuWorkspace {
 
         match cx.open_window(options, move |settings_window, cx| {
             let panel = cx.new(|cx| {
-                let mut panel =
-                    SettingsPanel::new(&config, registry.clone(), runtime, settings_window, cx);
+                let mut panel = SettingsPanel::new(&config, settings_window, cx);
                 panel.open_standalone(settings_window, cx);
                 panel
             });
@@ -425,15 +332,9 @@ impl VuWorkspace {
             pane_tree: PaneTree::new(terminal),
             title: format!("Terminal {}", tab_number),
             user_label: None,
-            ai_label: None,
-            ai_icon: None,
             color: None,
             summary_id,
-            summary_epoch: 0,
             needs_attention: false,
-            session: AgentSession::new(),
-            agent_routing: Self::default_agent_routing(self.harness.config()),
-            panel_state: PanelState::new(),
             runtime_trackers: RefCell::new(HashMap::new()),
             runtime_cache: RefCell::new(HashMap::new()),
             shell_history: HashMap::new(),
@@ -451,29 +352,6 @@ impl VuWorkspace {
 
         let new_index = self.tabs.len() - 1;
         self.activate_tab(new_index, window, cx);
-    }
-
-    pub(super) fn focus_agent_inline_input_next_frame(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        cx.on_next_frame(window, |workspace, window, cx| {
-            if !workspace.agent_panel_open || workspace.input_bar_visible {
-                return;
-            }
-            let focused = workspace
-                .agent_panel
-                .update(cx, |panel, cx| panel.focus_inline_input(window, cx));
-            if !focused {
-                workspace.focus_input_bar_surface(window, cx);
-            }
-        });
-    }
-
-    #[cfg(target_os = "macos")]
-    pub fn mark_as_quick_terminal(&mut self) {
-        self.is_quick_terminal = true;
     }
 
     pub(super) fn close_tab(&mut self, _: &CloseTab, window: &mut Window, cx: &mut Context<Self>) {
@@ -573,11 +451,6 @@ impl VuWorkspace {
             return;
         }
         if self.tabs.len() <= 1 {
-            if self.is_quick_terminal {
-                self.destroy_quick_terminal_window(window, cx);
-                return;
-            }
-
             self.close_window_from_last_tab(window, cx);
             return;
         }
@@ -587,20 +460,9 @@ impl VuWorkspace {
             .into_iter()
             .cloned()
             .collect();
-        // Save the closing tab's conversation
-        {
-            let conv = self.tabs[index].session.conversation();
-            let _ = conv.lock().save();
-        }
-        let was_active = index == self.active_tab;
-        self.reindex_pending_control_agent_requests_after_tab_close(index);
         self.reindex_pending_surface_control_requests_after_tab_close(index);
         self.remap_tab_rename_state_after_close(index);
-        let removed = self.tabs.remove(index);
-        // Drop the closed tab's cached AI summary so a future tab
-        // assigned the same summary_id (which won't happen, since
-        // ids are monotonic) doesn't inherit stale state.
-        self.tab_summary_engine.forget(removed.summary_id);
+        self.tabs.remove(index);
         if self.sync_tab_strip_motion() {
             #[cfg(target_os = "macos")]
             self.arm_top_chrome_snap_guard(cx);
@@ -609,16 +471,6 @@ impl VuWorkspace {
             self.active_tab = self.tabs.len() - 1;
         } else if self.active_tab > index {
             self.active_tab -= 1;
-        }
-        // Swap new active tab's panel state into the panel if needed
-        if was_active {
-            let incoming = std::mem::replace(
-                &mut self.tabs[self.active_tab].panel_state,
-                PanelState::new(),
-            );
-            self.agent_panel.update(cx, |panel, cx| {
-                panel.swap_state(incoming, cx);
-            });
         }
         // Show and focus new active tab's ghostty views
         for terminal in self.tabs[self.active_tab].pane_tree.all_terminals() {
@@ -660,18 +512,6 @@ impl VuWorkspace {
         }
     }
 
-    pub(super) fn destroy_quick_terminal_window(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        #[cfg(target_os = "macos")]
-        crate::quick_terminal::force_hide();
-        #[cfg(target_os = "macos")]
-        crate::quick_terminal::reset_destroyed_window();
-        self.close_window_from_last_tab(window, cx);
-    }
-
     pub(super) fn close_window_from_last_tab(
         &mut self,
         window: &mut Window,
@@ -693,7 +533,6 @@ impl VuWorkspace {
         }
         self.window_close_prepared = true;
 
-        self.cancel_all_sessions();
         self.flush_session_save(cx);
 
         if let Some(settings_window) = self.settings_window.take() {
@@ -724,16 +563,6 @@ impl VuWorkspace {
             }
         }
 
-        for (tab_idx, pending) in std::mem::take(&mut self.pending_control_agent_requests) {
-            Self::send_control_result(
-                pending.response_tx,
-                Err(ControlError::internal(format!(
-                    "window closed while agent.ask was still pending for tab {}",
-                    tab_idx + 1
-                ))),
-            );
-        }
-
         for request in std::mem::take(&mut self.pending_surface_control_requests) {
             let response_tx = match request {
                 PendingSurfaceControlRequest::Create { response_tx, .. }
@@ -749,40 +578,10 @@ impl VuWorkspace {
         }
 
         for tab in &self.tabs {
-            let conv = tab.session.conversation();
-            let _ = conv.lock().save();
-
             for terminal in tab.pane_tree.all_surface_terminals() {
                 terminal.shutdown_surface(cx);
             }
         }
-    }
-
-    pub(super) fn reindex_pending_control_agent_requests_after_tab_close(
-        &mut self,
-        closed_tab_idx: usize,
-    ) {
-        let mut shifted = HashMap::new();
-        for (tab_idx, pending) in std::mem::take(&mut self.pending_control_agent_requests) {
-            if tab_idx == closed_tab_idx {
-                Self::send_control_result(
-                    pending.response_tx,
-                    Err(ControlError::internal(format!(
-                        "Tab {} was closed while agent.ask was still pending",
-                        closed_tab_idx + 1
-                    ))),
-                );
-                continue;
-            }
-
-            let next_idx = if tab_idx > closed_tab_idx {
-                tab_idx - 1
-            } else {
-                tab_idx
-            };
-            shifted.insert(next_idx, pending);
-        }
-        self.pending_control_agent_requests = shifted;
     }
 
     pub(super) fn reindex_pending_surface_control_requests_after_tab_close(

@@ -3,8 +3,8 @@
 ## Background
 
 Vu embeds Ghostty terminal surfaces as native `NSScrollView` subtrees inside the
-GPUI Metal window. GPUI renders its own UI (workspace chrome, editor panes, agent
-panel) via a `GPUIView` (Metal-backed `NSView`) that is the window's initial first
+GPUI Metal window. GPUI renders its own UI (workspace chrome and editor panes)
+via a `GPUIView` (Metal-backed `NSView`) that is the window's initial first
 responder. Ghostty surfaces are added as siblings below `GPUIView` in the view
 hierarchy.
 

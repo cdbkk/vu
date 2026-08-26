@@ -23,7 +23,6 @@ impl VuWorkspace {
         for (pane_id, cwd) in history_records {
             self.record_shell_command(self.active_tab, pane_id, cmd, cwd);
         }
-        self.after_shell_command_recorded(cx);
 
         self.input_bar.update(cx, |bar, _cx| {
             bar.clear_completion_ui();
@@ -33,37 +32,6 @@ impl VuWorkspace {
         // Always keep focus on input bar after sending a command —
         // the terminal output is visible, and the user can click to focus it.
         self.input_bar.focus_handle(cx).focus(window, cx);
-    }
-
-    pub(super) fn send_to_agent(&mut self, content: &str, cx: &mut Context<Self>) {
-        if !self.has_active_tab() {
-            return;
-        }
-        self.record_input_history(content);
-        if let Some(target) =
-            super::chrome::agent_panel_motion_target_for_agent_request(self.agent_panel_open)
-        {
-            self.agent_panel_open = true;
-            let duration = Self::terminal_adjacent_chrome_duration(true, 290, 220);
-            #[cfg(target_os = "macos")]
-            if !duration.is_zero() {
-                self.arm_chrome_transition_underlay(duration + Duration::from_millis(80));
-            }
-            #[cfg(target_os = "macos")]
-            if duration.is_zero() {
-                self.arm_agent_panel_snap_guard(cx);
-            }
-            self.agent_panel_motion.set_target(target, duration);
-        }
-        self.agent_panel.update(cx, |panel, cx| {
-            panel.add_message("user", content, cx);
-        });
-        let context = self.build_agent_context(cx);
-        let session = &self.tabs[self.active_tab].session;
-        let agent_config = self.active_tab_agent_config();
-        self.harness
-            .send_message(session, agent_config, content.to_string(), context);
-        self.save_session(cx);
     }
 
     pub(super) fn create_surface_in_focused_pane(
@@ -113,7 +81,7 @@ impl VuWorkspace {
         self.record_runtime_event_for_terminal(
             tab_idx,
             &terminal,
-            vu_agent::context::PaneRuntimeEvent::PaneCreated {
+            vu_core::pane_context::PaneRuntimeEvent::PaneCreated {
                 startup_command: None,
             },
         );
@@ -176,7 +144,7 @@ impl VuWorkspace {
         self.record_runtime_event_for_terminal(
             tab_idx,
             &terminal,
-            vu_agent::context::PaneRuntimeEvent::PaneCreated {
+            vu_core::pane_context::PaneRuntimeEvent::PaneCreated {
                 startup_command: None,
             },
         );
@@ -403,7 +371,7 @@ impl VuWorkspace {
         self.record_runtime_event_for_terminal(
             self.active_tab,
             &terminal,
-            vu_agent::context::PaneRuntimeEvent::PaneCreated {
+            vu_core::pane_context::PaneRuntimeEvent::PaneCreated {
                 startup_command: None,
             },
         );
@@ -612,11 +580,6 @@ impl VuWorkspace {
             return;
         }
 
-        if self.is_quick_terminal {
-            self.destroy_quick_terminal_window(window, cx);
-            return;
-        }
-
         log::debug!("[close_pane] single pane, single tab — closing window");
         self.close_window_from_last_tab(window, cx);
     }
@@ -783,15 +746,9 @@ impl VuWorkspace {
                 pane_tree: new_pane_tree,
                 title: format!("Terminal {}", tab_number),
                 user_label: None,
-                ai_label: None,
-                ai_icon: None,
                 color: None,
                 summary_id,
-                summary_epoch: 0,
                 needs_attention: false,
-                session: AgentSession::new(),
-                agent_routing: Self::default_agent_routing(self.harness.config()),
-                panel_state: PanelState::new(),
                 runtime_trackers: RefCell::new(HashMap::new()),
                 runtime_cache: RefCell::new(HashMap::new()),
                 shell_history: HashMap::new(),

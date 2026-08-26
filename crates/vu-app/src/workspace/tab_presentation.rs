@@ -73,8 +73,6 @@ pub(super) struct VerticalTabPresentation {
 /// 6. Fallback `Tab N` — terminal icon, no subtitle.
 pub(super) fn smart_tab_presentation(
     user_label: Option<&str>,
-    ai_label: Option<&str>,
-    ai_icon: Option<&'static str>,
     hostname: Option<&str>,
     title: Option<&str>,
     current_dir: Option<&str>,
@@ -82,7 +80,7 @@ pub(super) fn smart_tab_presentation(
 ) -> VerticalTabPresentation {
     let is_ssh_session = hostname.map(|h| !h.trim().is_empty()).unwrap_or(false);
 
-    // Helper: pick the heuristic icon (used when no AI / SSH signal).
+    // Helper: pick an icon from the current terminal title.
     let heuristic_icon = || {
         if let Some(raw) = title.map(str::trim).filter(|s| !s.is_empty()) {
             parse_focused_process(raw)
@@ -98,9 +96,7 @@ pub(super) fn smart_tab_presentation(
         let icon = if is_ssh_session {
             "phosphor/globe.svg"
         } else {
-            // Prefer the AI-suggested icon for user-labelled tabs;
-            // fall back to the heuristic.
-            ai_icon.unwrap_or_else(heuristic_icon)
+            heuristic_icon()
         };
         return VerticalTabPresentation {
             name: label.to_string(),
@@ -110,24 +106,7 @@ pub(super) fn smart_tab_presentation(
         };
     }
 
-    // 2. AI label sits between user label and heuristics — never
-    //    overrides an explicit user choice, but does override the
-    //    "vim README.md" / "htop" parse output.
-    if let Some(label) = ai_label.map(str::trim).filter(|s| !s.is_empty()) {
-        let icon = if is_ssh_session {
-            "phosphor/globe.svg"
-        } else {
-            ai_icon.unwrap_or_else(heuristic_icon)
-        };
-        return VerticalTabPresentation {
-            name: label.to_string(),
-            subtitle: cwd_subtitle(current_dir),
-            icon,
-            is_ssh: is_ssh_session,
-        };
-    }
-
-    // 3. SSH host short-name (no AI needed for this).
+    // 2. SSH host short-name.
     if let Some(host) = hostname.map(str::trim).filter(|s| !s.is_empty()) {
         return VerticalTabPresentation {
             name: host.to_string(),
@@ -189,8 +168,6 @@ pub(super) fn smart_tab_presentation(
 
 pub(super) fn tab_rename_initial_label(
     user_label: Option<&str>,
-    ai_label: Option<&str>,
-    ai_icon: Option<&'static str>,
     hostname: Option<&str>,
     title: Option<&str>,
     current_dir: Option<&str>,
@@ -199,16 +176,7 @@ pub(super) fn tab_rename_initial_label(
     if let Some(label) = user_label.filter(|label| !label.trim().is_empty()) {
         label.to_string()
     } else {
-        smart_tab_presentation(
-            user_label,
-            ai_label,
-            ai_icon,
-            hostname,
-            title,
-            current_dir,
-            tab_index,
-        )
-        .name
+        smart_tab_presentation(user_label, hostname, title, current_dir, tab_index).name
     }
 }
 

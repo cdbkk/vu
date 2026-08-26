@@ -5,14 +5,13 @@ This is the reference workflow for validating Vu's local control plane against a
 Use it for:
 
 - smoke tests after control-plane changes
-- external-agent evaluation runs
+- automated client evaluation runs
 - reproducible bug reports for `vu-cli` and the Unix socket bridge
 
 ## Preconditions
 
 - Buildable workspace
 - A macOS session that can launch the Vu window
-- Provider config or env vars if you want to verify `agent ask`
 
 ## 1. Launch the app
 
@@ -72,23 +71,7 @@ Expected shape:
 - `panes wait` returns `"status":"matched"`
 - the pane remains in `shell_prompt` mode with `exec_visible_shell`
 
-## 4. Built-in agent smoke test
-
-This uses the tab's real in-app conversation, not a separate headless call.
-
-```bash
-vu-cli --json agent ask --tab 2 "Reply with ONLY READY_AGENT_OK"
-```
-
-Expected shape:
-
-- JSON includes `conversation_id`
-- `message.role` is `Assistant`
-- `message.content` matches the requested output
-
-If this fails, check provider config/env first before treating it as a socket bug.
-
-## 5. Pane creation
+## 4. Pane creation
 
 Current command:
 
@@ -115,11 +98,11 @@ For follow-up shell control, wait until the pane reports:
 - `is_alive: true`
 - the expected shell control capabilities if you need visible shell execution
 
-## 6. Automation guidance
+## 5. Automation guidance
 
 - Use `pane_id` for follow-up targeting, not `pane_index`
 - Use `surfaces.*` only when the test is explicitly about pane-local terminal
-  sessions. Existing pane and agent benchmarks should stay on `panes.*`.
+  sessions.
 - Use `surface_id` for surface follow-up targeting.
 - After `surfaces create` or `surfaces split`, call
   `surfaces wait-ready --surface-id <id> --timeout 10` before sending input that
@@ -137,5 +120,4 @@ vu-cli --json panes list --tab 2
 vu-cli --json panes exec --tab 2 --pane-id 0 -- /bin/echo READY_OK
 vu-cli --json panes wait --tab 2 --pane-id 0 --pattern READY_OK --timeout 10
 vu-cli --json panes list --tab 2
-vu-cli --json agent ask --tab 2 "Reply with ONLY READY_AGENT_OK"
 ```

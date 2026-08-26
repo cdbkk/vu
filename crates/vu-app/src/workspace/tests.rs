@@ -1,4 +1,3 @@
-use super::chrome::agent_panel_motion_target_for_agent_request;
 use super::{
     ActivationFocusTarget, ActivePaneFocusTarget, EditorFileCloseOutcome, EditorLineBoundary,
     FileTreeFocusSource, WorkspaceCloseIntent, activation_focus_target_for_reassertion,
@@ -8,8 +7,8 @@ use super::{
     should_show_activity_bar, workspace_close_intent, workspace_close_intent_for_close_tab,
 };
 use super::{
-    VuWorkspace, SPLIT_PREVIEW_SEAM_THICKNESS, SplitDirection, SplitPlacement,
-    TabRenameStateSnapshot, centered_drag_preview_origin, clamp_preview_origin_to_tab_bar,
+    SPLIT_PREVIEW_SEAM_THICKNESS, SplitDirection, SplitPlacement, TabRenameStateSnapshot,
+    VuWorkspace, centered_drag_preview_origin, clamp_preview_origin_to_tab_bar,
     clear_pane_tab_promotion_drag_state, horizontal_tab_slot_from_drag,
     horizontal_tab_slot_from_position, is_dragged_tab_source, is_tab_strip_preview_active,
     normalize_tab_user_label, pane_drag_floating_preview_origin,
@@ -150,25 +149,21 @@ fn editor_only_tabs_focus_editor_when_no_terminal_exists() {
 }
 
 #[test]
-fn window_activation_focus_prefers_input_bar_then_agent_then_editor_then_terminal() {
+fn window_activation_focus_prefers_input_bar_then_editor_then_terminal() {
     assert_eq!(
-        activation_focus_target_for_reassertion(true, true, true, true),
+        activation_focus_target_for_reassertion(true, true, true),
         ActivationFocusTarget::InputBar
     );
     assert_eq!(
-        activation_focus_target_for_reassertion(false, true, true, true),
-        ActivationFocusTarget::AgentInlineInput
-    );
-    assert_eq!(
-        activation_focus_target_for_reassertion(false, false, true, false),
+        activation_focus_target_for_reassertion(false, true, false),
         ActivationFocusTarget::ActiveEditor
     );
     assert_eq!(
-        activation_focus_target_for_reassertion(false, false, false, true),
+        activation_focus_target_for_reassertion(false, false, true),
         ActivationFocusTarget::ActiveEditor
     );
     assert_eq!(
-        activation_focus_target_for_reassertion(false, false, false, false),
+        activation_focus_target_for_reassertion(false, false, false),
         ActivationFocusTarget::Terminal
     );
 }
@@ -187,17 +182,6 @@ fn editor_file_close_outcome_closes_single_empty_editor_pane_container() {
         editor_file_close_outcome(1, true),
         EditorFileCloseOutcome::ReplaceEditorPaneWithTerminal
     );
-}
-
-#[test]
-fn agent_request_opening_panel_drives_panel_motion_to_visible() {
-    // Always drives to 1.0 regardless of current open state, so a stale
-    // agent_panel_open flag (set without motion) is corrected on next request.
-    assert_eq!(
-        agent_panel_motion_target_for_agent_request(false),
-        Some(1.0)
-    );
-    assert_eq!(agent_panel_motion_target_for_agent_request(true), Some(1.0));
 }
 
 #[test]
@@ -570,8 +554,6 @@ fn tab_rename_initial_label_prefers_rendered_presentation_over_raw_title() {
     assert_eq!(
         tab_rename_initial_label(
             None,
-            None,
-            None,
             Some("prod-1.example.com"),
             Some("ssh prod-1.example.com"),
             Some("/Users/sundy/src/vu-terminal"),
@@ -582,9 +564,7 @@ fn tab_rename_initial_label_prefers_rendered_presentation_over_raw_title() {
 
     assert_eq!(
         tab_rename_initial_label(
-            None,
             Some("Deploy"),
-            Some("phosphor/rocket.svg"),
             None,
             Some("zsh"),
             Some("/Users/sundy/src/vu-terminal"),
@@ -1185,7 +1165,6 @@ fn top_bar_clickables_explicitly_consume_left_mouse_down() {
         "tab-new",
         "toggle-left-sidebar",
         "toggle-input-bar",
-        "toggle-agent-panel",
         "toggle-settings",
     ] {
         let marker = format!(".id(\"{control_id}\")");

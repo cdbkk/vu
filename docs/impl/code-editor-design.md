@@ -8,7 +8,7 @@ vertical-tab coexistence, keybinding/focus integration.
 
 The code editor is a normal pane surface inside the workspace `PaneTree`. It is
 not a separate top-level editor area and there is no standalone `vu-editor`
-crate. Terminal panes, editor panes, the input bar, and the agent panel all
+crate. Terminal panes, editor panes, and the input bar all
 share the existing workspace layout and close/focus machinery.
 
 The left side of the window has two tab-orientation modes:
@@ -37,8 +37,8 @@ workflows can keep a clean pane area.
 The panel width is stored as `left_panel_width` in session state; old
 `vertical_tabs_width` session files load through a serde alias. The vertical tab
 folded/unfolded state persists as `vertical_tabs_pinned`. The active resize
-gesture is owned by the workspace because it needs the full window width, agent
-panel width, and pane layout constraints. While resizing, `render.rs` installs a
+gesture is owned by the workspace because it needs the full window width and
+pane layout constraints. While resizing, `render.rs` installs a
 capture overlay so mouse movement and mouse-up events end the drag even if the
 cursor leaves the handle.
 

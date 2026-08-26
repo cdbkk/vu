@@ -36,7 +36,7 @@ echo "  3. Stop recording with Ctrl+C in this terminal."
 echo
 
 export VU_GHOSTTY_PROFILE=1
-export RUST_LOG="${RUST_LOG:-vu::perf=info,vu_ghostty::perf=info,vu=warn,vu_core=warn,vu_agent=warn}"
+export RUST_LOG="${RUST_LOG:-vu::perf=info,vu_ghostty::perf=info,vu=warn,vu_core=warn}"
 
 xcrun xctrace record \
   --template 'Time Profiler' \

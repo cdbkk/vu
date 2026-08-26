@@ -58,12 +58,8 @@ pub(super) fn chrome_tooltip(
     .build(window, cx)
 }
 
-pub(super) fn max_agent_panel_width(window_width: f32) -> f32 {
-    (window_width - TERMINAL_MIN_CONTENT_WIDTH).max(AGENT_PANEL_MIN_WIDTH)
-}
-
-pub(super) fn max_sidebar_panel_width(window_width: f32, agent_panel_outer_width: f32) -> f32 {
-    (window_width - agent_panel_outer_width - TERMINAL_MIN_CONTENT_WIDTH)
+pub(super) fn max_sidebar_panel_width(window_width: f32, reserved_panel_outer_width: f32) -> f32 {
+    (window_width - reserved_panel_outer_width - TERMINAL_MIN_CONTENT_WIDTH)
         .clamp(PANEL_MIN_WIDTH, PANEL_MAX_WIDTH)
 }
 
@@ -169,11 +165,11 @@ pub(super) fn caption_buttons(
             WindowControlArea::Max => window.zoom_window(),
             WindowControlArea::Close => {
                 // Mirror the macOS / Windows close path: run the
-                // workspace cleanup (cancel agent sessions, flush
+                // workspace cleanup (flush
                 // session save, drop pending control responses,
                 // shut down terminal surfaces) *before* the window
                 // goes away. Without this, clicking the Linux CSD
-                // close button bypasses agent cancellation and
+                // close button bypasses workspace cleanup and
                 // pending control-request responses entirely.
                 let _ = workspace_for_close.update(cx, |workspace, cx| {
                     workspace.prepare_window_close(cx);

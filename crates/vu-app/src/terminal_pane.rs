@@ -1,7 +1,7 @@
 //! TerminalPane — Ghostty-backed terminal pane wrapper.
 
 use gpui::*;
-use vu_agent::context::{PaneObservationFrame, PaneObservationSupport, derive_screen_hints};
+use vu_core::pane_context::{PaneObservationFrame, PaneObservationSupport, derive_screen_hints};
 use vu_terminal::TerminalTheme;
 
 use crate::ghostty_view::GhosttyView;
@@ -154,10 +154,6 @@ impl TerminalPane {
     pub fn mark_native_layout_pending(&self, cx: &mut App) {
         self.entity
             .update(cx, |view, cx| view.mark_native_layout_pending(cx));
-    }
-
-    pub fn selection_text(&self, cx: &App) -> Option<String> {
-        self.entity.read(cx).selection_text()
     }
 
     pub fn release_mouse_selection(&self, cx: &App) {

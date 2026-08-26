@@ -12,15 +12,6 @@ impl VuWorkspace {
         }
         let old_active = self.active_tab;
 
-        // Take the incoming tab's panel state
-        let incoming = std::mem::replace(&mut self.tabs[index].panel_state, PanelState::new());
-        // Swap into the panel, get the outgoing state back
-        let outgoing = self
-            .agent_panel
-            .update(cx, |panel, cx| panel.swap_state(incoming, cx));
-        // Stash outgoing state into the old tab
-        self.tabs[old_active].panel_state = outgoing;
-
         self.active_tab = index;
         self.tabs[index].needs_attention = false;
 
@@ -58,18 +49,7 @@ impl VuWorkspace {
         }
 
         self.sync_file_tree_from_active_focus(cx);
-        let active_cwd = self
-            .try_active_terminal()
-            .and_then(|terminal| terminal.current_dir(cx));
-        if let Some(cwd) = active_cwd {
-            self.request_skill_scan_for_cwd(&cwd);
-        }
-
         self.sync_sidebar(cx);
-        // Activating a tab is a strong signal the user cares about
-        // it — refresh AI label/icon if context shifted since it was
-        // last summarized.
-        self.request_tab_summaries(cx);
         self.save_session(cx);
         cx.notify();
     }
@@ -396,14 +376,6 @@ impl VuWorkspace {
         });
     }
 
-    /// Cancel all pending agent operations across all tabs.
-    /// Must be called before cx.quit() to prevent shutdown hang.
-    pub(super) fn cancel_all_sessions(&self) {
-        for tab in &self.tabs {
-            tab.session.cancel_current();
-        }
-    }
-
     /// Show or hide ghostty NSViews for z-order management.
     /// When showing, only the active tab's views are made visible.
     /// When hiding, all views are hidden (for modal overlays).
@@ -463,7 +435,7 @@ impl VuWorkspace {
         self.record_runtime_event_for_terminal(
             tab_idx,
             &surface.terminal,
-            vu_agent::context::PaneRuntimeEvent::ProcessExited,
+            vu_core::pane_context::PaneRuntimeEvent::ProcessExited,
         );
 
         let pane_surface_count = self.tabs[tab_idx]
@@ -508,10 +480,6 @@ impl VuWorkspace {
         } else {
             // Last pane in this window — close this workspace only.
             // App-level quit would tear down sibling windows too.
-            if self.is_quick_terminal {
-                self.destroy_quick_terminal_window(window, cx);
-                return;
-            }
             self.close_window_from_last_tab(window, cx);
         }
         cx.notify();
@@ -526,63 +494,23 @@ impl VuWorkspace {
     ) {
         // Title changed — sync sidebar and tab bar.
         self.sync_sidebar(cx);
-        // The OSC title change is the most reliable signal that a
-        // tab's purpose just shifted (`vim` → `bash`, `bash` → `htop`).
-        // Re-ask the AI for an updated label/icon. The engine
-        // dedupes on cache key so this is cheap if context didn't
-        // actually change.
-        self.request_tab_summaries(cx);
         cx.notify();
     }
 
     pub(crate) fn on_terminal_cwd_changed(
         &mut self,
-        entity: &Entity<GhosttyView>,
-        event: &GhosttyCwdChanged,
+        _entity: &Entity<GhosttyView>,
+        _event: &GhosttyCwdChanged,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let _reported_cwd = event.0.as_deref();
-        // Stale AI label would take priority over the new CWD basename in
-        // smart_tab_presentation. Clear it so the tab reflects the new
-        // directory immediately while request_tab_summaries re-derives a
-        // fresh label.
-        let entity_id = entity.entity_id();
-        let invalidated_summary_id = self
-            .tabs
-            .iter_mut()
-            // Tab summaries and smart_tab_presentation are derived from each
-            // tab's focused terminal. A background split or inactive surface can
-            // report OSC-7 too, but that should not clear the visible tab label.
-            .find(|tab| tab.pane_tree.focused_terminal_entity_id() == Some(entity_id))
-            .map(|tab| {
-                tab.ai_label = None;
-                tab.ai_icon = None;
-                tab.summary_epoch = tab.summary_epoch.wrapping_add(1);
-                tab.summary_id
-            });
-        if let Some(summary_id) = invalidated_summary_id {
-            self.tab_summary_engine.invalidate_tab(summary_id);
-        }
         // Shell integration reports cwd independently from title/output.
         // Persist immediately so restart continuity survives a later crash or
         // force-quit instead of depending on an unrelated tab/layout save.
         self.sync_sidebar(cx);
         self.save_session(cx);
-        self.request_tab_summaries(cx);
         // Keep file tree root in sync with the active focused pane.
         self.sync_file_tree_from_active_focus(cx);
-        let active_focused_terminal = self
-            .tabs
-            .get(self.active_tab)
-            .and_then(|tab| tab.pane_tree.focused_terminal_entity_id());
-        if active_focused_terminal == Some(entity_id) {
-            if let Some(cwd) = event.0.as_deref() {
-                self.request_skill_scan_for_cwd(cwd);
-            } else if let Some(cwd) = self.try_active_terminal().and_then(|t| t.current_dir(cx)) {
-                self.request_skill_scan_for_cwd(&cwd);
-            }
-        }
         cx.notify();
     }
 
@@ -662,7 +590,7 @@ impl VuWorkspace {
         self.record_runtime_event_for_terminal(
             tab_idx,
             &terminal,
-            vu_agent::context::PaneRuntimeEvent::PaneCreated {
+            vu_core::pane_context::PaneRuntimeEvent::PaneCreated {
                 startup_command: None,
             },
         );
@@ -703,15 +631,9 @@ impl VuWorkspace {
             pane_tree,
             title: format!("Terminal {}", summary_id + 1),
             user_label: self.tabs[index].user_label.clone(),
-            ai_label: None,
-            ai_icon: None,
             color: self.tabs[index].color,
             summary_id,
-            summary_epoch: 0,
             needs_attention: false,
-            session: AgentSession::new(),
-            agent_routing: self.tabs[index].agent_routing.clone(),
-            panel_state: PanelState::new(),
             runtime_trackers: RefCell::new(HashMap::new()),
             runtime_cache: RefCell::new(HashMap::new()),
             shell_history: HashMap::new(),

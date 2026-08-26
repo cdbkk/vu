@@ -49,7 +49,7 @@ run:
 
 # Run the platform-appropriate test set
 test:
-    {{ if os() == "windows" { "cargo wtest -p vu-core -p vu-cli -p vu-agent -p vu-terminal" } else { "cargo test --workspace" } }}
+    {{ if os() == "windows" { "cargo wtest -p vu-core -p vu-cli -p vu-terminal" } else { "cargo test --workspace" } }}
 
 # Check without building — current platform
 check:
@@ -77,7 +77,7 @@ unsupported-platform:
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 
-# [macOS] Build a local .app bundle — no signing, no notarization
+# [macOS] Build and ad-hoc sign a local .app bundle
 # Output: dist/macos/{channel}/{arch}/vu.app
 macos-bundle channel=channel arch=arch:
     #!/usr/bin/env bash
@@ -87,43 +87,14 @@ macos-bundle channel=channel arch=arch:
         resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
     fi
     VU_CHANNEL={{ channel }} VU_ARCH="${resolved_arch}" ./scripts/macos/build-app.sh
-
-# [macOS] Build .app and copy to /Applications (replaces existing)
-macos-install channel=channel arch=arch: (macos-bundle channel arch)
-    #!/usr/bin/env bash
-    set -euo pipefail
-    resolved_arch="{{ arch }}"
-    if [[ -z "${resolved_arch}" ]]; then
-        resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
-    fi
-    app_name="vu"
-    if [[ "{{ channel }}" == "beta" ]]; then app_name="vu Beta"; fi
-    if [[ "{{ channel }}" == "dev" ]];  then app_name="vu Dev";  fi
-    src="dist/macos/{{ channel }}/${resolved_arch}/${app_name}.app"
-    dst="/Applications/${app_name}.app"
-    echo "Installing ${src} → ${dst}"
-    rm -rf "${dst}"
-    cp -R "${src}" "${dst}"
-    echo "Done. Launch ${app_name} from /Applications or Spotlight."
-
-# [macOS] Ad-hoc signed bundle (no Apple Developer account needed; Gatekeeper will warn once)
-macos-bundle-adhoc channel=channel arch=arch: (macos-bundle channel arch)
-    #!/usr/bin/env bash
-    set -euo pipefail
-    resolved_arch="{{ arch }}"
-    if [[ -z "${resolved_arch}" ]]; then
-        resolved_arch="$(uname -m | sed 's/aarch64/arm64/')"
-    fi
     app_name="vu"
     if [[ "{{ channel }}" == "beta" ]]; then app_name="vu Beta"; fi
     if [[ "{{ channel }}" == "dev" ]];  then app_name="vu Dev";  fi
     bundle="dist/macos/{{ channel }}/${resolved_arch}/${app_name}.app"
-    echo "Ad-hoc signing ${bundle}"
     codesign --force --deep --sign - "${bundle}"
-    echo "Signed (ad-hoc): ${bundle}"
 
-# [macOS] Install ad-hoc signed bundle to /Applications
-macos-install-adhoc channel=channel arch=arch: (macos-bundle-adhoc channel arch)
+# [macOS] Build .app and copy to /Applications (replaces existing)
+macos-install channel=channel arch=arch: (macos-bundle channel arch)
     #!/usr/bin/env bash
     set -euo pipefail
     resolved_arch="{{ arch }}"
@@ -222,7 +193,7 @@ windows-run:
 
 # [Windows] Test
 windows-test:
-    cargo wtest -p vu-core -p vu-cli -p vu-agent -p vu-terminal
+    cargo wtest -p vu-core -p vu-cli -p vu-terminal
 
 # [Windows] Build and install local release binaries to the user install root
 windows-install: windows-build-release

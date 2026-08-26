@@ -14,12 +14,10 @@ It describes workspace shape:
 - pane split structure
 - pane and surface names
 - relative working directories
-- optional agent provider/model defaults
 
 It does not contain private runtime state:
 
 - no commands to run
-- no conversations
 - no command history
 - no terminal text history
 - no credentials
@@ -38,7 +36,7 @@ session backup. It is safe to review because it describes shape, not activity.
    teammate can get the same starting shape.
 
 The profile captures the workspace you designed. It does not capture what you
-typed, what the agent said, or what processes were running.
+typed or what processes were running.
 
 Private terminal text settings live in **Settings -> General**. Layout profiles
 never include terminal text, regardless of that setting.
@@ -61,7 +59,7 @@ Project: ~/dev/app
     Pane: Shell      cwd .
     Pane: Server     cwd crates/server
     Pane: Tests      cwd crates/server
-  Tab: Agents
+  Tab: Workers
     Surface: Planner cwd .
     Surface: Worker  cwd crates/ui
 ```
@@ -126,7 +124,7 @@ Bad shared profile content:
 - output transcripts
 - secrets
 - commands that run automatically
-- private agent conversations
+- private terminal history
 
 ## New tab, new window, and defaults
 
@@ -165,12 +163,3 @@ tmux attach -t app || tmux new -s app
 ```
 
 vu recreates the layout and directory. tmux restores the running session.
-
-## Skills
-
-If a layout is the workspace shape, a skill is the routine that runs inside it.
-A release layout might open local tests, staging SSH, and logs. A `/release`
-skill can then decide which targets to reuse, which checks to run, and where it
-must stop for approval.
-
-See [Skills and workflows](skills-and-workflows.md).
