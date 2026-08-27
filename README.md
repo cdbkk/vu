@@ -26,28 +26,29 @@
 
 <p align="center"><sub>Click the demo for the full-quality video.</sub></p>
 
-## A better customizable terminal
+## What it is
 
-`vu` is for people who want a real terminal that looks and works like theirs.
-It keeps the speed and behavior of a native terminal, then makes the parts you
-touch every day easy to tune live — no dotfile archaeology required.
+`vu` is a native terminal for people who want it to look and behave like theirs.
+It keeps the speed of a real terminal and puts the things you tune every day in
+a settings panel that applies live. No config archaeology.
 
 ### Make it yours
 
-- 15 built-in themes with live previews
-- a full ANSI palette editor with direct color picking
-- Ghostty theme import and export
+- built-in themes with live previews, plus Ghostty theme import and export
+- a full ANSI palette editor with a color picker per slot
 - separate terminal and interface fonts
-- opacity, blur, background images, tab position, pane chrome, and icon scale
-- the terminal options power users expect, exposed in one place
+- opacity, blur, background images, tab placement, pane chrome, cursor style, and icon scale
+- editable shortcuts with conflict detection
 
-### Stay terminal-first
+### Work in it
 
-- native GPU rendering: Metal on macOS, D3D11/DirectWrite on Windows
-- tabs, split panes, pane zoom, drag-to-rearrange, and command broadcasting
-- first-class `ssh`, `tmux`, shells, editors, and TUIs
-- configurable shortcuts and a command palette
-- a local `vu-cli` control plane for scripts, tests, and external tools
+- native GPU rendering: Metal on macOS, D3D11 and DirectWrite on Windows
+- tabs, split panes, pane zoom, drag to rearrange, and multiple surfaces per pane
+- an input bar that runs a command in one pane or every selected pane, with history and path completion
+- a files sidebar and a command palette
+- saved workspaces: sessions restore on launch, and `.vu/workspace.toml` stores a project layout
+- `ssh`, `tmux`, shells, editors, and TUIs behave as they do in any good terminal
+- `vu-cli`, a local JSON-RPC control plane for scripts and tests that can list tabs, read panes, and send keys
 
 ## Status
 
