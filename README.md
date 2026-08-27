@@ -45,9 +45,9 @@ touch every day easy to tune live — no dotfile archaeology required.
 
 - native GPU rendering: Metal on macOS, D3D11/DirectWrite on Windows
 - tabs, split panes, pane zoom, drag-to-rearrange, and command broadcasting
-- first-class `ssh`, `tmux`, shells, editors, TUIs, and coding-agent CLIs
+- first-class `ssh`, `tmux`, shells, editors, and TUIs
 - configurable shortcuts and a command palette
-- a local `vu-cli` control plane for scripts, tests, and external agents
+- a local `vu-cli` control plane for scripts, tests, and external tools
 
 ## Status
 
