@@ -138,6 +138,8 @@ pub struct SettingsPanel {
     // Network / proxy
     http_proxy_input: Entity<InputState>,
     https_proxy_input: Entity<InputState>,
+
+    new_tab_directory_input: Entity<InputState>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -592,6 +594,12 @@ impl SettingsPanel {
             s.set_placeholder("http://127.0.0.1:1086", window, cx);
             s
         });
+        let new_tab_directory_input = cx.new(|cx| {
+            let mut s = InputState::new(window, cx);
+            s.set_value(&config.terminal.new_tab_directory, window, cx);
+            s.set_placeholder("inherit", window, cx);
+            s
+        });
 
         macro_rules! tweak_slider {
             ($slider:expr, $field:ident) => {
@@ -868,6 +876,7 @@ impl SettingsPanel {
             recording_resume_keybindings: None,
             http_proxy_input,
             https_proxy_input,
+            new_tab_directory_input,
         }
     }
 
@@ -1054,6 +1063,9 @@ impl SettingsPanel {
                 window,
                 cx,
             )
+        });
+        self.new_tab_directory_input.update(cx, |s, cx| {
+            s.set_value(&self.config.terminal.new_tab_directory, window, cx)
         });
         self.focus_handle.focus(window, cx);
     }
@@ -1485,6 +1497,18 @@ impl SettingsPanel {
             None
         } else {
             Some(https_proxy_text)
+        };
+
+        let new_tab_directory_text = self
+            .new_tab_directory_input
+            .read(cx)
+            .value()
+            .trim()
+            .to_string();
+        self.config.terminal.new_tab_directory = if new_tab_directory_text.is_empty() {
+            "inherit".to_string()
+        } else {
+            new_tab_directory_text
         };
 
         Ok(())
@@ -2020,6 +2044,20 @@ impl SettingsPanel {
                                     this.set_restore_terminal_text(*checked, cx);
                                 })),
                             theme,
+                        )),
+                        cx,
+                    ),
+                ),
+            )
+            // New tabs
+            .child(
+                div().flex().flex_col().gap(px(8.0)).child(
+                    self.group(
+                        "new-tabs",
+                        "New Tabs",
+                        card(theme, card_opacity).child(row_field(
+                            "Directory",
+                            &self.new_tab_directory_input,
                         )),
                         cx,
                     ),

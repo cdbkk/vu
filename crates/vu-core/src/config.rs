@@ -95,6 +95,10 @@ pub struct TerminalConfig {
     pub cursor_style: String,
     /// Terminal behaviour ghostty supports but vu never surfaced.
     pub tweaks: TerminalTweaks,
+    /// Working directory for new tabs. `"inherit"` reuses the active tab's
+    /// cwd (default). Any other value is tilde-expanded and used if it
+    /// exists on disk at spawn time; otherwise this falls back to inherit.
+    pub new_tab_directory: String,
 }
 
 impl Default for TerminalConfig {
@@ -105,8 +109,48 @@ impl Default for TerminalConfig {
             theme: default_theme(),
             cursor_style: default_cursor_style(),
             tweaks: TerminalTweaks::default(),
+            new_tab_directory: default_new_tab_directory(),
         }
     }
+}
+
+fn default_new_tab_directory() -> String {
+    "inherit".into()
+}
+
+/// Resolve the working directory for a newly-opened tab from the
+/// `new_tab_directory` config value.
+///
+/// `"inherit"` (or blank) keeps the existing behaviour of reusing
+/// `inherited`, the active tab's cwd. Any other value is tilde-expanded
+/// and used if it exists on disk at spawn time; otherwise this falls back
+/// to `inherited`, same as `"inherit"`, so a stale/typo'd path never
+/// crashes tab creation.
+pub fn resolve_new_tab_directory(setting: &str, inherited: Option<&str>) -> Option<String> {
+    let trimmed = setting.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
+        return inherited.map(str::to_string);
+    }
+    let expanded = expand_tilde(trimmed);
+    if Path::new(&expanded).is_dir() {
+        Some(expanded)
+    } else {
+        inherited.map(str::to_string)
+    }
+}
+
+fn expand_tilde(path: &str) -> String {
+    if path == "~" {
+        return std::env::home_dir()
+            .map(|home| home.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string());
+    }
+    if let Some(rest) = path.strip_prefix("~/") {
+        return std::env::home_dir()
+            .map(|home| home.join(rest).to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string());
+    }
+    path.to_string()
 }
 
 /// Terminal rendering options converted to the backend's plain-data tweak type
@@ -979,7 +1023,7 @@ fn replace_file(tmp_path: &Path, path: &Path) -> Result<()> {
 mod tests {
     use super::{
         Config, DEFAULT_TERMINAL_FONT_FAMILY, NetworkConfig, TabsOrientation,
-        sanitize_terminal_font_family,
+        resolve_new_tab_directory, sanitize_terminal_font_family,
     };
 
     #[test]
@@ -1001,6 +1045,34 @@ mod tests {
     #[test]
     fn new_configs_enable_restore_terminal_text_by_default() {
         assert!(Config::default().appearance.restore_terminal_text);
+    }
+
+    #[test]
+    fn new_tab_directory_defaults_to_inherit() {
+        assert_eq!(Config::default().terminal.new_tab_directory, "inherit");
+    }
+
+    #[test]
+    fn resolve_new_tab_directory_uses_existing_path() {
+        let dir = std::env::temp_dir();
+        let dir_str = dir.to_string_lossy().into_owned();
+        assert_eq!(
+            resolve_new_tab_directory(&dir_str, Some("/other")),
+            Some(dir_str)
+        );
+    }
+
+    #[test]
+    fn resolve_new_tab_directory_falls_back_to_inherit_on_missing_path() {
+        assert_eq!(
+            resolve_new_tab_directory("/definitely/not/a/real/path/vu-test", Some("/other")),
+            Some("/other".to_string())
+        );
+        assert_eq!(
+            resolve_new_tab_directory("inherit", Some("/other")),
+            Some("/other".to_string())
+        );
+        assert_eq!(resolve_new_tab_directory("", None), None);
     }
 
     #[test]

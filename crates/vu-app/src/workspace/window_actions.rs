@@ -319,10 +319,14 @@ impl VuWorkspace {
 
     pub(super) fn new_tab(&mut self, _: &NewTab, window: &mut Window, cx: &mut Context<Self>) {
         self.reveal_vertical_tab_rail_for_new_tab_if_needed(cx);
-        let cwd = self
+        let inherited_cwd = self
             .has_active_tab()
             .then(|| self.try_active_terminal().and_then(|t| t.current_dir(cx)))
             .flatten();
+        let cwd = resolve_new_tab_directory(
+            &self.config.terminal.new_tab_directory,
+            inherited_cwd.as_deref(),
+        );
         let terminal = self.create_terminal(cwd.as_deref(), window, cx);
         let tab_number = self.tabs.len() + 1;
         let summary_id = self.next_tab_summary_id;

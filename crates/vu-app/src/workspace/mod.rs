@@ -78,7 +78,8 @@ use crate::{
     TogglePaneScopePicker, TogglePaneZoom, Undo,
 };
 use vu_core::config::{
-    AppearanceConfig, Config, TabsOrientation, TerminalConfig, sanitize_terminal_font_family,
+    AppearanceConfig, Config, TabsOrientation, TerminalConfig, resolve_new_tab_directory,
+    sanitize_terminal_font_family,
 };
 use vu_core::control::{
     ControlCommand, ControlError, ControlRequestEnvelope, ControlResult, SystemIdentifyResult,
