@@ -40,6 +40,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=VU_GHOSTTY_VT_STEP");
     println!("cargo:rerun-if-env-changed={GHOSTTY_VT_TARGET_ENV}");
     println!("cargo:rerun-if-env-changed=VU_ZIG_BIN");
+    println!("cargo:rerun-if-env-changed=VU_GHOSTTY_FORCE_ZIG");
     println!("cargo:rerun-if-env-changed=VU_GHOSTTY_OPTIMIZE");
     println!("cargo:rerun-if-env-changed=TARGET");
     println!("cargo:rerun-if-env-changed=ZIG_GLOBAL_CACHE_DIR");
@@ -66,8 +67,7 @@ fn build_macos() {
     let _initial_output_restore_enabled = apply_embedded_initial_output_patch(&ghostty_dir);
     apply_runtime_padding_patch(&ghostty_dir);
     let optimize = ghostty_optimize();
-    let zig_bin =
-        env::var_os("VU_ZIG_BIN").unwrap_or_else(|| std::ffi::OsString::from("zig"));
+    let zig_bin = env::var_os("VU_ZIG_BIN").unwrap_or_else(|| std::ffi::OsString::from("zig"));
     let zig_global_cache_dir = zig_global_cache_dir("macos");
 
     let build_args = vec![
@@ -77,34 +77,50 @@ fn build_macos() {
         "-Demit-macos-app=false".to_string(),
         format!("-Doptimize={optimize}"),
     ];
-    let mut cmd = Command::new(&zig_bin);
-    configure_zig_command(&mut cmd, zig_global_cache_dir.as_deref());
-    cmd.args(&build_args).current_dir(&ghostty_dir);
-
-    let status = cmd.status().unwrap_or_else(|err| {
-        panic!(
-            "failed to run `{}` build for libghostty: {err}",
-            zig_bin.to_string_lossy()
-        )
-    });
-
-    if !status.success() {
+    // ponytail: reuse a libghostty already built for this vendored tree
+    // instead of always re-running zig. zig 0.15.2 cannot link natively
+    // on macOS 26 (the build-runner's libSystem detection is broken:
+    // undefined _sigaction etc.), and the pinned Ghostty rev refuses
+    // zig 0.16 at comptime, so a rebuild is impossible on such hosts
+    // anyway. Ceiling: a stale lib if the embedded patches change —
+    // set VU_GHOSTTY_FORCE_ZIG=1 to force a rebuild. Remove once the
+    // Ghostty pin builds on a zig that links on macOS 26.
+    let prebuilt = ghostty_dir.join("macos/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a");
+    let reuse_prebuilt = env::var_os("VU_GHOSTTY_FORCE_ZIG").is_none() && prebuilt.exists();
+    if reuse_prebuilt {
         println!(
-            "cargo:warning=zig build failed for libghostty; prefetching Zig package cache and retrying"
+            "cargo:warning=vu-ghostty: reusing existing libghostty-fat.a; set VU_GHOSTTY_FORCE_ZIG=1 to rebuild"
         );
-        prefetch_zig_dependencies(&zig_bin, &ghostty_dir, zig_global_cache_dir.as_deref());
+    } else {
+        let mut cmd = Command::new(&zig_bin);
+        configure_zig_command(&mut cmd, zig_global_cache_dir.as_deref());
+        cmd.args(&build_args).current_dir(&ghostty_dir);
 
-        let mut retry = Command::new(&zig_bin);
-        configure_zig_command(&mut retry, zig_global_cache_dir.as_deref());
-        retry.args(&build_args).current_dir(&ghostty_dir);
-        let retry_status = retry.status().unwrap_or_else(|err| {
+        let status = cmd.status().unwrap_or_else(|err| {
             panic!(
-                "failed to retry `{}` build for libghostty: {err}",
+                "failed to run `{}` build for libghostty: {err}",
                 zig_bin.to_string_lossy()
             )
         });
-        if !retry_status.success() {
-            panic!("zig build failed for libghostty");
+
+        if !status.success() {
+            println!(
+                "cargo:warning=zig build failed for libghostty; prefetching Zig package cache and retrying"
+            );
+            prefetch_zig_dependencies(&zig_bin, &ghostty_dir, zig_global_cache_dir.as_deref());
+
+            let mut retry = Command::new(&zig_bin);
+            configure_zig_command(&mut retry, zig_global_cache_dir.as_deref());
+            retry.args(&build_args).current_dir(&ghostty_dir);
+            let retry_status = retry.status().unwrap_or_else(|err| {
+                panic!(
+                    "failed to retry `{}` build for libghostty: {err}",
+                    zig_bin.to_string_lossy()
+                )
+            });
+            if !retry_status.success() {
+                panic!("zig build failed for libghostty");
+            }
         }
     }
 
@@ -212,8 +228,7 @@ fn build_vt_backend(target_os: &str) {
     // Detect Zig. Surface the actual error (not-found, permission-denied,
     // etc.) and the PATH we searched so the user can diagnose — previous
     // silent warnings led to confusing link-time failures.
-    let zig_bin =
-        env::var_os("VU_ZIG_BIN").unwrap_or_else(|| std::ffi::OsString::from("zig"));
+    let zig_bin = env::var_os("VU_ZIG_BIN").unwrap_or_else(|| std::ffi::OsString::from("zig"));
     let zig_global_cache_dir = zig_global_cache_dir(target_os);
     if let Some(dir) = &zig_global_cache_dir {
         println!("cargo:warning=using zig global cache dir {}", dir.display());
