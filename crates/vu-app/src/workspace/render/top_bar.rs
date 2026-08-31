@@ -423,10 +423,14 @@ impl VuWorkspace {
                     .flex_shrink_0()
                     .rounded(px(5.0))
                     .cursor_pointer()
-                    // Windows: without `.occlude()` the parent top_bar's
-                    // `WindowControlArea::Drag` hit-test swallows the
-                    // click (returns HTCAPTION → window drag starts).
-                    .occlude()
+                    // No `.occlude()` here: the parent tab is already
+                    // `.occlude()`d, which shields the top_bar's
+                    // `WindowControlArea::Drag` hit-test (HTCAPTION).
+                    // An occluding hitbox on the close button itself
+                    // would block the tab's "tab" group hitbox, so the
+                    // `group_hover` rule below would turn the X
+                    // invisible (and unclickable) exactly while
+                    // hovering it.
                     .hover(|s| s.bg(theme.muted.opacity(0.12)));
                 if !is_active {
                     close_el = close_el.invisible().group_hover("tab", |s| s.visible());
@@ -435,6 +439,10 @@ impl VuWorkspace {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, window, cx| {
+                            // Don't let the press bubble to the tab
+                            // (which would activate or start dragging
+                            // the tab being closed).
+                            cx.stop_propagation();
                             this.close_tab_by_id(tab_id, window, cx);
                         }),
                     )
