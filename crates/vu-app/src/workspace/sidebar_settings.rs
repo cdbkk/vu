@@ -682,6 +682,12 @@ impl VuWorkspace {
             "toggle-pane-zoom" => {
                 self.toggle_pane_zoom(&TogglePaneZoom, window, cx);
             }
+            "focus-next-pane" => {
+                self.focus_next_pane(&FocusNextPane, window, cx);
+            }
+            "focus-previous-pane" => {
+                self.focus_previous_pane(&FocusPreviousPane, window, cx);
+            }
             "new-surface" => {
                 self.create_surface_in_focused_pane(window, cx);
             }

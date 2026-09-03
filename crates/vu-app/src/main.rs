@@ -117,6 +117,8 @@ actions!(
         CloseTab,
         ClosePane,
         TogglePaneZoom,
+        FocusNextPane,
+        FocusPreviousPane,
         SplitRight,
         SplitDown,
         SplitLeft,
@@ -1433,6 +1435,8 @@ fn configurable_app_binding_specs(kb: &KeybindingConfig) -> Vec<BindingSpec> {
     push_global::<CloseTab>(&mut specs, &kb.close_tab);
     push_global::<ClosePane>(&mut specs, &kb.close_pane);
     push_global::<TogglePaneZoom>(&mut specs, &kb.toggle_pane_zoom);
+    push_global::<FocusNextPane>(&mut specs, &kb.focus_next_pane);
+    push_global::<FocusPreviousPane>(&mut specs, &kb.focus_previous_pane);
     push_global::<settings_panel::ToggleSettings>(&mut specs, &kb.settings);
     push_global::<command_palette::ToggleCommandPalette>(&mut specs, &kb.command_palette);
     push_global::<SplitRight>(&mut specs, &kb.split_right);
@@ -2546,6 +2550,8 @@ fn main() {
                     MenuItem::action("Close Tab", CloseTab),
                     MenuItem::action("Close Pane", ClosePane),
                     MenuItem::action("Toggle Pane Zoom", TogglePaneZoom),
+                    MenuItem::action("Focus Next Pane", FocusNextPane),
+                    MenuItem::action("Focus Previous Pane", FocusPreviousPane),
                     MenuItem::separator(),
                     MenuItem::action("Split Right", SplitRight),
                     MenuItem::action("Split Down", SplitDown),

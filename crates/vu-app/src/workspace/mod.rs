@@ -70,12 +70,12 @@ use crate::{
     EditorInsertNewline, EditorMoveDown, EditorMoveEnd, EditorMoveHome, EditorMoveLeft,
     EditorMoveLineEnd, EditorMoveLineStart, EditorMoveRight, EditorMoveUp, EditorSave,
     EditorSelectDown, EditorSelectEnd, EditorSelectHome, EditorSelectLeft, EditorSelectRight,
-    EditorSelectUp, ExportWorkspaceLayout, FocusFiles, FocusInput, Minimize, NewSurface,
-    NewSurfaceSplitDown, NewSurfaceSplitRight, NewTab, NextSurface, NextTab,
-    OpenWorkspaceLayoutWindow, Paste, PreviousSurface, PreviousTab, Quit, RenameSurface,
-    SearchFiles, SelectAll, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5, SelectTab6,
-    SelectTab7, SelectTab8, SelectTab9, SplitDown, SplitLeft, SplitRight, SplitUp, ToggleLeftPanel,
-    TogglePaneScopePicker, TogglePaneZoom, Undo,
+    EditorSelectUp, ExportWorkspaceLayout, FocusFiles, FocusInput, FocusNextPane,
+    FocusPreviousPane, Minimize, NewSurface, NewSurfaceSplitDown, NewSurfaceSplitRight, NewTab,
+    NextSurface, NextTab, OpenWorkspaceLayoutWindow, Paste, PreviousSurface, PreviousTab, Quit,
+    RenameSurface, SearchFiles, SelectAll, SelectTab1, SelectTab2, SelectTab3, SelectTab4,
+    SelectTab5, SelectTab6, SelectTab7, SelectTab8, SelectTab9, SplitDown, SplitLeft, SplitRight,
+    SplitUp, ToggleLeftPanel, TogglePaneScopePicker, TogglePaneZoom, Undo,
 };
 use vu_core::config::{
     AppearanceConfig, Config, TabsOrientation, TerminalConfig, resolve_new_tab_directory,

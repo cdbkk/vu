@@ -1137,6 +1137,14 @@ impl GhosttyView {
         ) || crate::terminal_shortcuts::key_down_starts_action_binding(
             event,
             window,
+            &crate::FocusNextPane,
+        ) || crate::terminal_shortcuts::key_down_starts_action_binding(
+            event,
+            window,
+            &crate::FocusPreviousPane,
+        ) || crate::terminal_shortcuts::key_down_starts_action_binding(
+            event,
+            window,
             &crate::FocusFiles,
         ) || crate::terminal_shortcuts::key_down_starts_action_binding(
             event,

@@ -593,6 +593,50 @@ impl VuWorkspace {
         self.toggle_focused_pane_zoom(window, cx);
     }
 
+    pub(super) fn focus_next_pane(
+        &mut self,
+        _: &FocusNextPane,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.has_active_tab() {
+            return;
+        }
+        let pane_tree = &self.tabs[self.active_tab].pane_tree;
+        let ids = pane_tree.pane_ids();
+        if ids.len() < 2 {
+            return;
+        }
+        let Some(index) = ids.iter().position(|id| *id == pane_tree.focused_pane_id()) else {
+            return;
+        };
+        let target = ids[(index + 1) % ids.len()];
+        self.focus_pane_in_active_tab(target, window, cx);
+        cx.notify();
+    }
+
+    pub(super) fn focus_previous_pane(
+        &mut self,
+        _: &FocusPreviousPane,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.has_active_tab() {
+            return;
+        }
+        let pane_tree = &self.tabs[self.active_tab].pane_tree;
+        let ids = pane_tree.pane_ids();
+        if ids.len() < 2 {
+            return;
+        }
+        let Some(index) = ids.iter().position(|id| *id == pane_tree.focused_pane_id()) else {
+            return;
+        };
+        let target = ids[(index + ids.len() - 1) % ids.len()];
+        self.focus_pane_in_active_tab(target, window, cx);
+        cx.notify();
+    }
+
     pub(super) fn toggle_focused_pane_zoom(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.has_active_tab() {
             return;

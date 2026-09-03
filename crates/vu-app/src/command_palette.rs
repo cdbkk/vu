@@ -23,6 +23,14 @@ const TOGGLE_PANE_ZOOM_SHORTCUT: &str = "secondary-shift-enter";
 #[cfg(not(target_os = "macos"))]
 const TOGGLE_PANE_ZOOM_SHORTCUT: &str = "alt-shift-enter";
 #[cfg(target_os = "macos")]
+const FOCUS_NEXT_PANE_SHORTCUT: &str = "alt-tab";
+#[cfg(not(target_os = "macos"))]
+const FOCUS_NEXT_PANE_SHORTCUT: &str = "ctrl-alt-tab";
+#[cfg(target_os = "macos")]
+const FOCUS_PREVIOUS_PANE_SHORTCUT: &str = "alt-shift-tab";
+#[cfg(not(target_os = "macos"))]
+const FOCUS_PREVIOUS_PANE_SHORTCUT: &str = "ctrl-alt-shift-tab";
+#[cfg(target_os = "macos")]
 const TOGGLE_LEFT_SIDEBAR_SHORTCUT: &str = "secondary-b";
 #[cfg(not(target_os = "macos"))]
 const TOGGLE_LEFT_SIDEBAR_SHORTCUT: &str = "ctrl-shift-b";
@@ -162,6 +170,18 @@ const PALETTE_ACTIONS: &[PaletteAction] = &[
         id: "toggle-pane-zoom",
         label: "Toggle Pane Zoom",
         shortcut: TOGGLE_PANE_ZOOM_SHORTCUT,
+        category: "Pane",
+    },
+    PaletteAction {
+        id: "focus-next-pane",
+        label: "Focus Next Pane",
+        shortcut: FOCUS_NEXT_PANE_SHORTCUT,
+        category: "Pane",
+    },
+    PaletteAction {
+        id: "focus-previous-pane",
+        label: "Focus Previous Pane",
+        shortcut: FOCUS_PREVIOUS_PANE_SHORTCUT,
         category: "Pane",
     },
     PaletteAction {

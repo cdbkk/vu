@@ -1194,8 +1194,24 @@ impl PaneTree {
         }
     }
 
+    fn collect_leaf_ids(node: &PaneNode, result: &mut Vec<PaneId>) {
+        match node {
+            PaneNode::Leaf { id, .. } => result.push(*id),
+            PaneNode::Split { first, second, .. } => {
+                Self::collect_leaf_ids(first, result);
+                Self::collect_leaf_ids(second, result);
+            }
+        }
+    }
+
     pub fn first_pane_id_pub(&self) -> PaneId {
         Self::first_pane_id(&self.root)
+    }
+
+    pub fn pane_ids(&self) -> Vec<PaneId> {
+        let mut ids = Vec::new();
+        Self::collect_leaf_ids(&self.root, &mut ids);
+        ids
     }
 
     pub fn contains_pane(&self, pane_id: PaneId) -> bool {
@@ -3113,6 +3129,8 @@ impl PaneTree {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // `use gpui::*` above also imports gpui's `test` macro; pin the std one.
+    use core::prelude::v1::test;
 
     fn empty_leaf(id: PaneId) -> PaneNode {
         PaneNode::Leaf {
@@ -3140,16 +3158,6 @@ mod tests {
                 ..
             } => (*direction, first, second),
             PaneNode::Leaf { .. } => panic!("expected split"),
-        }
-    }
-
-    fn collect_leaf_ids(node: &PaneNode, result: &mut Vec<PaneId>) {
-        match node {
-            PaneNode::Leaf { id, .. } => result.push(*id),
-            PaneNode::Split { first, second, .. } => {
-                collect_leaf_ids(first, result);
-                collect_leaf_ids(second, result);
-            }
         }
     }
 
@@ -3194,7 +3202,36 @@ mod tests {
         }
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
+    fn pane_ids_returns_leaf_layout_order() {
+        let tree = PaneTree {
+            root: PaneNode::Split {
+                split_id: 0,
+                direction: SplitDirection::Horizontal,
+                first: Box::new(empty_leaf(0)),
+                second: Box::new(PaneNode::Split {
+                    split_id: 1,
+                    direction: SplitDirection::Vertical,
+                    first: Box::new(empty_leaf(1)),
+                    second: Box::new(empty_leaf(2)),
+                    ratio: 0.5,
+                }),
+                ratio: 0.5,
+            },
+            focused_pane_id: 0,
+            zoomed_pane_id: None,
+            next_id: 3,
+            next_surface_id: 0,
+            next_split_id: 2,
+            dragging: None,
+        };
+
+        let ids = tree.pane_ids();
+        assert_eq!(ids, vec![0, 1, 2]);
+        assert_eq!(ids.first().copied(), Some(tree.first_pane_id_pub()));
+    }
+
+    #[test]
     fn short_pane_title_handles_unix_paths() {
         assert_eq!(
             PaneTree::short_pane_title("~/work/vu-terminal"),
@@ -3207,7 +3244,7 @@ mod tests {
         assert_eq!(PaneTree::short_pane_title("/"), "/");
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn short_pane_title_handles_windows_paths() {
         assert_eq!(
             PaneTree::short_pane_title(r"C:\Users\alice\project"),
@@ -3220,13 +3257,13 @@ mod tests {
         assert_eq!(PaneTree::short_pane_title(r"C:\"), r"C:");
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn short_pane_title_preserves_non_path_titles() {
         assert_eq!(PaneTree::short_pane_title("Terminal"), "Terminal");
         assert_eq!(PaneTree::short_pane_title("nvim main.rs"), "nvim main.rs");
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn merge_tree_horizontal_before_places_incoming_first() {
         let mut target = PaneTree {
             root: empty_leaf(0),
@@ -3253,12 +3290,11 @@ mod tests {
         assert_eq!(root_direction, SplitDirection::Horizontal);
         assert_eq!(leaf_id(first), target.focused_pane_id);
         assert_eq!(leaf_id(second), 0);
-        let mut leaf_ids = Vec::new();
-        collect_leaf_ids(&target.root, &mut leaf_ids);
+        let leaf_ids = target.pane_ids();
         assert_unique(&leaf_ids);
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn merge_tree_vertical_after_places_incoming_second() {
         let mut target = PaneTree {
             root: empty_leaf(0),
@@ -3285,12 +3321,11 @@ mod tests {
         assert_eq!(root_direction, SplitDirection::Vertical);
         assert_eq!(leaf_id(first), 0);
         assert_eq!(leaf_id(second), target.focused_pane_id);
-        let mut leaf_ids = Vec::new();
-        collect_leaf_ids(&target.root, &mut leaf_ids);
+        let leaf_ids = target.pane_ids();
         assert_unique(&leaf_ids);
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn merge_tree_clears_zoom_and_focuses_incoming() {
         let mut target = simple_two_pane_tree();
         target.zoomed_pane_id = Some(0);
@@ -3314,7 +3349,7 @@ mod tests {
         ));
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn focus_pane_supports_non_terminal_leaves_before_zoom() {
         let mut tree = simple_two_pane_tree();
 
@@ -3325,7 +3360,7 @@ mod tests {
         assert_eq!(tree.zoomed_pane_id(), Some(1));
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn merge_tree_assigns_unique_split_ids() {
         let mut target = simple_two_pane_tree();
         let incoming = simple_two_pane_tree();
@@ -3337,7 +3372,7 @@ mod tests {
         assert_unique(&split_ids);
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn move_pane_to_top_edge_places_source_before_target_vertically() {
         let mut tree = simple_two_pane_tree();
 
@@ -3350,7 +3385,7 @@ mod tests {
         assert_eq!(tree.focused_pane_id, 1);
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn pane_move_noop_when_source_is_already_after_target_in_same_horizontal_split() {
         let tree = simple_two_pane_tree();
 
@@ -3360,7 +3395,7 @@ mod tests {
         assert!(!tree.is_noop_pane_move(1, 0, SplitDirection::Horizontal, SplitPlacement::Before,));
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn pane_move_noop_when_source_is_already_after_target_in_same_vertical_split() {
         let mut tree = simple_two_pane_tree();
         tree.root = PaneNode::Split {
@@ -3376,7 +3411,7 @@ mod tests {
         assert!(!tree.is_noop_pane_move(1, 0, SplitDirection::Horizontal, SplitPlacement::After,));
     }
 
-    #[::core::prelude::v1::test]
+    #[test]
     fn pane_move_is_not_noop_when_source_and_target_are_in_opposite_subtrees() {
         let tree = PaneTree {
             root: PaneNode::Split {

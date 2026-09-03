@@ -947,6 +947,8 @@ impl Render for VuWorkspace {
             .on_action(cx.listener(Self::close_tab))
             .on_action(cx.listener(Self::close_pane))
             .on_action(cx.listener(Self::toggle_pane_zoom))
+            .on_action(cx.listener(Self::focus_next_pane))
+            .on_action(cx.listener(Self::focus_previous_pane))
             .on_action(cx.listener(Self::split_right))
             .on_action(cx.listener(Self::split_down))
             .on_action(cx.listener(Self::split_left))

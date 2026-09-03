@@ -1670,6 +1670,8 @@ impl SettingsPanel {
             "close_tab" => self.config.keybindings.close_tab = binding,
             "close_pane" => self.config.keybindings.close_pane = binding,
             "toggle_pane_zoom" => self.config.keybindings.toggle_pane_zoom = binding,
+            "focus_next_pane" => self.config.keybindings.focus_next_pane = binding,
+            "focus_previous_pane" => self.config.keybindings.focus_previous_pane = binding,
             "next_tab" => self.config.keybindings.next_tab = binding,
             "previous_tab" => self.config.keybindings.previous_tab = binding,
             "settings" => self.config.keybindings.settings = binding,
@@ -1711,6 +1713,8 @@ impl SettingsPanel {
             "close_tab" => &self.config.keybindings.close_tab,
             "close_pane" => &self.config.keybindings.close_pane,
             "toggle_pane_zoom" => &self.config.keybindings.toggle_pane_zoom,
+            "focus_next_pane" => &self.config.keybindings.focus_next_pane,
+            "focus_previous_pane" => &self.config.keybindings.focus_previous_pane,
             "next_tab" => &self.config.keybindings.next_tab,
             "previous_tab" => &self.config.keybindings.previous_tab,
             "settings" => &self.config.keybindings.settings,
@@ -3373,6 +3377,8 @@ impl SettingsPanel {
             ("Split Right", "split_right"),
             ("Split Down", "split_down"),
             ("Toggle Pane Zoom", "toggle_pane_zoom"),
+            ("Focus Next Pane", "focus_next_pane"),
+            ("Focus Previous Pane", "focus_previous_pane"),
             ("Close Pane", "close_pane"),
         ];
 

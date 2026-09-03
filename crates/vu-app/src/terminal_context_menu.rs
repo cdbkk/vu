@@ -67,6 +67,14 @@ pub(crate) fn terminal_context_menu(
             "Toggle Pane Zoom",
             Box::new(crate::TogglePaneZoom),
         ))
+        .item(action_item(
+            "Focus Next Pane",
+            Box::new(crate::FocusNextPane),
+        ))
+        .item(action_item(
+            "Focus Previous Pane",
+            Box::new(crate::FocusPreviousPane),
+        ))
         .item(action_item("Close Pane", Box::new(crate::ClosePane)))
         .separator()
         .submenu("Surfaces", window, cx, |menu, _window, _cx| {

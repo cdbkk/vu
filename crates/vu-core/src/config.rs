@@ -467,6 +467,24 @@ fn default_toggle_pane_zoom() -> String {
     "alt-shift-enter".into()
 }
 
+#[cfg(target_os = "macos")]
+fn default_focus_next_pane() -> String {
+    "alt-tab".into()
+}
+#[cfg(not(target_os = "macos"))]
+fn default_focus_next_pane() -> String {
+    "ctrl-alt-tab".into()
+}
+
+#[cfg(target_os = "macos")]
+fn default_focus_previous_pane() -> String {
+    "alt-shift-tab".into()
+}
+#[cfg(not(target_os = "macos"))]
+fn default_focus_previous_pane() -> String {
+    "ctrl-alt-shift-tab".into()
+}
+
 fn default_next_tab() -> String {
     "ctrl-tab".into()
 }
@@ -626,6 +644,8 @@ pub struct KeybindingConfig {
     pub close_tab: String,
     pub close_pane: String,
     pub toggle_pane_zoom: String,
+    pub focus_next_pane: String,
+    pub focus_previous_pane: String,
     pub next_tab: String,
     pub previous_tab: String,
     pub settings: String,
@@ -684,6 +704,8 @@ impl KeybindingConfig {
             ("Close Tab", self.close_tab.as_str()),
             ("Close Pane", self.close_pane.as_str()),
             ("Toggle Pane Zoom", self.toggle_pane_zoom.as_str()),
+            ("Focus Next Pane", self.focus_next_pane.as_str()),
+            ("Focus Previous Pane", self.focus_previous_pane.as_str()),
             ("Settings", self.settings.as_str()),
             ("Command Palette", self.command_palette.as_str()),
             ("Toggle Input Bar", self.toggle_input_bar.as_str()),
@@ -759,6 +781,8 @@ impl Default for KeybindingConfig {
             close_tab: default_close_tab(),
             close_pane: default_close_pane(),
             toggle_pane_zoom: default_toggle_pane_zoom(),
+            focus_next_pane: default_focus_next_pane(),
+            focus_previous_pane: default_focus_previous_pane(),
             next_tab: default_next_tab(),
             previous_tab: default_previous_tab(),
             settings: default_settings(),
@@ -1148,6 +1172,24 @@ restore_terminal_text = false
         let shortcuts = config.keybindings.active_shortcuts();
         assert!(shortcuts.contains(&("Next Surface Tab", expected_next)));
         assert!(shortcuts.contains(&("Previous Surface Tab", expected_previous)));
+    }
+
+    #[test]
+    fn default_keybindings_include_pane_cycle_shortcuts_without_conflicts() {
+        let config = Config::default();
+        let (expected_next, expected_previous) = if cfg!(target_os = "macos") {
+            ("alt-tab", "alt-shift-tab")
+        } else {
+            ("ctrl-alt-tab", "ctrl-alt-shift-tab")
+        };
+
+        assert_eq!(config.keybindings.focus_next_pane, expected_next);
+        assert_eq!(config.keybindings.focus_previous_pane, expected_previous);
+
+        let shortcuts = config.keybindings.active_shortcuts();
+        assert!(shortcuts.contains(&("Focus Next Pane", expected_next)));
+        assert!(shortcuts.contains(&("Focus Previous Pane", expected_previous)));
+        assert!(config.keybindings.shortcut_conflicts(&[]).is_empty());
     }
 
     #[cfg(target_os = "macos")]
