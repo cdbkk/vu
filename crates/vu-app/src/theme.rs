@@ -1,11 +1,11 @@
-use vu_core::config::{MAX_UI_FONT_SIZE, MIN_UI_FONT_SIZE, sanitize_terminal_font_family};
-use vu_terminal::{Color, TerminalTheme};
 use gpui::App;
-use std::sync::atomic::{AtomicU32, Ordering};
 use gpui_component::highlighter::LanguageRegistry;
 use gpui_component::scroll::ScrollbarShow;
 use gpui_component::{Theme, ThemeMode, ThemeRegistry};
 use std::borrow::Cow;
+use std::sync::atomic::{AtomicU32, Ordering};
+use vu_core::config::{MAX_UI_FONT_SIZE, MIN_UI_FONT_SIZE, sanitize_terminal_font_family};
+use vu_terminal::{Color, TerminalTheme};
 
 const VU_DARK_THEME: &str = include_str!("../../../assets/themes/vu-dark.json");
 const VU_LIGHT_THEME: &str = include_str!("../../../assets/themes/vu-light.json");
@@ -348,7 +348,13 @@ static CHROME_BORDER_STRENGTH: AtomicU32 = AtomicU32::new(1.0f32.to_bits());
 /// Set how far chrome is separated from the terminal background. Call whenever
 /// the appearance config changes, before re-applying the theme.
 pub fn set_chrome_strengths(surface: f32, border: f32) {
-    let clamp = |v: f32| if v.is_finite() { v.clamp(0.0, 4.0) } else { 1.0 };
+    let clamp = |v: f32| {
+        if v.is_finite() {
+            v.clamp(0.0, 4.0)
+        } else {
+            1.0
+        }
+    };
     CHROME_SURFACE_STRENGTH.store(clamp(surface).to_bits(), Ordering::Relaxed);
     CHROME_BORDER_STRENGTH.store(clamp(border).to_bits(), Ordering::Relaxed);
 }
@@ -634,7 +640,10 @@ mod tests {
         // 0 collapses chrome onto the terminal background exactly.
         set_chrome_strengths(0.0, 0.0);
         let flat = generate_gpui_theme_json(&tt);
-        let bg = format!("{:02X}{:02X}{:02X}", tt.background.r, tt.background.g, tt.background.b);
+        let bg = format!(
+            "{:02X}{:02X}{:02X}",
+            tt.background.r, tt.background.g, tt.background.b
+        );
         assert!(
             flat.contains(&format!("\"title_bar.background\": \"#{bg}\"")),
             "expected title bar to match terminal background, got:\n{flat}"

@@ -1,6 +1,3 @@
-/// Shared tab context menu builder used by both the horizontal tab strip
-/// and the vertical sidebar panel rows.
-use vu_core::session::TabAccentColor;
 use gpui::{App, ElementId, Hsla, MouseButton, Window, div, prelude::*, px};
 use gpui_component::{
     ActiveTheme, h_flex,
@@ -8,6 +5,9 @@ use gpui_component::{
 };
 use std::cell::Cell;
 use std::rc::Rc;
+/// Shared tab context menu builder used by both the horizontal tab strip
+/// and the vertical sidebar panel rows.
+use vu_core::session::TabAccentColor;
 
 type WinCb = Box<dyn Fn(&mut Window, &mut App) + 'static>;
 type ColorCb = Box<dyn Fn(Option<TabAccentColor>, &mut Window, &mut App) + 'static>;

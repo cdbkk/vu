@@ -1341,7 +1341,6 @@ fn has_tmux_scope(scopes: &[PaneRuntimeScope]) -> bool {
         .any(|scope| scope.kind == PaneScopeKind::Multiplexer)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

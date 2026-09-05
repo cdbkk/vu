@@ -99,6 +99,8 @@ pub struct SettingsPanel {
     tab_accent_inactive_hover_alpha_slider: Entity<SliderState>,
     tab_inactive_opacity_slider: Entity<SliderState>,
     tab_close_size_slider: Entity<SliderState>,
+    /// One picker per `TabColorSlot`, in `TabColorSlot::ALL` order.
+    tab_color_pickers: Vec<Entity<ColorPickerState>>,
     background_image_input: Entity<InputState>,
     background_image_opacity_slider: Entity<SliderState>,
     background_image_position_select: Entity<SelectState<Vec<String>>>,
@@ -746,6 +748,25 @@ impl SettingsPanel {
             },
         )
         .detach();
+        let tab_color_pickers: Vec<Entity<ColorPickerState>> = TabColorSlot::ALL
+            .iter()
+            .map(|_| cx.new(|cx| ColorPickerState::new(window, cx)))
+            .collect();
+        for (idx, picker) in tab_color_pickers.iter().enumerate() {
+            let slot = TabColorSlot::ALL[idx];
+            cx.subscribe(picker, move |this, _, event: &ColorPickerEvent, cx| {
+                let ColorPickerEvent::Change(Some(hsla)) = event else {
+                    return;
+                };
+                slot.write(
+                    &mut this.config.appearance,
+                    Some(crate::tab_colors::hsla_to_hex(*hsla)),
+                );
+                cx.emit(AppearancePreview);
+                cx.notify();
+            })
+            .detach();
+        }
         cx.subscribe(
             &background_image_opacity_slider,
             |this, _, event: &SliderEvent, cx| match event {
@@ -849,6 +870,7 @@ impl SettingsPanel {
             tab_accent_inactive_hover_alpha_slider,
             tab_inactive_opacity_slider,
             tab_close_size_slider,
+            tab_color_pickers,
             background_image_input,
             background_image_opacity_slider,
             background_image_position_select,
@@ -1013,6 +1035,7 @@ impl SettingsPanel {
                 cx,
             );
         });
+        self.sync_tab_color_pickers(window, cx);
         self.background_image_input.update(cx, |s, cx| {
             s.set_value(
                 &self
@@ -2059,10 +2082,8 @@ impl SettingsPanel {
                     self.group(
                         "new-tabs",
                         "New Tabs",
-                        card(theme, card_opacity).child(row_field(
-                            "Directory",
-                            &self.new_tab_directory_input,
-                        )),
+                        card(theme, card_opacity)
+                            .child(row_field("Directory", &self.new_tab_directory_input)),
                         cx,
                     ),
                 ),
@@ -2725,6 +2746,12 @@ impl SettingsPanel {
                             theme,
                         ))
                         .child(row_separator(theme))
+                        .children(TabColorSlot::ALL.iter().flat_map(|slot| {
+                            [
+                                self.render_tab_color_row(*slot, theme, cx),
+                                row_separator(theme),
+                            ]
+                        }))
                         .child(slider_row(
                             "Surface Contrast",
                             "How far the title bar, tab strip, sidebar, and cards sit from the terminal background. 0 makes them match it exactly.",
@@ -4537,6 +4564,189 @@ const THEME_SLOTS: &[ThemeSlot] = &[
     slot("Bright Cyan", "Bright variant of Cyan", Some(14)),
     slot("Bright White", "Bright variant of White", Some(15)),
 ];
+
+/// Which horizontal tab strip surface a color picker edits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TabColorSlot {
+    ActiveBackground,
+    ActiveBorder,
+    InactiveBackground,
+    InactiveBorder,
+    InactiveHoverBackground,
+}
+
+impl TabColorSlot {
+    const ALL: [TabColorSlot; 5] = [
+        TabColorSlot::ActiveBackground,
+        TabColorSlot::ActiveBorder,
+        TabColorSlot::InactiveBackground,
+        TabColorSlot::InactiveBorder,
+        TabColorSlot::InactiveHoverBackground,
+    ];
+
+    fn id(self) -> &'static str {
+        match self {
+            Self::ActiveBackground => "active-bg",
+            Self::ActiveBorder => "active-border",
+            Self::InactiveBackground => "inactive-bg",
+            Self::InactiveBorder => "inactive-border",
+            Self::InactiveHoverBackground => "inactive-hover-bg",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::ActiveBackground => "Active Tab Color",
+            Self::ActiveBorder => "Active Tab Border",
+            Self::InactiveBackground => "Inactive Tab Color",
+            Self::InactiveBorder => "Inactive Tab Border",
+            Self::InactiveHoverBackground => "Inactive Tab Hover",
+        }
+    }
+
+    fn hint(self) -> &'static str {
+        match self {
+            Self::ActiveBackground => "Background of the tab you are on.",
+            Self::ActiveBorder => "Outline around the active tab. Theme default draws none.",
+            Self::InactiveBackground => "Background of tabs you are not on.",
+            Self::InactiveBorder => "Outline around inactive tabs.",
+            Self::InactiveHoverBackground => {
+                "Background of an inactive tab while the mouse is over it."
+            }
+        }
+    }
+
+    fn is_border(self) -> bool {
+        matches!(self, Self::ActiveBorder | Self::InactiveBorder)
+    }
+
+    fn read(self, a: &AppearanceConfig) -> Option<&str> {
+        match self {
+            Self::ActiveBackground => a.tab_active_background.as_deref(),
+            Self::ActiveBorder => a.tab_active_border.as_deref(),
+            Self::InactiveBackground => a.tab_inactive_background.as_deref(),
+            Self::InactiveBorder => a.tab_inactive_border.as_deref(),
+            Self::InactiveHoverBackground => a.tab_inactive_hover_background.as_deref(),
+        }
+    }
+
+    fn write(self, a: &mut AppearanceConfig, value: Option<String>) {
+        let slot = match self {
+            Self::ActiveBackground => &mut a.tab_active_background,
+            Self::ActiveBorder => &mut a.tab_active_border,
+            Self::InactiveBackground => &mut a.tab_inactive_background,
+            Self::InactiveBorder => &mut a.tab_inactive_border,
+            Self::InactiveHoverBackground => &mut a.tab_inactive_hover_background,
+        };
+        *slot = value;
+    }
+
+    /// What the picker shows while no override is set, so the swatch matches
+    /// roughly what the tab strip is drawing.
+    fn fallback(self, theme: &gpui_component::Theme) -> Hsla {
+        if self.is_border() {
+            theme.border
+        } else {
+            theme.background
+        }
+    }
+}
+
+impl SettingsPanel {
+    fn sync_tab_color_pickers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let theme = cx.theme().clone();
+        for (idx, slot) in TabColorSlot::ALL.iter().enumerate() {
+            let Some(picker) = self.tab_color_pickers.get(idx) else {
+                continue;
+            };
+            let value = slot
+                .read(&self.config.appearance)
+                .and_then(crate::tab_colors::parse_hex_hsla)
+                .unwrap_or_else(|| slot.fallback(&theme));
+            picker.update(cx, |state, cx| state.set_value(value, window, cx));
+        }
+    }
+
+    fn render_tab_color_row(
+        &self,
+        slot: TabColorSlot,
+        theme: &gpui_component::Theme,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let idx = TabColorSlot::ALL
+            .iter()
+            .position(|s| *s == slot)
+            .unwrap_or(0);
+        let current = slot.read(&self.config.appearance).map(str::to_string);
+        let is_set = current.is_some();
+        let picker = self
+            .tab_color_pickers
+            .get(idx)
+            .map(|state| ColorPicker::new(state).small().anchor(Corner::TopRight));
+        let reset_btn = Button::new(ElementId::Name(
+            format!("tab-color-reset-{}", slot.id()).into(),
+        ))
+        .label("Reset")
+        .small()
+        .ghost()
+        .disabled(!is_set)
+        .on_click(cx.listener(move |this, _, window, cx| {
+            slot.write(&mut this.config.appearance, None);
+            let fallback = slot.fallback(&cx.theme().clone());
+            if let Some(picker) = this.tab_color_pickers.get(idx) {
+                picker.update(cx, |state, cx| state.set_value(fallback, window, cx));
+            }
+            cx.emit(AppearancePreview);
+            cx.notify();
+        }));
+
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .gap(px(18.0))
+            .px(px(16.0))
+            .py(px(12.0))
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(3.0))
+                    .flex_1()
+                    .min_w_0()
+                    .max_w(px(380.0))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(slot.label().to_string()),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(13.0))
+                            .line_height(px(19.0))
+                            .text_color(theme.muted_foreground.opacity(0.82))
+                            .child(slot.hint().to_string()),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(8.0))
+                    .flex_shrink_0()
+                    .child(
+                        div()
+                            .text_size(px(12.0))
+                            .font_family(theme.mono_font_family.clone())
+                            .text_color(theme.muted_foreground.opacity(0.7))
+                            .child(current.unwrap_or_else(|| "theme".to_string())),
+                    )
+                    .children(picker)
+                    .child(reset_btn),
+            )
+    }
+}
 
 fn color_to_hex(c: vu_terminal::Color) -> String {
     format!("#{:02X}{:02X}{:02X}", c.r, c.g, c.b)

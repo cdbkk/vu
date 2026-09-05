@@ -6,9 +6,9 @@
 //! off the paint path: callers should use it only on mouse gestures.
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-use vu_ghostty::vt::ScreenSnapshot;
-#[cfg(any(target_os = "windows", target_os = "linux"))]
 use gpui::Modifiers;
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use vu_ghostty::vt::ScreenSnapshot;
 
 #[cfg(any(target_os = "windows", target_os = "linux", test))]
 const URL_SCHEMES: &[&str] = &[

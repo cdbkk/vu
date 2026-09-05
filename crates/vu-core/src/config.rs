@@ -281,6 +281,13 @@ pub struct AppearanceConfig {
     pub tab_inactive_opacity: f32,
     /// Tab close (X) glyph size in px. The hit target grows with it.
     pub tab_close_size: f32,
+    /// Horizontal tab strip chrome overrides, `#RRGGBB`. `None` keeps the
+    /// theme-derived default for that surface.
+    pub tab_active_background: Option<String>,
+    pub tab_active_border: Option<String>,
+    pub tab_inactive_background: Option<String>,
+    pub tab_inactive_border: Option<String>,
+    pub tab_inactive_hover_background: Option<String>,
     /// Keep bounded private terminal text so restart continuity can show what
     /// was on screen. This is never exported to workspace layout profiles.
     pub restore_terminal_text: bool,
@@ -321,6 +328,11 @@ impl Default for AppearanceConfig {
             tab_accent_inactive_hover_alpha: default_tab_accent_inactive_hover_alpha(),
             tab_inactive_opacity: default_tab_inactive_opacity(),
             tab_close_size: default_tab_close_size(),
+            tab_active_background: None,
+            tab_active_border: None,
+            tab_inactive_background: None,
+            tab_inactive_border: None,
+            tab_inactive_hover_background: None,
             restore_terminal_text: default_restore_terminal_text(),
             hide_pane_title_bar: false,
             tabs_orientation: TabsOrientation::Vertical,
@@ -375,6 +387,17 @@ impl AppearanceConfig {
             Self::MAX_TAB_ACCENT_INACTIVE_HOVER_ALPHA,
         )
         .max(self.tab_accent_inactive_alpha);
+        for slot in [
+            &mut self.tab_active_background,
+            &mut self.tab_active_border,
+            &mut self.tab_inactive_background,
+            &mut self.tab_inactive_border,
+            &mut self.tab_inactive_hover_background,
+        ] {
+            if !slot.as_deref().is_some_and(is_hex_color) {
+                *slot = None;
+            }
+        }
         self.icon_scale = if self.icon_scale.is_finite() {
             self.icon_scale.clamp(MIN_ICON_SCALE, MAX_ICON_SCALE)
         } else {

@@ -142,6 +142,7 @@ pub struct VuWorkspace {
     tab_accent_inactive_hover_alpha: f32,
     tab_inactive_opacity: f32,
     tab_close_size: f32,
+    tab_chrome_colors: crate::tab_colors::TabChromeColors,
     background_image: Option<String>,
     background_image_opacity: f32,
     background_image_position: String,

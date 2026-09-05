@@ -978,6 +978,7 @@ impl VuWorkspace {
         } else {
             self.tab_close_size
         };
+        self.tab_chrome_colors = crate::tab_colors::TabChromeColors::from_config(appearance_config);
         self.background_image = next_background_image;
         self.background_image_opacity = next_background_image_opacity;
         self.background_image_position = next_background_image_position;

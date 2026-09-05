@@ -645,16 +645,24 @@ impl VuWorkspace {
                         cx.notify();
                     }));
 
+                let chrome = self.tab_chrome_colors;
                 if is_active {
+                    let active_bg = chrome.active_background.unwrap_or_else(|| match tab_color {
+                        Some(color) => crate::tab_colors::tab_accent_surface_hsla(
+                            color,
+                            crate::tab_colors::TAB_ACCENT_ACTIVE_ALPHA,
+                            cx,
+                        ),
+                        None => theme.background.opacity(elevated_ui_surface_opacity),
+                    });
                     tab_el = tab_el
                         .rounded_t(px(7.0))
-                        .map(|el| match tab_color {
-                            Some(color) => el.bg(crate::tab_colors::tab_accent_surface_hsla(
-                                color,
-                                crate::tab_colors::TAB_ACCENT_ACTIVE_ALPHA,
-                                cx,
-                            )),
-                            None => el.bg(theme.background.opacity(elevated_ui_surface_opacity)),
+                        .bg(active_bg)
+                        .when_some(chrome.active_border, |el, border| {
+                            el.border_t_1()
+                                .border_l_1()
+                                .border_r_1()
+                                .border_color(border)
                         })
                         .text_color(theme.foreground)
                         .font_weight(FontWeight::MEDIUM);
@@ -664,26 +672,37 @@ impl VuWorkspace {
                         sanitize_tab_accent_alpha(self.tab_accent_inactive_hover_alpha)
                             .max(inactive_alpha);
                     let inactive_surface = self.tab_inactive_opacity;
-                    let inactive_bg = tab_color
-                        .map(|color| {
-                            crate::tab_colors::tab_accent_surface_hsla(color, inactive_alpha, cx)
-                        })
-                        .unwrap_or(theme.background.opacity(inactive_surface));
-                    let inactive_hover_bg = tab_color
-                        .map(|color| {
-                            crate::tab_colors::tab_accent_surface_hsla(
-                                color,
-                                inactive_hover_alpha,
-                                cx,
-                            )
-                        })
-                        .unwrap_or(theme.background.opacity((inactive_surface + 0.08).min(1.0)));
+                    let inactive_bg = chrome.inactive_background.unwrap_or_else(|| {
+                        tab_color
+                            .map(|color| {
+                                crate::tab_colors::tab_accent_surface_hsla(
+                                    color,
+                                    inactive_alpha,
+                                    cx,
+                                )
+                            })
+                            .unwrap_or(theme.background.opacity(inactive_surface))
+                    });
+                    let inactive_hover_bg = chrome.inactive_hover_background.unwrap_or_else(|| {
+                        tab_color
+                            .map(|color| {
+                                crate::tab_colors::tab_accent_surface_hsla(
+                                    color,
+                                    inactive_hover_alpha,
+                                    cx,
+                                )
+                            })
+                            .unwrap_or(theme.background.opacity((inactive_surface + 0.08).min(1.0)))
+                    });
+                    let inactive_border = chrome
+                        .inactive_border
+                        .unwrap_or_else(|| gpui::white().opacity(0.28));
                     tab_el = tab_el
                         .rounded_t(px(6.0))
                         .border_t_1()
                         .border_l_1()
                         .border_r_1()
-                        .border_color(gpui::white().opacity(0.28))
+                        .border_color(inactive_border)
                         .bg(inactive_bg)
                         .text_color(theme.muted_foreground.opacity(0.72))
                         .hover(move |s: gpui::StyleRefinement| {

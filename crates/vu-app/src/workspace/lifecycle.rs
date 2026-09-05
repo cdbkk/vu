@@ -30,6 +30,7 @@ impl VuWorkspace {
         let tab_accent_inactive_hover_alpha = config.appearance.tab_accent_inactive_hover_alpha;
         let tab_inactive_opacity = config.appearance.tab_inactive_opacity;
         let tab_close_size = config.appearance.tab_close_size;
+        let tab_chrome_colors = crate::tab_colors::TabChromeColors::from_config(&config.appearance);
         let effective_ui_opacity = Self::effective_ui_opacity(ui_opacity);
         sidebar.update(cx, |s, cx| {
             s.set_ui_opacity(effective_ui_opacity, cx);
@@ -240,8 +241,12 @@ impl VuWorkspace {
             .detach();
         // Re-render workspace only when settings panel visibility changes (e.g. X close button).
         // A blanket observe re-rendered the whole workspace on every settings scroll tick.
-        cx.subscribe_in(&settings_panel, window, |_, _, _: &VisibilityChanged, _, cx| cx.notify())
-            .detach();
+        cx.subscribe_in(
+            &settings_panel,
+            window,
+            |_, _, _: &VisibilityChanged, _, cx| cx.notify(),
+        )
+        .detach();
         cx.subscribe_in(&command_palette, window, Self::on_palette_select)
             .detach();
         cx.subscribe_in(&command_palette, window, Self::on_palette_dismissed)
@@ -500,6 +505,7 @@ impl VuWorkspace {
             tab_accent_inactive_hover_alpha,
             tab_inactive_opacity,
             tab_close_size,
+            tab_chrome_colors,
             background_image,
             background_image_opacity,
             background_image_position,

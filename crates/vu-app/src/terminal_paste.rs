@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
+use gpui::{ClipboardEntry, ClipboardItem, ExternalPaths};
 #[cfg(target_os = "windows")]
 use vu_ghostty::GhosttyTerminal;
-use gpui::{ClipboardEntry, ClipboardItem, ExternalPaths};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TerminalPastePayload {

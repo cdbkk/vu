@@ -1,6 +1,6 @@
-use vu_core::session::TabAccentColor;
 use gpui::{App, Hsla};
 use gpui_component::ActiveTheme;
+use vu_core::session::TabAccentColor;
 
 pub(crate) const TAB_ACCENT_ACTIVE_ALPHA: f32 = 0.35;
 pub(crate) const TAB_ACCENT_INACTIVE_ALPHA: f32 = 0.15;
@@ -34,4 +34,50 @@ pub(crate) fn tab_accent_surface_hsla(color: TabAccentColor, alpha: f32, cx: &Ap
 /// Green dot used to indicate the active tab when no explicit accent color is set.
 pub(crate) fn active_tab_indicator_color() -> Hsla {
     gpui::hsla(142.0 / 360.0, 0.60, 0.42, 1.0)
+}
+
+/// Parse `#RRGGBB` (hash optional) into an opaque `Hsla`.
+pub(crate) fn parse_hex_hsla(value: &str) -> Option<Hsla> {
+    let h = value.trim().strip_prefix('#').unwrap_or(value.trim());
+    if h.len() != 6 || !h.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let v = u32::from_str_radix(h, 16).ok()?;
+    Some(gpui::rgb(v).into())
+}
+
+/// Format an `Hsla` as `#RRGGBB`, dropping alpha.
+pub(crate) fn hsla_to_hex(color: Hsla) -> String {
+    let rgba: gpui::Rgba = color.into();
+    let to_u8 = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+    format!(
+        "#{:02X}{:02X}{:02X}",
+        to_u8(rgba.r),
+        to_u8(rgba.g),
+        to_u8(rgba.b)
+    )
+}
+
+/// User overrides for the horizontal tab strip chrome. `None` keeps the
+/// theme-derived default for that surface.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub(crate) struct TabChromeColors {
+    pub active_background: Option<Hsla>,
+    pub active_border: Option<Hsla>,
+    pub inactive_background: Option<Hsla>,
+    pub inactive_border: Option<Hsla>,
+    pub inactive_hover_background: Option<Hsla>,
+}
+
+impl TabChromeColors {
+    pub(crate) fn from_config(appearance: &vu_core::config::AppearanceConfig) -> Self {
+        let parse = |v: &Option<String>| v.as_deref().and_then(parse_hex_hsla);
+        Self {
+            active_background: parse(&appearance.tab_active_background),
+            active_border: parse(&appearance.tab_active_border),
+            inactive_background: parse(&appearance.tab_inactive_background),
+            inactive_border: parse(&appearance.tab_inactive_border),
+            inactive_hover_background: parse(&appearance.tab_inactive_hover_background),
+        }
+    }
 }
