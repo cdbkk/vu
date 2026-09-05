@@ -1528,8 +1528,8 @@ fn editor_binding_specs() -> Vec<BindingSpec> {
 }
 
 fn binding_specs(kb: &KeybindingConfig) -> Vec<BindingSpec> {
-    let mut specs = configurable_app_binding_specs(kb);
-    specs.extend(fixed_app_binding_specs());
+    let mut specs = fixed_app_binding_specs();
+    specs.extend(configurable_app_binding_specs(kb));
     specs.extend(editor_binding_specs());
     specs
 }
@@ -2078,6 +2078,25 @@ mod tests {
             conflicts.is_empty(),
             "default shortcuts should not conflict with fixed app shortcuts: {conflicts:?}"
         );
+    }
+
+    #[test]
+    fn configured_tab_shortcuts_take_display_precedence_over_fixed_aliases() {
+        let mut kb = KeybindingConfig::default();
+        kb.next_tab = "]".into();
+        kb.previous_tab = "[".into();
+        let specs = binding_specs(&kb);
+        for (action, expected, alias) in [
+            (TypeId::of::<super::NextTab>(), "]", "secondary-shift-]"),
+            (TypeId::of::<super::PreviousTab>(), "[", "secondary-shift-["),
+        ] {
+            let bindings = specs
+                .iter()
+                .filter(|spec| spec.action == action)
+                .collect::<Vec<_>>();
+            assert!(bindings.iter().any(|spec| spec.key == alias));
+            assert_eq!(bindings.last().unwrap().key.as_ref(), expected);
+        }
     }
 
     #[test]

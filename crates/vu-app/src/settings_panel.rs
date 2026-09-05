@@ -3414,6 +3414,14 @@ impl SettingsPanel {
                         .font_weight(FontWeight::MEDIUM)
                         .child("Press shortcut…")
                         .into_any_element()
+                } else if value.trim().is_empty() {
+                    // Unbound (empty in config.toml). Keep a visible target so
+                    // the row still reads as clickable instead of a blank gap.
+                    div()
+                        .text_size(px(13.0))
+                        .font_weight(FontWeight::MEDIUM)
+                        .child("Not set")
+                        .into_any_element()
                 } else {
                     crate::keycaps::keycaps_for_binding(&value, theme)
                 };

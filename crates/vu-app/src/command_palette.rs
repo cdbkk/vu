@@ -12,260 +12,246 @@ actions!(command_palette, [ToggleCommandPalette]);
 struct PaletteAction {
     id: &'static str,
     label: &'static str,
+    /// GPUI action whose live keymap binding is shown as the shortcut.
+    /// Resolved at render time so user keybinding overrides show up.
+    action: Option<&'static dyn Action>,
+    /// Shortcut hint for entries handled outside the GPUI keymap.
+    /// Ignored when `action` is set.
     shortcut: &'static str,
     category: &'static str,
 }
-
-// Shortcut strings are parsed by `Keystroke::parse` and rendered by
-// `Kbd`, so `secondary-` shows as ⌘ on macOS and Ctrl on Windows/Linux.
-#[cfg(target_os = "macos")]
-const TOGGLE_PANE_ZOOM_SHORTCUT: &str = "secondary-shift-enter";
-#[cfg(not(target_os = "macos"))]
-const TOGGLE_PANE_ZOOM_SHORTCUT: &str = "alt-shift-enter";
-#[cfg(target_os = "macos")]
-const FOCUS_NEXT_PANE_SHORTCUT: &str = "alt-tab";
-#[cfg(not(target_os = "macos"))]
-const FOCUS_NEXT_PANE_SHORTCUT: &str = "ctrl-alt-tab";
-#[cfg(target_os = "macos")]
-const FOCUS_PREVIOUS_PANE_SHORTCUT: &str = "alt-shift-tab";
-#[cfg(not(target_os = "macos"))]
-const FOCUS_PREVIOUS_PANE_SHORTCUT: &str = "ctrl-alt-shift-tab";
-#[cfg(target_os = "macos")]
-const TOGGLE_LEFT_SIDEBAR_SHORTCUT: &str = "secondary-b";
-#[cfg(not(target_os = "macos"))]
-const TOGGLE_LEFT_SIDEBAR_SHORTCUT: &str = "ctrl-shift-b";
-#[cfg(target_os = "macos")]
-const FOCUS_FILES_SHORTCUT: &str = "secondary-alt-e";
-#[cfg(not(target_os = "macos"))]
-const FOCUS_FILES_SHORTCUT: &str = "secondary-shift-e";
-const SEARCH_FILES_SHORTCUT: &str = "secondary-shift-f";
-#[cfg(target_os = "macos")]
-const NEW_SURFACE_SHORTCUT: &str = "secondary-alt-t";
-#[cfg(not(target_os = "macos"))]
-const NEW_SURFACE_SHORTCUT: &str = "alt-shift-t";
-#[cfg(target_os = "macos")]
-const NEW_SURFACE_SPLIT_RIGHT_SHORTCUT: &str = "secondary-alt-d";
-#[cfg(not(target_os = "macos"))]
-const NEW_SURFACE_SPLIT_RIGHT_SHORTCUT: &str = "alt-shift-right";
-#[cfg(target_os = "macos")]
-const NEW_SURFACE_SPLIT_DOWN_SHORTCUT: &str = "secondary-alt-shift-d";
-#[cfg(not(target_os = "macos"))]
-const NEW_SURFACE_SPLIT_DOWN_SHORTCUT: &str = "alt-shift-down";
-#[cfg(target_os = "macos")]
-const NEXT_SURFACE_SHORTCUT: &str = "secondary-ctrl-]";
-#[cfg(not(target_os = "macos"))]
-const NEXT_SURFACE_SHORTCUT: &str = "alt-shift-]";
-#[cfg(target_os = "macos")]
-const PREVIOUS_SURFACE_SHORTCUT: &str = "secondary-ctrl-[";
-#[cfg(not(target_os = "macos"))]
-const PREVIOUS_SURFACE_SHORTCUT: &str = "alt-shift-[";
-#[cfg(target_os = "macos")]
-const RENAME_SURFACE_SHORTCUT: &str = "secondary-alt-r";
-#[cfg(not(target_os = "macos"))]
-const RENAME_SURFACE_SHORTCUT: &str = "alt-shift-r";
-#[cfg(target_os = "macos")]
-const CLOSE_SURFACE_SHORTCUT: &str = "secondary-alt-shift-w";
-#[cfg(not(target_os = "macos"))]
-const CLOSE_SURFACE_SHORTCUT: &str = "alt-shift-x";
 
 const PALETTE_ACTIONS: &[PaletteAction] = &[
     PaletteAction {
         id: "new-window",
         label: "New Window",
-        shortcut: "secondary-n",
+        action: Some(&crate::NewWindow),
+        shortcut: "",
         category: "App",
     },
     #[cfg(target_os = "macos")]
     PaletteAction {
         id: "minimize-window",
         label: "Minimize Window",
-        shortcut: "secondary-m",
+        action: Some(&crate::Minimize),
+        shortcut: "",
         category: "App",
     },
     PaletteAction {
         id: "new-tab",
         label: "New Tab",
-        shortcut: "secondary-t",
+        action: Some(&crate::NewTab),
+        shortcut: "",
         category: "Terminal",
     },
     PaletteAction {
         id: "export-workspace-layout",
         label: "Save Layout Profile",
+        action: None,
         shortcut: "",
         category: "Workspace",
     },
     PaletteAction {
         id: "add-workspace-layout-tabs",
         label: "Add Tabs from Layout Profile",
+        action: None,
         shortcut: "",
         category: "Workspace",
     },
     PaletteAction {
         id: "open-workspace-layout-window",
         label: "Open Layout Profile in New Window",
+        action: None,
         shortcut: "",
         category: "Workspace",
     },
     PaletteAction {
         id: "next-tab",
         label: "Next Tab",
-        shortcut: "ctrl-tab",
+        action: Some(&crate::NextTab),
+        shortcut: "",
         category: "Terminal",
     },
     PaletteAction {
         id: "previous-tab",
         label: "Previous Tab",
-        shortcut: "ctrl-shift-tab",
+        action: Some(&crate::PreviousTab),
+        shortcut: "",
         category: "Terminal",
     },
     PaletteAction {
         id: "close-tab",
         label: "Close Tab",
-        shortcut: "secondary-w",
+        action: Some(&crate::CloseTab),
+        shortcut: "",
         category: "Terminal",
     },
     PaletteAction {
         id: "clear-terminal",
         label: "Clear Terminal",
+        action: None,
         shortcut: "secondary-k",
         category: "Terminal",
     },
     PaletteAction {
         id: "clear-restored-terminal-history",
         label: "Clear Restored Terminal History",
+        action: None,
         shortcut: "",
         category: "Privacy",
     },
     PaletteAction {
         id: "focus-terminal",
         label: "Focus Terminal",
+        action: None,
         shortcut: "",
         category: "Terminal",
     },
     PaletteAction {
         id: "split-right",
         label: "Split Right",
-        shortcut: "secondary-d",
+        action: Some(&crate::SplitRight),
+        shortcut: "",
         category: "Pane",
     },
     PaletteAction {
         id: "split-down",
         label: "Split Down",
-        shortcut: "secondary-shift-d",
+        action: Some(&crate::SplitDown),
+        shortcut: "",
         category: "Pane",
     },
     PaletteAction {
         id: "split-left",
         label: "Split Left",
+        action: None,
         shortcut: "",
         category: "Pane",
     },
     PaletteAction {
         id: "split-up",
         label: "Split Up",
+        action: None,
         shortcut: "",
         category: "Pane",
     },
     PaletteAction {
         id: "toggle-pane-zoom",
         label: "Toggle Pane Zoom",
-        shortcut: TOGGLE_PANE_ZOOM_SHORTCUT,
+        action: Some(&crate::TogglePaneZoom),
+        shortcut: "",
         category: "Pane",
     },
     PaletteAction {
         id: "focus-next-pane",
         label: "Focus Next Pane",
-        shortcut: FOCUS_NEXT_PANE_SHORTCUT,
+        action: Some(&crate::FocusNextPane),
+        shortcut: "",
         category: "Pane",
     },
     PaletteAction {
         id: "focus-previous-pane",
         label: "Focus Previous Pane",
-        shortcut: FOCUS_PREVIOUS_PANE_SHORTCUT,
+        action: Some(&crate::FocusPreviousPane),
+        shortcut: "",
         category: "Pane",
     },
     PaletteAction {
         id: "new-surface",
         label: "New Surface Tab",
-        shortcut: NEW_SURFACE_SHORTCUT,
+        action: Some(&crate::NewSurface),
+        shortcut: "",
         category: "Surface",
     },
     PaletteAction {
         id: "new-surface-split-right",
         label: "New Surface Pane Right",
-        shortcut: NEW_SURFACE_SPLIT_RIGHT_SHORTCUT,
+        action: Some(&crate::NewSurfaceSplitRight),
+        shortcut: "",
         category: "Surface",
     },
     PaletteAction {
         id: "new-surface-split-down",
         label: "New Surface Pane Down",
-        shortcut: NEW_SURFACE_SPLIT_DOWN_SHORTCUT,
+        action: Some(&crate::NewSurfaceSplitDown),
+        shortcut: "",
         category: "Surface",
     },
     PaletteAction {
         id: "next-surface",
         label: "Next Surface Tab",
-        shortcut: NEXT_SURFACE_SHORTCUT,
+        action: Some(&crate::NextSurface),
+        shortcut: "",
         category: "Surface",
     },
     PaletteAction {
         id: "previous-surface",
         label: "Previous Surface Tab",
-        shortcut: PREVIOUS_SURFACE_SHORTCUT,
+        action: Some(&crate::PreviousSurface),
+        shortcut: "",
         category: "Surface",
     },
     PaletteAction {
         id: "rename-surface",
         label: "Rename Current Surface",
-        shortcut: RENAME_SURFACE_SHORTCUT,
+        action: Some(&crate::RenameSurface),
+        shortcut: "",
         category: "Surface",
     },
     PaletteAction {
         id: "close-surface",
         label: "Close Current Surface",
-        shortcut: CLOSE_SURFACE_SHORTCUT,
+        action: Some(&crate::CloseSurface),
+        shortcut: "",
         category: "Surface",
     },
     PaletteAction {
         id: "toggle-input-bar",
         label: "Toggle Input Bar",
-        shortcut: "ctrl-`",
+        action: Some(&crate::ToggleInputBar),
+        shortcut: "",
         category: "View",
     },
     PaletteAction {
         id: "toggle-left-sidebar",
         label: "Toggle Left Sidebar",
-        shortcut: TOGGLE_LEFT_SIDEBAR_SHORTCUT,
+        action: Some(&crate::ToggleLeftPanel),
+        shortcut: "",
         category: "View",
     },
     PaletteAction {
         id: "focus-files",
         label: "Focus Files",
-        shortcut: FOCUS_FILES_SHORTCUT,
+        action: Some(&crate::FocusFiles),
+        shortcut: "",
         category: "Workspace",
     },
     PaletteAction {
         id: "search-files",
         label: "Search Files",
-        shortcut: SEARCH_FILES_SHORTCUT,
+        action: Some(&crate::SearchFiles),
+        shortcut: "",
         category: "Workspace",
     },
     PaletteAction {
         id: "settings",
         label: "Open Settings",
-        shortcut: "secondary-,",
+        action: Some(&crate::settings_panel::ToggleSettings),
+        shortcut: "",
         category: "Settings",
     },
     PaletteAction {
         id: "check-for-updates",
         label: "Check for Updates",
+        action: None,
         shortcut: "",
         category: "App",
     },
     PaletteAction {
         id: "quit",
         label: "Quit",
-        shortcut: "secondary-q",
+        action: Some(&crate::Quit),
+        shortcut: "",
         category: "App",
     },
 ];
@@ -398,6 +384,21 @@ impl Focusable for CommandPalette {
     }
 }
 
+/// Keycaps for an action row: the live keymap binding when the entry maps to
+/// a GPUI action (so user overrides show), otherwise the static hint.
+fn shortcut_keycaps(
+    action: &PaletteAction,
+    window: &Window,
+    theme: &gpui_component::Theme,
+) -> Option<AnyElement> {
+    match action.action {
+        Some(gpui_action) => crate::keycaps::first_action_keystroke(gpui_action, window)
+            .map(|stroke| crate::keycaps::keycaps_for_stroke(&stroke, theme).into_any_element()),
+        None if action.shortcut.is_empty() => None,
+        None => Some(crate::keycaps::keycaps_for_binding(action.shortcut, theme)),
+    }
+}
+
 impl Render for CommandPalette {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let overlay_progress = self.overlay_motion.value(window);
@@ -438,20 +439,12 @@ impl Render for CommandPalette {
         for (i, action) in actions.iter().enumerate() {
             let is_selected = i == selected;
             let idx = i;
-            let shortcut = if action.shortcut.is_empty() {
-                div()
-                    .min_w(px(96.0))
-                    .flex()
-                    .justify_end()
-                    .into_any_element()
-            } else {
-                div()
-                    .min_w(px(96.0))
-                    .flex()
-                    .justify_end()
-                    .child(crate::keycaps::keycaps_for_binding(action.shortcut, theme))
-                    .into_any_element()
-            };
+            let shortcut = div()
+                .min_w(px(96.0))
+                .flex()
+                .justify_end()
+                .children(shortcut_keycaps(action, window, theme))
+                .into_any_element();
 
             list_content = list_content.child(
                 div()

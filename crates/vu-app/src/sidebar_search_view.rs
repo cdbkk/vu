@@ -373,7 +373,7 @@ impl Render for SidebarSearchView {
             );
         } else if self.search_in_progress {
             rows.push(
-                empty_state("Searching...", theme)
+                empty_state("Searching…", theme)
                     .id("search-in-progress")
                     .into_any_element(),
             );

@@ -963,7 +963,9 @@ impl Config {
     }
 
     pub fn config_path() -> PathBuf {
-        vu_paths::config_file()
+        std::env::var_os("VU_CONFIG_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(vu_paths::config_file)
     }
 
     pub fn save(&self) -> Result<()> {

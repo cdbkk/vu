@@ -20,7 +20,7 @@
 
 <p align="center">
   <a href="docs/media/vu-demo.mp4">
-    <img src="docs/media/vu-demo.gif" width="1080" alt="vu building a live four-pane workspace with lazygit, yazi, repository activity, and a real 89-test Rust suite" />
+    <img src="docs/media/vu-demo.gif" width="1080" alt="vu switching main tabs, splitting a workspace, running a command in both panes, opening a file in the editor, searching the project, and finding commands with their shortcuts" />
   </a>
 </p>
 
