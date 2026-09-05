@@ -26,14 +26,16 @@ pub struct EditorBuffer {
     cursor: CursorPosition,
     selection_anchor: Option<CursorPosition>,
     dirty: bool,
-    undo_stack: VecDeque<BufferSnapshot>,
+    undo_stack: VecDeque<UndoEdit>,
     revision: u64,
 }
 
+/// One reversible edit: `start..end` in the current text replaced `removed`.
 #[derive(Debug, Clone)]
-struct BufferSnapshot {
-    lines: Vec<String>,
-    line_ending: LineEnding,
+struct UndoEdit {
+    start: CursorPosition,
+    end: CursorPosition,
+    removed: String,
     cursor: CursorPosition,
     selection_anchor: Option<CursorPosition>,
     dirty: bool,
@@ -119,108 +121,35 @@ impl EditorBuffer {
             return;
         }
 
-        self.push_undo_snapshot();
-        let _ = self.delete_selection_if_any();
-        for ch in text.chars() {
-            match ch {
-                '\r' => {}
-                '\n' => self.insert_newline_raw(),
-                ch => self.insert_char(ch),
-            }
-        }
-        self.dirty = true;
-        self.bump_revision();
+        let (start, end) = self.selection_or_cursor();
+        self.apply_edit(start, end, text);
     }
 
     pub fn insert_newline(&mut self) {
-        self.push_undo_snapshot();
-        let _ = self.delete_selection_if_any();
-        self.insert_newline_raw();
-        self.dirty = true;
-        self.bump_revision();
+        let (start, end) = self.selection_or_cursor();
+        self.apply_edit(start, end, "\n");
     }
 
     pub fn delete_backward(&mut self) {
-        if self.has_selection() {
-            self.push_undo_snapshot();
-            if self.delete_selection_if_any() {
-                self.dirty = true;
-                self.bump_revision();
-            }
-            return;
+        let (mut start, end) = self.selection_or_cursor();
+        if start == end {
+            let Some(previous) = self.previous_position(end) else {
+                return;
+            };
+            start = previous;
         }
-
-        if self.cursor.column == 0 && self.cursor.row == 0 {
-            return;
-        }
-
-        self.push_undo_snapshot();
-        if self.delete_selection_if_any() {
-            self.dirty = true;
-            return;
-        }
-
-        if self.cursor.column > 0 {
-            let row = self.cursor.row;
-            let column = self.cursor.column;
-            let previous = previous_char_start(&self.lines[row], column).unwrap_or(0);
-            self.lines[row].replace_range(previous..column, "");
-            self.cursor.column = previous;
-            self.dirty = true;
-            self.bump_revision();
-            return;
-        }
-
-        if self.cursor.row == 0 {
-            return;
-        }
-
-        let row = self.cursor.row;
-        let current = self.lines.remove(row);
-        let previous_len = self.lines[row - 1].len();
-        self.lines[row - 1].push_str(&current);
-        self.cursor = CursorPosition::new(row - 1, previous_len);
-        self.dirty = true;
-        self.bump_revision();
+        self.apply_edit(start, end, "");
     }
 
     pub fn delete_forward(&mut self) {
-        if self.has_selection() {
-            self.push_undo_snapshot();
-            if self.delete_selection_if_any() {
-                self.dirty = true;
-                self.bump_revision();
-            }
-            return;
+        let (start, mut end) = self.selection_or_cursor();
+        if start == end {
+            let Some(next) = self.next_position(start) else {
+                return;
+            };
+            end = next;
         }
-
-        let row = self.cursor.row;
-        let column = self.cursor.column;
-        if column >= self.lines[row].len() && row + 1 >= self.lines.len() {
-            return;
-        }
-
-        self.push_undo_snapshot();
-        if self.delete_selection_if_any() {
-            self.dirty = true;
-            return;
-        }
-
-        if column < self.lines[row].len() {
-            self.lines[row].remove(column);
-            self.dirty = true;
-            self.bump_revision();
-            return;
-        }
-
-        if row + 1 >= self.lines.len() {
-            return;
-        }
-
-        let next = self.lines.remove(row + 1);
-        self.lines[row].push_str(&next);
-        self.dirty = true;
-        self.bump_revision();
+        self.apply_edit(start, end, "");
     }
 
     pub fn move_left(&mut self) {
@@ -311,15 +240,13 @@ impl EditorBuffer {
 
     pub fn selected_text(&self) -> Option<String> {
         let (start, end) = self.normalized_selection()?;
-        Some(self.text_in_range(start, end))
+        Some(self.text_in_range(start, end, self.line_ending.as_str()))
     }
 
     pub fn cut_selection(&mut self) -> Option<String> {
-        let text = self.selected_text()?;
-        self.push_undo_snapshot();
-        self.delete_selection_if_any();
-        self.dirty = true;
-        self.bump_revision();
+        let (start, end) = self.normalized_selection()?;
+        let text = self.text_in_range(start, end, self.line_ending.as_str());
+        self.apply_edit(start, end, "");
         Some(text)
     }
 
@@ -338,29 +265,96 @@ impl EditorBuffer {
     }
 
     pub fn undo(&mut self) -> bool {
-        let Some(snapshot) = self.undo_stack.pop_back() else {
+        let Some(edit) = self.undo_stack.pop_back() else {
             return false;
         };
-        self.lines = snapshot.lines;
-        self.line_ending = snapshot.line_ending;
-        self.cursor = snapshot.cursor;
-        self.selection_anchor = snapshot.selection_anchor;
-        self.dirty = snapshot.dirty;
+        let _ = self.splice(edit.start, edit.end, &edit.removed);
+        self.cursor = edit.cursor;
+        self.selection_anchor = edit.selection_anchor;
+        self.dirty = edit.dirty;
         self.bump_revision();
         true
     }
 
-    fn push_undo_snapshot(&mut self) {
+    fn apply_edit(&mut self, start: CursorPosition, end: CursorPosition, text: &str) {
+        let normalized;
+        let text = if text.contains('\r') {
+            normalized = text.replace('\r', "");
+            normalized.as_str()
+        } else {
+            text
+        };
+        let (cursor, selection_anchor, dirty) = (self.cursor, self.selection_anchor, self.dirty);
+        let (removed, end_after) = self.splice(start, end, text);
         while self.undo_stack.len() >= MAX_UNDO_ENTRIES {
             let _ = self.undo_stack.pop_front();
         }
-        self.undo_stack.push_back(BufferSnapshot {
-            lines: self.lines.clone(),
-            line_ending: self.line_ending,
-            cursor: self.cursor,
-            selection_anchor: self.selection_anchor,
-            dirty: self.dirty,
+        self.undo_stack.push_back(UndoEdit {
+            start,
+            end: end_after,
+            removed,
+            cursor,
+            selection_anchor,
+            dirty,
         });
+        self.cursor = end_after;
+        self.clear_selection();
+        self.dirty = true;
+        self.bump_revision();
+    }
+
+    /// Undo text uses LF separators and preserves literal carriage returns in the source.
+    /// Returns the replaced text and the position just past the inserted text.
+    fn splice(
+        &mut self,
+        start: CursorPosition,
+        end: CursorPosition,
+        text: &str,
+    ) -> (String, CursorPosition) {
+        let removed = self.text_in_range(start, end, "\n");
+        let tail = self.lines[end.row].split_off(end.column);
+        self.lines[start.row].truncate(start.column);
+
+        let mut pieces = text.split('\n');
+        self.lines[start.row].push_str(pieces.next().expect("split yields a first piece"));
+        let new_lines = pieces.map(str::to_string).collect::<Vec<_>>();
+        let end_row = start.row + new_lines.len();
+        self.lines.splice((start.row + 1)..=end.row, new_lines);
+
+        let end_after = CursorPosition::new(end_row, self.lines[end_row].len());
+        self.lines[end_row].push_str(&tail);
+        (removed, end_after)
+    }
+
+    fn selection_or_cursor(&self) -> (CursorPosition, CursorPosition) {
+        self.normalized_selection()
+            .unwrap_or((self.cursor, self.cursor))
+    }
+
+    fn previous_position(&self, position: CursorPosition) -> Option<CursorPosition> {
+        if position.column > 0 {
+            let column = previous_char_start(&self.lines[position.row], position.column)?;
+            Some(CursorPosition::new(position.row, column))
+        } else if position.row > 0 {
+            let row = position.row - 1;
+            Some(CursorPosition::new(row, self.lines[row].len()))
+        } else {
+            None
+        }
+    }
+
+    fn next_position(&self, position: CursorPosition) -> Option<CursorPosition> {
+        let line = &self.lines[position.row];
+        if position.column < line.len() {
+            Some(CursorPosition::new(
+                position.row,
+                next_char_end(line, position.column),
+            ))
+        } else if position.row + 1 < self.lines.len() {
+            Some(CursorPosition::new(position.row + 1, 0))
+        } else {
+            None
+        }
     }
 
     fn bump_revision(&mut self) {
@@ -439,7 +433,7 @@ impl EditorBuffer {
         )
     }
 
-    fn text_in_range(&self, start: CursorPosition, end: CursorPosition) -> String {
+    fn text_in_range(&self, start: CursorPosition, end: CursorPosition, separator: &str) -> String {
         if start.row == end.row {
             return self.lines[start.row][start.column..end.column].to_string();
         }
@@ -447,45 +441,12 @@ impl EditorBuffer {
         let mut text = String::new();
         text.push_str(&self.lines[start.row][start.column..]);
         for row in (start.row + 1)..end.row {
-            text.push_str(self.line_ending.as_str());
+            text.push_str(separator);
             text.push_str(&self.lines[row]);
         }
-        text.push_str(self.line_ending.as_str());
+        text.push_str(separator);
         text.push_str(&self.lines[end.row][..end.column]);
         text
-    }
-
-    fn delete_selection_if_any(&mut self) -> bool {
-        let Some((start, end)) = self.normalized_selection() else {
-            return false;
-        };
-
-        if start.row == end.row {
-            self.lines[start.row].replace_range(start.column..end.column, "");
-        } else {
-            let tail = self.lines[end.row][end.column..].to_string();
-            self.lines[start.row].replace_range(start.column.., "");
-            self.lines[start.row].push_str(&tail);
-            self.lines.drain((start.row + 1)..=end.row);
-        }
-        self.cursor = start;
-        self.clear_selection();
-        true
-    }
-
-    fn insert_newline_raw(&mut self) {
-        let row = self.cursor.row;
-        let column = self.cursor.column;
-        let tail = self.lines[row].split_off(column);
-        self.lines.insert(row + 1, tail);
-        self.cursor = CursorPosition::new(row + 1, 0);
-    }
-
-    fn insert_char(&mut self, ch: char) {
-        let row = self.cursor.row;
-        let column = self.cursor.column;
-        self.lines[row].insert(column, ch);
-        self.cursor.column += ch.len_utf8();
     }
 }
 
@@ -814,6 +775,243 @@ mod tests {
         buffer.insert_text("!");
 
         assert_eq!(buffer.text(), "hello\r\nworld!\r\n");
+    }
+
+    #[test]
+    fn undo_reverts_multiline_paste_and_restores_cursor() {
+        let mut buffer = EditorBuffer::from_text("ab\ncd");
+        buffer.set_cursor(0, 1);
+
+        buffer.insert_text("1\r\n2\n3");
+        assert_eq!(buffer.text(), "a1\n2\n3b\ncd");
+        assert_eq!(buffer.cursor(), CursorPosition::new(2, 1));
+
+        assert!(buffer.undo());
+        assert_eq!(buffer.text(), "ab\ncd");
+        assert_eq!(buffer.cursor(), CursorPosition::new(0, 1));
+        assert!(!buffer.is_dirty());
+        assert!(!buffer.undo());
+    }
+
+    #[test]
+    fn undo_reverts_line_joins_in_both_directions() {
+        let mut buffer = EditorBuffer::from_text("héllo\nwörld\n!");
+
+        buffer.set_cursor(1, 0);
+        buffer.delete_backward();
+        assert_eq!(buffer.text(), "héllowörld\n!");
+        assert_eq!(buffer.cursor(), CursorPosition::new(0, "héllo".len()));
+
+        buffer.move_to_line_end();
+        buffer.delete_forward();
+        assert_eq!(buffer.text(), "héllowörld!");
+
+        assert!(buffer.undo());
+        assert_eq!(buffer.text(), "héllowörld\n!");
+        assert_eq!(buffer.cursor(), CursorPosition::new(0, "héllowörld".len()));
+
+        assert!(buffer.undo());
+        assert_eq!(buffer.text(), "héllo\nwörld\n!");
+        assert_eq!(buffer.cursor(), CursorPosition::new(1, 0));
+    }
+
+    #[test]
+    fn undo_reverts_multiline_selection_replacement_and_restores_selection() {
+        let mut buffer = EditorBuffer::from_text("one\ntwo\nthree");
+        buffer.set_selection(CursorPosition::new(2, 2), CursorPosition::new(0, 1));
+
+        buffer.insert_text("X");
+        assert_eq!(buffer.text(), "oXree");
+        assert_eq!(buffer.cursor(), CursorPosition::new(0, 2));
+        assert!(!buffer.has_selection());
+
+        assert!(buffer.undo());
+        assert_eq!(buffer.text(), "one\ntwo\nthree");
+        assert_eq!(buffer.cursor(), CursorPosition::new(0, 1));
+        assert_eq!(
+            buffer.normalized_selection(),
+            Some((CursorPosition::new(0, 1), CursorPosition::new(2, 2)))
+        );
+    }
+
+    #[test]
+    fn undo_reverts_unicode_deletes_on_char_boundaries() {
+        let mut buffer = EditorBuffer::from_text("a😀é");
+        buffer.set_cursor(0, "a😀".len());
+
+        buffer.delete_backward();
+        assert_eq!(buffer.text(), "aé");
+        buffer.delete_forward();
+        assert_eq!(buffer.text(), "a");
+
+        assert!(buffer.undo());
+        assert_eq!(buffer.text(), "aé");
+        assert_eq!(buffer.cursor(), CursorPosition::new(0, 1));
+
+        assert!(buffer.undo());
+        assert_eq!(buffer.text(), "a😀é");
+        assert_eq!(buffer.cursor(), CursorPosition::new(0, "a😀".len()));
+    }
+
+    #[test]
+    fn undo_restores_crlf_buffer_after_multiline_cut() {
+        let mut buffer = EditorBuffer::from_text("one\r\ntwo\r\nthree\r\n");
+        buffer.set_selection(CursorPosition::new(0, 1), CursorPosition::new(2, 2));
+
+        assert_eq!(buffer.cut_selection().as_deref(), Some("ne\r\ntwo\r\nth"));
+        assert_eq!(buffer.text(), "oree\r\n");
+
+        assert!(buffer.undo());
+        assert_eq!(buffer.text(), "one\r\ntwo\r\nthree\r\n");
+        assert_eq!(buffer.lines().len(), 4);
+        assert!(buffer.lines().iter().all(|line| !line.contains('\r')));
+        assert_eq!(buffer.selected_text().as_deref(), Some("ne\r\ntwo\r\nth"));
+    }
+
+    #[test]
+    fn undo_after_mark_clean_restores_recorded_dirty_state() {
+        let mut buffer = EditorBuffer::from_text("hello");
+        buffer.set_cursor(0, 5);
+        buffer.insert_text("!");
+        buffer.mark_clean();
+        buffer.insert_text("?");
+        assert!(buffer.is_dirty());
+
+        assert!(buffer.undo());
+        assert_eq!(buffer.text(), "hello!");
+        assert!(!buffer.is_dirty());
+
+        assert!(buffer.undo());
+        assert_eq!(buffer.text(), "hello");
+        assert!(!buffer.is_dirty());
+    }
+
+    #[test]
+    fn no_op_edits_do_not_record_undo_entries() {
+        let mut buffer = EditorBuffer::from_text("ab");
+        let revision = buffer.revision();
+
+        buffer.delete_backward();
+        buffer.insert_text("");
+        buffer.set_cursor(0, 2);
+        buffer.delete_forward();
+
+        assert!(buffer.undo_stack.is_empty());
+        assert_eq!(buffer.revision(), revision);
+        assert!(!buffer.is_dirty());
+        assert!(!buffer.undo());
+        assert_eq!(buffer.text(), "ab");
+    }
+
+    #[test]
+    fn undo_cap_evicts_oldest_edits_first() {
+        let mut buffer = EditorBuffer::from_text("");
+        for _ in 0..(MAX_UNDO_ENTRIES + 8) {
+            buffer.insert_text("x");
+        }
+
+        let mut undone = 0;
+        while buffer.undo() {
+            undone += 1;
+        }
+
+        assert_eq!(undone, MAX_UNDO_ENTRIES);
+        assert_eq!(buffer.text(), "x".repeat(8));
+        assert_eq!(buffer.cursor(), CursorPosition::new(0, 8));
+        assert!(buffer.is_dirty());
+    }
+
+    #[test]
+    fn undo_replays_scripted_history_exactly() {
+        type Step = fn(&mut EditorBuffer);
+        let steps: Vec<(Step, Step)> = vec![
+            (|b| b.set_cursor(0, 2), |b| b.insert_text("ÿ")),
+            (|_| {}, |b| b.insert_newline()),
+            (
+                |b| b.set_selection(CursorPosition::new(0, 1), CursorPosition::new(2, 3)),
+                |b| b.delete_backward(),
+            ),
+            (|b| b.select_all(), |b| b.insert_text("a\nb\r\nc")),
+            (|b| b.set_cursor(1, 0), |b| b.delete_backward()),
+            (|b| b.set_cursor(0, 0), |b| b.delete_forward()),
+            (
+                |b| b.set_selection(CursorPosition::new(0, 0), CursorPosition::new(1, 0)),
+                |b| {
+                    b.cut_selection();
+                },
+            ),
+            (|b| b.select_all(), |b| b.delete_forward()),
+        ];
+        let snapshot =
+            |b: &EditorBuffer| (b.text(), b.cursor(), b.normalized_selection(), b.is_dirty());
+
+        let mut buffer = EditorBuffer::from_text("héllo wörld\nsecond\n");
+        let mut states = Vec::new();
+        for (setup, edit) in &steps {
+            setup(&mut buffer);
+            states.push(snapshot(&buffer));
+            edit(&mut buffer);
+        }
+        assert_eq!(buffer.text(), "");
+
+        for expected in states.iter().rev() {
+            assert!(buffer.undo());
+            assert_eq!(&snapshot(&buffer), expected);
+        }
+        assert!(!buffer.undo());
+    }
+
+    #[test]
+    fn single_char_edits_retain_only_edit_deltas() {
+        let text = ("x".repeat(127) + "\n").repeat(8192);
+        let mut buffer = EditorBuffer::from_text(text.clone());
+        for _ in 0..64 {
+            buffer.insert_text("a");
+        }
+
+        let retained = buffer
+            .undo_stack
+            .iter()
+            .map(|edit| std::mem::size_of::<UndoEdit>() + edit.removed.capacity())
+            .sum::<usize>();
+        assert!(
+            retained < 16 * 1024,
+            "undo history retains {retained} bytes for 64 one-character edits"
+        );
+
+        for _ in 0..64 {
+            assert!(buffer.undo());
+        }
+        assert_eq!(buffer.text(), text);
+    }
+
+    #[test]
+    fn undo_restores_literal_carriage_returns_without_changing_clipboard_line_endings() {
+        for original in ["a\rb", "a\rb\nc", "a\rb\r\nc\r\n"] {
+            let mut buffer = EditorBuffer::from_text(original);
+            buffer.select_all();
+            assert_eq!(buffer.cut_selection().as_deref(), Some(original));
+            assert!(buffer.undo());
+            assert_eq!(buffer.text(), original);
+            buffer.insert_text("x\r\ny");
+            assert!(buffer.undo());
+            assert_eq!(buffer.text(), original);
+        }
+    }
+
+    #[test]
+    fn collapsed_selection_does_not_survive_a_line_join() {
+        let mut buffer = EditorBuffer::from_text("abc\n");
+        let cursor = CursorPosition::new(1, 0);
+        buffer.set_selection(cursor, cursor);
+        buffer.delete_backward();
+        assert_eq!(buffer.text(), "abc");
+        assert_eq!(buffer.selected_text(), None);
+        assert_eq!(buffer.cursor(), CursorPosition::new(0, 3));
+        assert!(buffer.undo());
+        assert_eq!(buffer.text(), "abc\n");
+        assert_eq!(buffer.cursor(), cursor);
+        assert_eq!(buffer.selected_text(), None);
     }
 
     fn unique_suffix() -> u128 {

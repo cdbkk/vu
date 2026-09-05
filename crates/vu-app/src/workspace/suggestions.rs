@@ -1,4 +1,9 @@
+use super::path_completion::{complete_path, path_token};
 use super::*;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 impl VuWorkspace {
     pub(super) fn record_shell_command(
@@ -101,138 +106,14 @@ impl VuWorkspace {
             .cloned()
     }
 
-    pub(super) fn local_path_completion_for_prefix(
-        &self,
-        tab_idx: usize,
-        pane_id: usize,
-        input: &str,
-        cx: &App,
-    ) -> Option<LocalPathCompletion> {
-        let pane_tree = &self.tabs.get(tab_idx)?.pane_tree;
-        let terminal = pane_tree
-            .pane_terminals()
-            .into_iter()
-            .find_map(|(id, terminal)| (id == pane_id).then_some(terminal))?;
-
-        if self
-            .effective_remote_host_for_tab(tab_idx, &terminal, cx)
-            .is_some()
-        {
-            return None;
-        }
-
-        let cwd = terminal.current_dir(cx)?;
-        let token_start = input
-            .char_indices()
-            .rev()
-            .find_map(|(idx, ch)| ch.is_whitespace().then_some(idx + ch.len_utf8()))
-            .unwrap_or(0);
-        let token = &input[token_start..];
-        if token.is_empty() {
-            return None;
-        }
-
-        let head = input[..token_start].trim_end();
-        let first_word = head.split_whitespace().next().unwrap_or_default();
-        let completes_path = first_word == "cd"
-            || token.starts_with('~')
-            || token.starts_with('.')
-            || token.contains('/');
-        if !completes_path {
-            return None;
-        }
-
-        let directories_only = first_word == "cd";
-        let home_dir = dirs::home_dir();
-        let (search_dir, dir_prefix, search_prefix) = if let Some(stripped) =
-            token.strip_prefix("~/")
-        {
-            let home = home_dir?;
-            match stripped.rsplit_once('/') {
-                Some((dir, prefix)) => (home.join(dir), format!("~/{dir}/"), prefix.to_string()),
-                None => (home, "~/".to_string(), stripped.to_string()),
-            }
-        } else if token == "~" {
-            let home = home_dir?;
-            (home, String::new(), "~".to_string())
-        } else if let Some((dir, prefix)) = token.rsplit_once('/') {
-            let base = if dir.is_empty() {
-                PathBuf::from("/")
-            } else if Path::new(dir).is_absolute() {
-                PathBuf::from(dir)
-            } else {
-                PathBuf::from(&cwd).join(dir)
-            };
-            (base, format!("{dir}/"), prefix.to_string())
-        } else {
-            (PathBuf::from(&cwd), String::new(), token.to_string())
-        };
-
-        let mut matches = std::fs::read_dir(&search_dir)
-            .ok()?
-            .filter_map(|entry| {
-                let entry = entry.ok()?;
-                let file_type = entry.file_type().ok()?;
-                if directories_only && !file_type.is_dir() {
-                    return None;
-                }
-                let name = entry.file_name().to_string_lossy().to_string();
-                name.starts_with(&search_prefix)
-                    .then_some((name, file_type.is_dir()))
-            })
-            .collect::<Vec<_>>();
-        if matches.is_empty() {
-            return None;
-        }
-        matches.sort_by(|a, b| a.0.cmp(&b.0));
-
-        let matched_name = if matches.len() == 1 {
-            let (name, is_dir) = &matches[0];
-            let mut single = name.clone();
-            if *is_dir {
-                single.push('/');
-            }
-            single
-        } else {
-            let prefix = longest_common_prefix(matches.iter().map(|(name, _)| name.as_str()));
-            if prefix.chars().count() <= search_prefix.chars().count() {
-                let candidates = matches
-                    .into_iter()
-                    .map(|(name, is_dir)| {
-                        let mut candidate = if token == "~" {
-                            name
-                        } else {
-                            format!("{dir_prefix}{name}")
-                        };
-                        if is_dir {
-                            candidate.push('/');
-                        }
-                        format!("{}{}", &input[..token_start], candidate)
-                    })
-                    .collect::<Vec<_>>();
-                return Some(LocalPathCompletion::Candidates(candidates));
-            }
-            prefix
-        };
-
-        let completed_token = if token == "~" {
-            matched_name
-        } else {
-            format!("{dir_prefix}{matched_name}")
-        };
-
-        Some(LocalPathCompletion::Inline(format!(
-            "{}{}",
-            &input[..token_start],
-            completed_token
-        )))
-    }
-
     pub(super) fn refresh_input_suggestion(
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.input_suggestion_cancel.store(true, Ordering::Relaxed);
+        self.input_suggestion_task.take();
+        self.input_suggestion_cancel = Arc::new(AtomicBool::new(false));
         if !self.has_active_tab() {
             self.input_bar
                 .update(cx, |bar, _| bar.clear_completion_ui());
@@ -257,17 +138,75 @@ impl VuWorkspace {
             .find_map(|(id, terminal)| (id == pane_id).then_some(terminal));
         let cwd = pane.as_ref().and_then(|pane| pane.current_dir(cx));
 
-        if let Some(path_match) =
-            self.local_path_completion_for_prefix(self.active_tab, pane_id, &text, cx)
+        if let Some(terminal) = pane.filter(|terminal| {
+            path_token(&text).is_some()
+                && self
+                    .effective_remote_host_for_tab(self.active_tab, terminal, cx)
+                    .is_none()
+        }) && let Some(cwd) = cwd.clone()
         {
-            self.input_bar.update(cx, |bar, _| match path_match {
-                LocalPathCompletion::Inline(completion) => {
-                    bar.set_path_inline_suggestion(&text, &completion)
+            let tab_id = self.tabs[self.active_tab].summary_id;
+            let terminal_id = terminal.entity_id();
+            let cancelled = self.input_suggestion_cancel.clone();
+            self.input_bar
+                .update(cx, |bar, _| bar.clear_completion_ui());
+            self.input_suggestion_task = Some(cx.spawn(async move |this, cx| {
+                cx.background_executor()
+                    .timer(Duration::from_millis(100))
+                    .await;
+                if cancelled.load(Ordering::Relaxed) {
+                    return;
                 }
-                LocalPathCompletion::Candidates(candidates) => {
-                    bar.set_path_completion_candidates(&text, candidates)
-                }
-            });
+                let search_cwd = cwd.clone();
+                let search_text = text.clone();
+                let result = cx
+                    .background_executor()
+                    .spawn(async move { complete_path(&search_cwd, &search_text, &cancelled) })
+                    .await;
+                let _ = this.update(cx, |workspace, cx| {
+                    let Some(tab) = workspace.tabs.get(workspace.active_tab) else {
+                        return;
+                    };
+                    if tab.summary_id != tab_id {
+                        return;
+                    }
+                    let Some(terminal) = tab
+                        .pane_tree
+                        .pane_terminals()
+                        .into_iter()
+                        .find_map(|(id, terminal)| (id == pane_id).then_some(terminal))
+                    else {
+                        return;
+                    };
+                    let bar = workspace.input_bar.read(cx);
+                    if terminal.entity_id() != terminal_id
+                        || terminal.current_dir(cx).as_deref() != Some(cwd.as_str())
+                        || workspace
+                            .effective_remote_host_for_tab(workspace.active_tab, &terminal, cx)
+                            .is_some()
+                        || bar.current_text(cx) != text
+                        || bar.target_pane_ids() != [pane_id]
+                    {
+                        return;
+                    }
+                    let history = workspace.history_completion_for_prefix(&text, Some(&cwd));
+                    workspace.input_bar.update(cx, |bar, _| match result {
+                        Some(LocalPathCompletion::Inline(completion)) => {
+                            bar.set_path_inline_suggestion(&text, &completion)
+                        }
+                        Some(LocalPathCompletion::Candidates(candidates)) => {
+                            bar.set_path_completion_candidates(&text, candidates)
+                        }
+                        None => match history {
+                            Some(completion) => {
+                                bar.set_history_inline_suggestion(&text, &completion)
+                            }
+                            None => bar.clear_completion_ui(),
+                        },
+                    });
+                    cx.notify();
+                });
+            }));
             return;
         }
 

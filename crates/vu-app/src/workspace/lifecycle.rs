@@ -65,7 +65,7 @@ impl VuWorkspace {
         .map(std::sync::Arc::new)
         .unwrap_or_else(|e| panic!("Fatal: failed to initialize Ghostty: {}", e));
         let session_save_tx = spawn_session_save_worker();
-        let (control_request_tx, control_request_rx) = crossbeam_channel::unbounded();
+        let (control_request_tx, mut control_request_rx) = tokio::sync::mpsc::unbounded_channel();
         let control_runtime = std::sync::Arc::new(
             tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(1)
@@ -413,25 +413,45 @@ impl VuWorkspace {
             }
         });
 
+        let terminal_wakeup = std::sync::Arc::new(tokio::sync::Notify::new());
+        #[cfg(target_os = "macos")]
+        ghostty_app.set_wakeup_callback({
+            let terminal_wakeup = terminal_wakeup.clone();
+            std::sync::Arc::new(move || terminal_wakeup.notify_one())
+        });
         cx.spawn(async move |this, cx| {
+            let mut next_request = None;
+            let mut control_open = true;
             loop {
-                let mut got_event = false;
-                this.update(cx, |workspace, cx| {
-                    while let Ok(request) = workspace.control_request_rx.try_recv() {
-                        got_event = true;
+                let alive = this.update(cx, |workspace, cx| {
+                    if workspace.window_close_prepared {
+                        return false;
+                    }
+                    if let Some(request) = next_request.take() {
+                        workspace.handle_control_request(request, cx);
+                    }
+                    while let Ok(request) = control_request_rx.try_recv() {
                         workspace.handle_control_request(request, cx);
                     }
                     if workspace.pump_ghostty_views(cx) {
-                        got_event = true;
                         cx.notify();
                     }
-                })
-                .ok();
+                    true
+                });
+                if !matches!(alive, Ok(true)) {
+                    break;
+                }
 
-                if !got_event {
-                    cx.background_executor()
-                        .timer(std::time::Duration::from_millis(8))
-                        .await;
+                // Non-macOS backends still require polling for surface events.
+                let fallback =
+                    Duration::from_millis(if cfg!(target_os = "macos") { 250 } else { 8 });
+                tokio::select! {
+                    request = control_request_rx.recv(), if control_open => {
+                        next_request = request;
+                        control_open = next_request.is_some();
+                    }
+                    _ = terminal_wakeup.notified() => {}
+                    _ = cx.background_executor().timer(fallback) => {}
                 }
             }
         })
@@ -486,6 +506,8 @@ impl VuWorkspace {
             background_image_fit,
             background_image_repeat,
             input_bar,
+            input_suggestion_cancel: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            input_suggestion_task: None,
             settings_panel,
             settings_window: None,
             settings_window_panel: None,
@@ -520,7 +542,6 @@ impl VuWorkspace {
             pending_window_control_requests: Vec::new(),
             pending_surface_control_requests: Vec::new(),
             surface_rename: None,
-            control_request_rx,
             _control_runtime: control_runtime,
             control_socket,
             next_tab_summary_id: next_tab_summary_id_init,
@@ -528,6 +549,7 @@ impl VuWorkspace {
             workspace_handle: cx.weak_entity(),
             window_close_prepared: false,
             session_save_tx,
+            session_save_task: RefCell::new(None),
             tab_rename: None,
             tab_rename_cancelled_generation: None,
             tab_rename_generation: 0,
@@ -878,45 +900,22 @@ impl VuWorkspace {
         let mut terminal_count = 0usize;
         let mut drain_count = 0usize;
 
-        for tab in &self.tabs {
+        let generation = self.ghostty_app.wake_generation();
+        let generation_changed = generation != self.last_ghostty_wake_generation;
+        self.last_ghostty_wake_generation = generation;
+        for (tab_index, tab) in self.tabs.iter().enumerate() {
+            let sync_native_scroll = generation_changed && tab_index == self.active_tab;
             for terminal in tab.pane_tree.all_surface_terminals() {
                 terminal_count += 1;
                 changed |= terminal.pump_surface_deferred_work(cx);
-            }
-        }
-
-        let generation = self.ghostty_app.wake_generation();
-        if generation == self.last_ghostty_wake_generation {
-            for tab in &self.tabs {
-                for terminal in tab.pane_tree.all_surface_terminals() {
-                    drain_count += 1;
-                    changed |= terminal.drain_surface_state_with_native_scroll(false, cx);
-                }
-            }
-            if let Some(started) = started {
-                if changed {
-                    log::info!(
-                        target: "vu::perf",
-                        "pump_ghostty_views generation_unchanged terminals={} drains={} changed=1 elapsed_ms={:.3}",
-                        terminal_count,
-                        drain_count,
-                        started.elapsed().as_secs_f64() * 1000.0
-                    );
-                }
-            }
-            return changed;
-        }
-
-        self.last_ghostty_wake_generation = generation;
-        for (tab_index, tab) in self.tabs.iter().enumerate() {
-            let sync_native_scroll = tab_index == self.active_tab;
-            for terminal in tab.pane_tree.all_surface_terminals() {
                 drain_count += 1;
                 changed |= terminal.drain_surface_state_with_native_scroll(sync_native_scroll, cx);
             }
         }
 
-        if let Some(started) = started {
+        if let Some(started) = started
+            && (generation_changed || changed)
+        {
             log::info!(
                 target: "vu::perf",
                 "pump_ghostty_views generation={} terminals={} drains={} changed={} elapsed_ms={:.3}",

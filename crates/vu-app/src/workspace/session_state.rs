@@ -98,6 +98,24 @@ impl VuWorkspace {
     }
 
     pub(super) fn save_session(&self, cx: &App) {
+        if self.window_close_prepared || self.session_save_task.borrow().is_some() {
+            return;
+        }
+        let workspace = self.workspace_handle.clone();
+        *self.session_save_task.borrow_mut() = Some(cx.spawn(async move |cx| {
+            cx.background_executor()
+                .timer(Duration::from_millis(150))
+                .await;
+            let _ = workspace.update(cx, |workspace, cx| {
+                workspace.session_save_task.borrow_mut().take();
+                if !workspace.window_close_prepared {
+                    workspace.queue_session_snapshot(cx);
+                }
+            });
+        }));
+    }
+
+    fn queue_session_snapshot(&self, cx: &App) {
         let session = self.snapshot_session(cx);
         let history = self.snapshot_global_history();
         if let Err(err) = self
@@ -109,6 +127,7 @@ impl VuWorkspace {
     }
 
     pub(super) fn flush_session_save(&self, cx: &App) {
+        self.session_save_task.borrow_mut().take();
         let session = self.snapshot_session(cx);
         let history = self.snapshot_global_history();
         let (done_tx, done_rx) = crossbeam_channel::bounded(1);

@@ -102,6 +102,7 @@ mod helpers;
 mod input_events;
 mod lifecycle;
 mod pane_actions;
+mod path_completion;
 mod render;
 mod session_state;
 mod session_worker;
@@ -147,6 +148,8 @@ pub struct VuWorkspace {
     background_image_fit: String,
     background_image_repeat: bool,
     input_bar: Entity<InputBar>,
+    input_suggestion_cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    input_suggestion_task: Option<Task<()>>,
     settings_panel: Entity<SettingsPanel>,
     settings_window: Option<AnyWindowHandle>,
     settings_window_panel: Option<Entity<SettingsPanel>>,
@@ -191,8 +194,6 @@ pub struct VuWorkspace {
     pending_surface_control_requests: Vec<PendingSurfaceControlRequest>,
     /// Inline editor for the pane-local surface rail.
     surface_rename: Option<SurfaceRenameEditor>,
-    /// Control-plane requests from the external `vu-cli` socket bridge.
-    control_request_rx: crossbeam_channel::Receiver<ControlRequestEnvelope>,
     /// Runtime backing the local control socket.
     _control_runtime: std::sync::Arc<tokio::runtime::Runtime>,
     /// Keeps the Unix socket alive for this workspace instance.
@@ -207,6 +208,7 @@ pub struct VuWorkspace {
     window_close_prepared: bool,
     /// Ordered, coalescing session persistence worker.
     session_save_tx: crossbeam_channel::Sender<SessionSaveRequest>,
+    session_save_task: RefCell<Option<Task<()>>>,
     /// Inline rename state for the horizontal tab strip.
     tab_rename: Option<TabRenameEditor>,
     /// Escape-cancel marker so the subsequent input blur does not

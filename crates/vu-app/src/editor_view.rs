@@ -79,7 +79,6 @@ pub struct EditorEmptied;
 impl EventEmitter<ActiveFileChanged> for EditorView {}
 impl EventEmitter<EditorEmptied> for EditorView {}
 
-#[derive(Clone)]
 pub struct EditorTab {
     pub path: PathBuf,
     buffer: EditorBuffer,
@@ -87,12 +86,13 @@ pub struct EditorTab {
     save_enabled: bool,
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 struct EditorRenderCache {
     key: Option<EditorRenderCacheKey>,
     lines: Arc<Vec<String>>,
     syntax_runs: Arc<Vec<Vec<gpui::TextRun>>>,
     widest_line_index: usize,
+    syntax: Option<editor_syntax::SyntaxState>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -158,6 +158,7 @@ impl EditorTab {
             let lines = Arc::new(self.buffer.lines().to_vec());
             let text = self.buffer.text();
             let syntax_runs = Arc::new(editor_syntax::highlighted_line_runs(
+                &mut self.render_cache.syntax,
                 &text,
                 &lines,
                 language,
@@ -178,6 +179,7 @@ impl EditorTab {
                 lines,
                 syntax_runs,
                 widest_line_index,
+                syntax: self.render_cache.syntax.take(),
             };
         }
 
@@ -1902,6 +1904,62 @@ mod tests {
             &first.syntax_runs,
             &third.syntax_runs
         ));
+    }
+
+    #[test]
+    fn editor_tab_retained_parser_matches_fresh_highlighting_after_edits() {
+        let mut tab = EditorTab::new(
+            PathBuf::from("src/main.rs"),
+            EditorBuffer::from_text("fn main() {\n    let x = 1;\n}\n"),
+        );
+        let theme = gpui_component::Theme::default();
+        let mono_font = SharedString::from("Test Mono");
+        let metrics = EditorMetrics::from_terminal_font_size(EDITOR_FONT_SIZE);
+
+        tab.render_snapshot(&theme, mono_font.clone(), metrics);
+        assert!(tab.render_cache.syntax.is_some());
+
+        tab.buffer.set_cursor(1, 4);
+        tab.buffer.insert_text("/* héllo 🌍 ");
+        let edited = tab.render_snapshot(&theme, mono_font.clone(), metrics);
+        tab.buffer.set_cursor(2, 0);
+        tab.buffer.insert_text("*/ ");
+        let closed = tab.render_snapshot(&theme, mono_font.clone(), metrics);
+        let bigger = tab.render_snapshot(
+            &theme,
+            mono_font.clone(),
+            EditorMetrics::from_terminal_font_size(EDITOR_FONT_SIZE + 4.0),
+        );
+
+        assert!(tab.render_cache.syntax.is_some());
+        assert_ne!(*edited.syntax_runs, *closed.syntax_runs);
+        assert!(!Arc::ptr_eq(&closed.syntax_runs, &bigger.syntax_runs));
+        let fresh = |metrics: EditorMetrics| {
+            editor_syntax::highlighted_line_runs(
+                &mut None,
+                &tab.buffer.text(),
+                tab.buffer.lines(),
+                Some("rust"),
+                &theme,
+                mono_font.clone(),
+                px(metrics.font_size),
+                px(metrics.line_height),
+            )
+        };
+        assert_eq!(*closed.syntax_runs, fresh(metrics));
+        assert_eq!(
+            *bigger.syntax_runs,
+            fresh(EditorMetrics::from_terminal_font_size(
+                EDITOR_FONT_SIZE + 4.0
+            ))
+        );
+
+        let mut plain = EditorTab::new(
+            PathBuf::from("notes.txt"),
+            EditorBuffer::from_text("plain text"),
+        );
+        plain.render_snapshot(&theme, mono_font, metrics);
+        assert!(plain.render_cache.syntax.is_none());
     }
 
     #[test]

@@ -228,6 +228,7 @@ pub(super) struct NSOperatingSystemVersion {
     pub(super) patch_version: isize,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub(super) enum LocalPathCompletion {
     Inline(String),
     Candidates(Vec<String>),

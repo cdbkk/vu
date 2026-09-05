@@ -536,6 +536,9 @@ impl VuWorkspace {
             return;
         }
         self.window_close_prepared = true;
+        self.input_suggestion_cancel
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.input_suggestion_task.take();
 
         self.flush_session_save(cx);
 

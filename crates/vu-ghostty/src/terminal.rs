@@ -542,6 +542,7 @@ struct GhosttyWakeHandle {
     app: AtomicPtr<c_void>,
     tick_scheduled: AtomicBool,
     generation: AtomicU64,
+    callback: Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
 }
 
 impl Default for GhosttyWakeHandle {
@@ -550,6 +551,17 @@ impl Default for GhosttyWakeHandle {
             app: AtomicPtr::new(std::ptr::null_mut()),
             tick_scheduled: AtomicBool::new(false),
             generation: AtomicU64::new(0),
+            callback: Mutex::new(None),
+        }
+    }
+}
+
+impl GhosttyWakeHandle {
+    fn finish_tick(&self) {
+        self.generation.fetch_add(1, Ordering::AcqRel);
+        let callback = self.callback.lock().clone();
+        if let Some(callback) = callback {
+            callback();
         }
     }
 }
@@ -606,6 +618,10 @@ impl GhosttyApp {
     /// Monotonic counter bumped after every Ghostty wakeup-driven app tick.
     pub fn wake_generation(&self) -> u64 {
         self.wake_handle.generation.load(Ordering::Acquire)
+    }
+
+    pub fn set_wakeup_callback(&self, callback: Arc<dyn Fn() + Send + Sync>) {
+        *self.wake_handle.callback.lock() = Some(callback);
     }
 
     /// Current configured terminal background, used by the embedding UI for
@@ -1386,7 +1402,7 @@ unsafe extern "C" fn wakeup_callback(userdata: *mut c_void) {
                 tick_elapsed.as_secs_f64() * 1000.0
             );
         }
-        wake_handle.generation.fetch_add(1, Ordering::AcqRel);
+        wake_handle.finish_tick();
     });
 }
 
@@ -1664,6 +1680,25 @@ mod tests {
         GhosttyConfigPatch, TerminalColors, TerminalState, Tweaks,
         installed_app_ghostty_resources_dir_for_exe, mark_child_exited_state,
     };
+
+    #[test]
+    fn completed_tick_notifies_after_publishing_generation_without_holding_callback_lock() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let wake = Arc::new(super::GhosttyWakeHandle::default());
+        let observed = Arc::new(AtomicU64::new(0));
+        let weak_wake = Arc::downgrade(&wake);
+        *wake.callback.lock() = Some({
+            let observed = observed.clone();
+            Arc::new(move || {
+                let wake = weak_wake.upgrade().unwrap();
+                assert!(wake.callback.try_lock().is_some());
+                observed.store(wake.generation.load(Ordering::Acquire), Ordering::Release);
+            })
+        });
+        wake.finish_tick();
+        wake.finish_tick();
+        assert_eq!(observed.load(Ordering::Acquire), 2);
+    }
 
     fn sample_colors(seed: u8) -> TerminalColors {
         TerminalColors {

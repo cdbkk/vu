@@ -3,11 +3,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use crossbeam_channel::Sender;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::runtime::Runtime;
+use tokio::sync::mpsc::UnboundedSender as Sender;
 use tokio::sync::oneshot;
 
 use crate::{PaneCreateLocation, TmuxExecLocation};
@@ -1591,6 +1591,35 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn control_request_wakes_receiver_and_returns_response() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let response = tokio::spawn(async move {
+            handle_json_rpc_request(
+                JsonRpcRequest {
+                    jsonrpc: JSON_RPC_VERSION.into(),
+                    id: Some(json!(42)),
+                    method: "system.identify".into(),
+                    params: Value::Null,
+                },
+                &tx,
+            )
+            .await
+        });
+        let request = tokio::time::timeout(std::time::Duration::from_secs(1), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(matches!(request.command, ControlCommand::SystemIdentify));
+        request
+            .response_tx
+            .send(Err(ControlError::internal("bridge test")))
+            .unwrap();
+        let response = response.await.unwrap();
+        assert_eq!(response.id, json!(42));
+        assert_eq!(response.error.unwrap().message, "bridge test");
+    }
 
     #[test]
     fn control_command_round_trips_from_rpc() {
