@@ -3,31 +3,68 @@
   "repository": "nowledge-co/vu-terminal",
   "defaultRef": "main",
   "extra": [
-    { "label": "Changelog", "path": "CHANGELOG.md", "route": "/changelog/" },
-    { "label": "License", "path": "LICENSE", "route": "/docs/license/" }
+    {
+      "label": "Changelog",
+      "path": "CHANGELOG.md",
+      "route": "/changelog/"
+    },
+    {
+      "label": "License",
+      "path": "LICENSE",
+      "route": "/docs/license/"
+    }
   ],
   "groups": [
     {
       "label": "Start",
       "items": [
-        { "label": "Welcome", "path": "docs/README.md", "route": "/docs/" },
-        { "label": "Install", "path": "docs/install.md" },
-        { "label": "Quick controls", "path": "docs/quick-controls.md" },
-        { "label": "Settings", "path": "docs/settings.md" }
+        {
+          "label": "Welcome",
+          "path": "docs/README.md",
+          "route": "/docs/"
+        },
+        {
+          "label": "Install",
+          "path": "docs/install.md"
+        },
+        {
+          "label": "Quick controls",
+          "path": "docs/quick-controls.md"
+        },
+        {
+          "label": "Settings",
+          "path": "docs/settings.md"
+        },
+        {
+          "label": "Customization",
+          "path": "docs/customization.md"
+        }
       ]
     },
     {
       "label": "Use vu",
       "items": [
-        { "label": "Terminal workflows", "path": "docs/terminal-workflows.md" },
-        { "label": "Workspace profiles", "path": "docs/workspace-layout-profiles-guide.md" },
-        { "label": "Screenshots", "path": "docs/screenshots.md" }
+        {
+          "label": "Terminal workflows",
+          "path": "docs/terminal-workflows.md"
+        },
+        {
+          "label": "Workspace profiles",
+          "path": "docs/workspace-layout-profiles-guide.md"
+        },
+        {
+          "label": "Screenshots",
+          "path": "docs/screenshots.md"
+        }
       ]
     },
     {
       "label": "Build on vu",
       "items": [
-        { "label": "vu-cli and surfaces", "path": "docs/cli.md" }
+        {
+          "label": "vu-cli and surfaces",
+          "path": "docs/cli.md"
+        }
       ]
     }
   ]

@@ -34,11 +34,17 @@ a settings panel that applies live. No config archaeology.
 
 ### Make it yours
 
-- built-in themes with live previews, plus Ghostty theme import and export
+<img src="docs/media/vu-03-customize.png" width="1080" alt="vu Appearance settings with the theme picker, font controls, and the live palette editor" />
+
+- 15 built-in themes with live previews, plus Ghostty theme import and export
 - a full ANSI palette editor with a color picker per slot
 - separate terminal and interface fonts
-- opacity, blur, background images, tab placement, pane chrome, cursor style, and icon scale
+- opacity, blur, background images, tab placement and strip colors, pane chrome, cursor style, and icon scale
 - editable shortcuts with conflict detection
+
+Everything above is in the Settings window (<kbd>⌘</kbd> <kbd>,</kbd>) and in
+one `config.toml`. The [customization guide](docs/customization.md) lists every
+key, the theme file format, and a complete annotated config.
 
 ### Work in it
 
@@ -99,7 +105,8 @@ See the [install guide](docs/install.md) for platform prerequisites and
 ## Start here
 
 - [Quick controls](docs/quick-controls.md)
-- [Appearance and settings](docs/settings.md)
+- [Settings](docs/settings.md)
+- [Customization](docs/customization.md)
 - [Terminal workflows](docs/terminal-workflows.md)
 - [CLI and control plane](docs/cli.md)
 - [Architecture](DESIGN.md)
